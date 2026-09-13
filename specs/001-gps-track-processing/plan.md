@@ -20,7 +20,7 @@ abordagem técnica segue arquitetura hexagonal: o núcleo (`internal/domain` +
 biblioteca de parsing/algoritmo concreta vive em adapters de saída
 (`internal/infra/outbound`), e a CLI (`internal/infra/inbound/cli`, via
 Cobra) é o único adapter de entrada desta etapa, convertendo flags em um DTO
-de entrada e formatando o DTO de saída do caso de uso `InspectTrack` — sem
+de entrada e formatando o DTO de saída do serviço `InspectTrackService` — sem
 nenhuma regra de negócio duplicada nele.
 
 ## Contexto Técnico
@@ -35,10 +35,15 @@ de GPX); `github.com/stretchr/testify` (asserções de teste); `go.uber.org/mock
 persiste nenhum estado
 
 **Testes**: `go test` com `testify` (assert/require) para todo o núcleo e os
-adapters; testes de tabela para as funções puras do domínio (incluindo casos
-de antimeridiano e equador); mocks gerados com `go.uber.org/mock` para as
-portas `TrackParser`, `Simplifier` e `Smoother` nos testes de
-`internal/application`; testes do comando Cobra via `cmd.SetArgs`/`SetOut`
+adapters, no formato given/when/then (comentários `// given`/`// when`/
+`// then`, sem tabelas de casos), com builders de dados de teste
+(`build_domain`, `build_application`) onde isso deixa o teste mais legível;
+casos explícitos de antimeridiano e equador nas funções puras do domínio;
+mocks gerados com `go.uber.org/mock` para as portas `TrackParser`,
+`Simplifier` e `Smoother` nos testes de `internal/application`, e para o
+serviço `InspectTrackService` nos testes de `internal/infra/inbound/cli`
+(a CLI nunca é testada contra a implementação real do serviço); testes do
+comando Cobra via `cmd.SetArgs`/`SetOut`
 
 **Plataforma-Alvo**: binário de linha de comando multiplataforma (Linux,
 macOS, Windows) — sem dependência de sistema operacional específico
@@ -68,12 +73,12 @@ de milhares de pontos
 |---|---|---|
 | I. Arquitetura Hexagonal | PASSA | `internal/domain` contém só entidades (`TrackPoint`, `Track`, `Route`, `BoundingBox`), portas (`TrackParser`, `Simplifier`, `Smoother`) e funções puras (Haversine, elevação, bounding box, descarte). Nenhum desses arquivos importa `gpxgo`, `encoding/xml` para parsing real, ou qualquer pacote de `internal/infra`. |
 | II. Portas para Toda Dependência Externa | PASSA | Parsing de GPX e os algoritmos de simplificação/suavização são acessados via `TrackParser`, `Simplifier` e `Smoother`, declaradas no domínio e implementadas em `internal/infra/outbound/*`. |
-| III. Entrypoints Descartáveis | PASSA | `InspectTrack` (em `internal/application`) recebe/devolve apenas DTOs de dados (`InspectTrackInput`/`Output`); a CLI é o único adapter que existe hoje, mas o caso de uso não conhece Cobra, flags, nem formatação de texto — pronto para um adapter HTTP futuro sem alteração. |
+| III. Entrypoints Descartáveis | PASSA | `InspectTrackService` (em `internal/application`) recebe/devolve apenas DTOs de dados (`InspectTrackInput`/`Output`); a CLI depende apenas da interface e é o único adapter que existe hoje, mas o serviço não conhece Cobra, flags, nem formatação de texto — pronto para um adapter HTTP futuro sem alteração. |
 | IV. Neutralidade Geográfica | PASSA | Nenhum dado de mapa/relevo/coordenada embutido; o cálculo de bounding box trata o antimeridiano algebricamente (unwrap de longitude), sem tabela ou suposição de região (ver `research.md` item 6). |
 | V. Funcionamento Offline | PASSA | `gpxgo` opera sobre bytes já lidos do arquivo local; nenhuma chamada de rede em nenhum adapter desta etapa. |
 | VI. Testes Automatizados no Núcleo | PASSA | Domínio testado por tabelas puras (sem I/O); `internal/application` testado com mocks de `TrackParser`/`Simplifier`/`Smoother` gerados por `go.uber.org/mock`; meta de cobertura alta no núcleo, com casos explícitos de antimeridiano e equador. |
 | VII. Erros Sentinela no Domínio | PASSA | `ErrEmptyFile`, `ErrUnsupportedFormat`, `ErrInsufficientPoints`, `ErrInsufficientPointsAfterCleaning` declarados em `internal/domain`; a CLI os traduz em códigos de saída de processo (ver `contracts/cli.md`); a tradução para status HTTP fica pronta para um adapter futuro, sem exigir mudança no domínio. |
-| VIII. Configuração Injetada | PASSA | Os limiares internos (mínimo de pontos, velocidade máxima plausível, nível padrão) são resolvidos por `internal/infra/outbound/config` e injetados no caso de uso por quem monta a CLI (`cmd/sobrevoo`); o núcleo nunca lê variável de ambiente, arquivo, ou flag diretamente. |
+| VIII. Configuração Injetada | PASSA | Os limiares internos (mínimo de pontos, velocidade máxima plausível, nível padrão) são resolvidos por `internal/infra/outbound/config` e injetados no serviço por quem monta a CLI (`cmd/sobrevoo`); o núcleo nunca lê variável de ambiente, arquivo, ou flag diretamente. |
 | Idioma dos Artefatos | PASSA | Este plano, o `research.md`, `data-model.md`, `contracts/cli.md` e `quickstart.md` estão em português do Brasil; identificadores, nomes de pacote/arquivo e comentários de código (a serem escritos na fase de implementação) permanecerão em inglês. Adicionalmente, por decisão do usuário, todo o I/O em tempo de execução da própria ferramenta (valores de flag como `low`/`medium`/`high`, texto do resumo, mensagens de erro) também é em inglês — ver `research.md` item 11 e a nota de escopo em `spec.md`. |
 
 Nenhuma violação identificada. A seção de Rastreamento de Complexidade não se
@@ -111,14 +116,18 @@ internal/
 │   ├── discard_stats.go                     # DiscardStats
 │   ├── cleaning.go                          # ReorderByTime, Discard* (funções puras)
 │   ├── distance.go                          # Haversine, TotalDistance
+│   ├── duration.go                          # Duration
 │   ├── elevation.go                         # ElevationGain
 │   ├── simplification.go                    # porta Simplifier (não pertence a uma única entidade)
 │   ├── smoothing.go                         # porta Smoother (não pertence a uma única entidade)
 │   ├── errors.go                            # erros sentinela (ErrEmptyFile, ErrUnsupportedFormat, ...)
+│   ├── build_domain/                        # test data builders (ex.: TrackPointBuilder, TrackBuilder)
 │   └── mock_domain/                         # mocks gerados (go.uber.org/mock), um arquivo por porta
 │
 ├── application/
-│   └── inspect_track.go                     # caso de uso InspectTrack + InspectTrackInput/Output
+│   ├── inspect_track_service.go             # InspectTrackService (interface) + inspectTrackService + InspectTrackInput/Output
+│   ├── build_application/                   # test data builders (ex.: InspectTrackOutputBuilder)
+│   └── mock_application/                    # mock gerado (go.uber.org/mock) de InspectTrackService
 │
 └── infra/
     ├── outbound/
@@ -136,13 +145,8 @@ internal/
             ├── root.go                       # comando raiz Cobra
             └── inspect.go                    # comando `inspect`: flags → InspectTrackInput, formata InspectTrackOutput
 
-pkg/
-└── ptr/
-    └── ptr.go                                # helper genérico Of[T](v T) *T, usado pelos campos opcionais dos DTOs
-
 test/
 └── helper/
-    ├── trackpoint.go                         # builders de TrackPoint/Track para testes
     └── gpx_fixture.go                        # geração de conteúdo GPX de teste (válido/inválido)
 ```
 
@@ -161,8 +165,24 @@ específica fica no arquivo dessa entidade (`TrackParser` em `track.go`, pois
 produz `Track`); uma interface sem entidade dona ganha um arquivo próprio
 nomeado pelo conceito que representa (`Simplifier` em `simplification.go`,
 `Smoother` em `smoothing.go`). Os mocks seguem o mesmo padrão do repositório
-de referência: gerados em `internal/domain/mock_domain/`, um arquivo por
-porta, via `//go:generate` posicionado junto da própria interface.
+de referência: gerados em `<pacote>/mock_<pacote>/`, um arquivo por
+porta/serviço, via `//go:generate` posicionado junto da própria interface.
+
+A camada de `internal/application` é a *service layer* do projeto — cada
+caso de uso é modelado como uma interface exportada (`InspectTrackService`)
+implementada por uma struct não exportada (`inspectTrackService`), construída
+por `NewInspectTrackService(...)`, também espelhando
+`waliqueiroz/mystery-gifter-api`. Isso permite que adapters de entrada (como
+a CLI) dependam apenas da interface, e a substituam por um mock nos próprios
+testes de unidade — os testes de `internal/infra/inbound/cli` nunca
+executam a implementação real do serviço nem dos adapters de saída.
+
+Testes de unidade seguem o formato given/when/then (comentários `// given`,
+`// when`, `// then` dentro de cada `t.Run`), sem tabelas de casos
+(`[]struct{...}`) — um `t.Run` por cenário, ainda que isso repita alguma
+configuração entre cenários. Builders de dados de teste (`build_domain`,
+`build_application`) substituem literais de struct repetidos quando isso
+deixa o teste mais legível.
 
 ## Rastreamento de Complexidade
 

@@ -234,13 +234,28 @@ pelo usuário e da especificação já clarificada.
 ## 12. Testes do comando Cobra
 
 - **Decisão**: testar o comando `inspect` via `cmd.SetArgs(...)`,
-  `cmd.SetOut(&buf)` e `cmd.Execute()`, fornecendo arquivos de fixture GPX
-  (válidos e inválidos) via `test/helper`, e comparando a saída de texto e o
-  erro/código de saída resultante.
-- **Racional**: é o padrão idiomático de teste de comandos Cobra, evita
-  precisar rodar o binário compilado, e mantém o teste rápido e determinístico
-  (sem tocar em stdin/stdout reais).
-- **Alternativas consideradas**: testar via `os/exec` rodando o binário
-  compilado (rejeitada — mais lento e desnecessário para validar a lógica de
-  conversão flags → input e formatação de saída, que é o único papel deste
-  adapter).
+  `cmd.SetOut(&buf)` e `cmd.Execute()`, com `InspectTrackService` **mockado**
+  (`mock_application.NewMockInspectTrackService`, gerado com
+  `go.uber.org/mock`) — nunca com a implementação real do serviço nem com os
+  adapters reais de parsing/simplificação/suavização. Superada uma decisão
+  anterior deste item, que usava arquivos de fixture GPX reais fim a fim
+  através da CLI.
+- **Racional**: mantém a CLI testável de forma independente da camada de
+  aplicação (e, por consequência, de todo adapter de saída por trás dela),
+  como um teste de unidade de verdade — a CLI só é responsável por
+  parsing de flags/argumentos, tradução de erro para código de saída, e
+  formatação de texto; nenhuma dessas responsabilidades exige um `Track` real
+  passando pelo pipeline de tratamento. Os cenários que antes validavam o
+  pipeline real fim a fim (antimeridiano, motivos de descarte, efeito dos
+  níveis de simplificação/suavização) migraram para os testes de
+  `internal/application` (que já mockam `TrackParser`/`Simplifier`/
+  `Smoother`, mas exercitam as funções puras reais de limpeza do domínio) e
+  para os testes próprios de cada adapter de saída; a verificação de ponta a
+  ponta com um binário real fica a cargo da validação manual do
+  `quickstart.md`.
+- **Alternativas consideradas**: fixtures GPX reais fim a fim através da CLI
+  (decisão anterior, superada — acopla o teste da CLI à implementação real do
+  serviço e de todos os adapters de saída, e não é um teste de unidade);
+  testar via `os/exec` rodando o binário compilado (rejeitada — mais lento e
+  desnecessário para validar a lógica de conversão flags → input e formatação
+  de saída, que é o único papel deste adapter).
