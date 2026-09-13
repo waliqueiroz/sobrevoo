@@ -1,37 +1,31 @@
 <!--
 Sync Impact Report
 ==================
-Version change: (none) → 1.0.0
-Rationale: Initial ratification of the project constitution. No prior version existed.
+Version change: 1.1.0 → 1.1.1
+Rationale: PATCH — clarified that the pt-BR language policy also covers
+repository guidance documents aimed at people or coding agents (e.g.
+CLAUDE.md), not only Spec Kit flow artifacts. Triggered by CLAUDE.md having
+been generated in English in this session, which the user flagged as a
+violation of the language policy's intent. No principle added, removed, or
+redefined; no new governance introduced.
 
-Modified principles: N/A (initial adoption)
+Modified sections:
+  - Stack Tecnológica e Idioma dos Artefatos — extended the pt-BR requirement
+    to repository guidance docs (CLAUDE.md or equivalent), with code blocks,
+    commands, paths and identifiers still in English.
 
-Added sections:
-  - Core Principles (I–VIII):
-    I. Arquitetura Hexagonal (Núcleo Isolado)
-    II. Portas para Toda Dependência Externa
-    III. Entrypoints Descartáveis
-    IV. Neutralidade Geográfica
-    V. Funcionamento Offline
-    VI. Testes Automatizados no Núcleo
-    VII. Erros Sentinela no Domínio
-    VIII. Configuração Injetada
-  - Stack Tecnológica e Idioma dos Artefatos
-  - Fluxo de Desenvolvimento e Verificação de Conformidade
-  - Governance
-
-Removed sections: N/A (initial adoption)
+Added principles: N/A
+Removed sections: N/A
 
 Templates requiring alignment review:
-  - .specify/templates/plan-template.md — ⚠ pending manual check that the "Constitution
-    Check" gate references these eight principles explicitly.
-  - .specify/templates/spec-template.md — ⚠ pending manual check for language-policy
-    consistency (spec artifacts in pt-BR).
-  - .specify/templates/tasks-template.md — ⚠ pending manual check for hexagonal
-    boundary phrasing (domain/application vs. infra/outbound).
-  - Command prompts under .claude/commands/ or equivalent — no agent-specific runtime
-    guidance file (e.g. CLAUDE.md) was found in the repository at ratification time;
-    none updated.
+  - .specify/templates/plan-template.md — ⚠ still pending manual check that the
+    "Constitution Check" gate references all ten principles explicitly (was eight,
+    from the previous 1.0.0 → 1.1.0 amendment).
+  - .specify/templates/tasks-template.md — ⚠ still pending manual check that generated
+    task descriptions follow the given/when/then + no-table-tests convention
+    (Principle X) and the ports/service-layer file-naming convention (Principle IX).
+  - CLAUDE.md — MUST be rewritten in Portuguese prose (code/commands/paths/identifiers
+    stay in English) to comply with this amendment.
 
 Follow-up TODOs:
   - None. All placeholders were resolved from user-supplied input.
@@ -122,6 +116,68 @@ de um entrypoint específico, e permite que adapters futuros configurem os mesmo
 casos de uso por vias diferentes (flags vs. corpo de requisição HTTP, etc.) sem
 tocar na application layer.
 
+### IX. Organização de Portas, Service Layer e Mocks
+Nenhum arquivo de porta genérico (`ports.go`, `interfaces.go`) é permitido em
+nenhuma camada. Uma interface que manipula ou produz uma entidade específica
+MUST ser declarada no mesmo arquivo dessa entidade (por exemplo, `TrackParser`
+em `track.go`, pois produz `Track`). Uma interface sem entidade dona MUST
+ganhar um arquivo próprio, nomeado pelo conceito que representa (por exemplo,
+`Simplifier` em `simplification.go`, `Smoother` em `smoothing.go`).
+
+Cada caso de uso em `internal/application` — a service layer do projeto —
+MUST ser modelado como uma interface exportada terminada em `Service` (por
+exemplo, `InspectTrackService`), implementada por uma struct não exportada
+com o mesmo nome em minúsculas (`inspectTrackService`), construída por uma
+função `NewXService(...)`. Um adapter de entrada MUST depender exclusivamente
+da interface, nunca da struct concreta.
+
+Mocks de qualquer interface — porta de domínio ou serviço de aplicação —
+MUST ser gerados com `go.uber.org/mock/mockgen`, via diretiva `//go:generate`
+posicionada imediatamente acima da própria interface, nunca centralizada em
+um arquivo à parte. A saída MUST viver em um subpacote `mock_<nome do
+pacote>` dentro do pacote onde a interface é declarada (por exemplo,
+`internal/domain/mock_domain`, `internal/application/mock_application`), um
+arquivo gerado por interface.
+**Rationale**: nomes de arquivo genéricos escondem o que o código realmente
+faz e viram um "catch-all" para qualquer interface nova, independentemente de
+ela pertencer ali. Nomear a service layer de forma consistente
+(`XService`/`xService`/`NewXService`) e mantê-la sempre atrás de uma
+interface é o que permite a um adapter de entrada (CLI hoje, REST amanhã) ser
+testado sem nunca instanciar a implementação real — pré-requisito para o
+Princípio X. Gerar os mocks junto da interface que representam, em vez de
+centralizados, evita que a geração de mocks de um pacote dependa de outro.
+
+### X. Testes: Given/When/Then, Builders e Isolamento por Camada
+Todo teste unitário MUST ser escrito como um ou mais
+`t.Run("should ...", func(t *testing.T) {...})`, com comentários `// given`,
+`// when` e `// then` demarcando cada etapa dentro do subteste. Testes
+tabulares (`[]struct{...}` percorrido por um `for` que gera os casos) são
+PROIBIDOS — cada cenário MUST ser seu próprio `t.Run`, mesmo que isso repita
+configuração entre cenários.
+
+Quando a construção de uma entidade ou DTO em teste é repetitiva ou tem
+muitos campos, um builder fluente MUST ser criado em um subpacote
+`build_<nome do pacote>` (por exemplo, `internal/domain/build_domain`,
+`internal/application/build_application`), no formato `NewXBuilder()` com
+defaults sensatos, métodos `WithCampo(...)`/`WithoutCampo()` retornando o
+próprio builder, e um método terminal `Build()`.
+
+Cada camada MUST ser testada isoladamente das demais: o núcleo (domain +
+application) é testado com portas mockadas, nunca com adapters reais; um
+adapter de entrada (por exemplo, a CLI) MUST ser testado com a service layer
+mockada, nunca com a implementação real do serviço nem com os adapters de
+saída reais por trás dele. Nenhuma suíte automatizada substitui uma
+verificação de integração real de ponta a ponta — quando essa verificação é
+necessária, ela é manual (por exemplo, via `quickstart.md`).
+**Rationale**: o formato given/when/then torna a intenção de cada teste
+legível sem decifrar uma tabela de casos, e proibir testes tabulares evita
+que um único `t.Run` combine múltiplas asserções não relacionadas sob um
+nome genérico. Builders eliminam a repetição de literais de struct extensos
+sem esconder o dado relevante para o cenário sendo testado. Isolar cada
+camada atrás de mocks é o que torna possível testar um adapter de entrada
+sem reexecutar toda a lógica de negócio a cada mudança — a mesma disciplina
+que o Princípio VI já exige do núcleo, estendida para os adapters.
+
 ## Stack Tecnológica e Idioma dos Artefatos
 
 Sobrevoo é implementado em Go, como projeto pessoal e open source.
@@ -129,7 +185,11 @@ Sobrevoo é implementado em Go, como projeto pessoal e open source.
 Todos os artefatos de especificação do fluxo Spec Kit — `spec.md`, `plan.md`,
 `tasks.md`, `research.md`, checklists, e qualquer documento gerado por esse fluxo
 — assim como toda comunicação conduzida durante o fluxo, DEVEM ser escritos em
-português do Brasil.
+português do Brasil. A mesma regra se aplica a qualquer documento de orientação
+do repositório dirigido a pessoas ou a agentes de codificação (por exemplo,
+`CLAUDE.md` ou equivalente) — a prosa MUST estar em português do Brasil, com
+blocos de código, comandos, caminhos de arquivo e identificadores permanecendo
+em inglês, como em qualquer outro artefato deste projeto.
 
 Código-fonte, identificadores, nomes de pacotes, nomes de arquivos, nomes de
 branch, mensagens de commit e comentários no código permanecem em inglês. Termos
@@ -148,7 +208,7 @@ adição seja código de acoplamento (glue code) estritamente limitado ao adapte
 isso esteja explicitado na descrição da mudança.
 
 A seção "Constitution Check" dos artefatos de planejamento do Spec Kit MUST
-confirmar, para cada um dos oito princípios acima, que ele não foi violado antes
+confirmar, para cada um dos dez princípios acima, que ele não foi violado antes
 de a fase de implementação começar.
 
 ## Governance
@@ -175,4 +235,4 @@ antes do início da implementação. Qualquer desvio MUST ser justificado
 explicitamente na seção de Complexity Tracking do plano, ou o desvio MUST ser
 eliminado.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.1.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
