@@ -12,10 +12,29 @@
 
 ### Session 2026-09-13
 
-- Q: Quais formatos de arquivo de rastreamento GPS a ferramenta deve reconhecer e aceitar nesta primeira etapa? → A: GPX e TCX
+- Q: Quais formatos de arquivo de rastreamento GPS a ferramenta deve reconhecer e aceitar nesta primeira etapa? → A: GPX e TCX (decisão posteriormente revista — ver nota abaixo)
+
+**Nota de escopo (2026-09-13, durante o planejamento)**: por pedido do usuário,
+o suporte a TCX foi removido desta primeira etapa para simplificar a
+implementação. Nesta etapa a ferramenta reconhece exclusivamente o formato
+GPX. FR-002, FR-003 e a suposição correspondente foram atualizados de acordo.
+Suporte a formatos adicionais (TCX, FIT, ou outros) continua possível em
+etapas futuras, sem impacto na arquitetura, graças à porta `TrackParser`
+(Princípio II da constituição).
 - Q: O que a ferramenta deve fazer quando, após o descarte de pontos problemáticos, sobrarem menos pontos do que o mínimo necessário para gerar o resumo? → A: Recusar o arquivo, com a mesma mensagem de "pontos insuficientes", mencionando que isso ocorreu após a limpeza
-- Q: Como o usuário deve informar os níveis de simplificação e de suavização ao executar a ferramenta? → A: Predefinições nomeadas (baixo, médio, alto) para simplificação e para suavização
+- Q: Como o usuário deve informar os níveis de simplificação e de suavização ao executar a ferramenta? → A: Predefinições nomeadas (low, medium, high) para simplificação e para suavização
 - Q: O que a ferramenta deve fazer quando os pontos do arquivo não estão em ordem cronológica crescente (timestamps fora de ordem)? → A: Reordenar os pontos por timestamp antes do tratamento
+
+**Nota de escopo (2026-09-13, durante o planejamento)**: por pedido do
+usuário, toda a entrada e saída em tempo de execução da ferramenta (valores de
+flag, textos do resumo, mensagens de erro) DEVE ser em inglês — não apenas os
+nomes das flags. Os nomes das predefinições de simplificação e suavização
+citados nesta especificação (FR-014, FR-015, FR-016, SC-006, SC-007 e os
+cenários de aceitação da História de Usuário 4) usam os termos em inglês
+`low`, `medium` e `high`, tratados como valores literais da interface, não
+como texto a ser traduzido — de forma equivalente a um nome de formato como
+"GPX". O restante da narrativa desta especificação permanece em português do
+Brasil, conforme a política de idioma da constituição.
 
 ## Cenários de Usuário e Testes *(obrigatório)*
 
@@ -170,15 +189,15 @@ geral do trajeto original.
    e o resumo mostra uma quantidade de pontos após o tratamento menor que a
    original, preservando o formato geral do trajeto.
 2. **Dado** o mesmo arquivo de rastreamento GPS, **Quando** o usuário processa
-   esse arquivo escolhendo o nível "alto" de simplificação, **Então** a
+   esse arquivo escolhendo o nível "high" de simplificação, **Então** a
    quantidade de pontos após o tratamento é menor do que a obtida com o nível
-   "médio" (padrão), e essa por sua vez é menor do que a obtida com o nível
-   "baixo".
+   "medium" (padrão), e essa por sua vez é menor do que a obtida com o nível
+   "low".
 3. **Dado** o mesmo arquivo de rastreamento GPS, **Quando** o usuário escolhe o
-   nível "alto" de suavização, **Então** o traçado resultante apresenta menos
-   variações bruscas ponto a ponto do que o obtido com o nível "médio"
+   nível "high" de suavização, **Então** o traçado resultante apresenta menos
+   variações bruscas ponto a ponto do que o obtido com o nível "medium"
    (padrão), e essa por sua vez apresenta menos variações bruscas do que o
-   obtido com o nível "baixo".
+   obtido com o nível "low".
 
 ### Casos Extremos
 
@@ -208,7 +227,7 @@ geral do trajeto original.
 - **FR-002**: O sistema DEVE identificar o formato do arquivo de rastreamento
   pelo próprio conteúdo, sem exigir que o usuário informe o formato ou dependa
   da extensão do arquivo.
-- **FR-003**: O sistema DEVE suportar os formatos GPX e TCX de arquivo de
+- **FR-003**: O sistema DEVE suportar o formato GPX de arquivo de
   rastreamento GPS de atividades (corrida, pedalada, caminhada).
 - **FR-004**: O sistema DEVE recusar o processamento de um arquivo cujo
   conteúdo não corresponda a nenhum formato de rastreamento suportado,
@@ -241,11 +260,12 @@ geral do trajeto original.
 - **FR-013**: O sistema DEVE suavizar o traçado do trajeto tratado para reduzir
   a trepidação característica de leituras de GPS.
 - **FR-014**: O sistema DEVE permitir que o usuário escolha o nível de
-  simplificação aplicado à redução de pontos entre as predefinições baixo,
-  médio e alto.
+  simplificação aplicado à redução de pontos entre as predefinições `low`,
+  `medium` e `high`.
 - **FR-015**: O sistema DEVE permitir que o usuário escolha o nível de
-  suavização aplicado ao traçado entre as predefinições baixo, médio e alto.
-- **FR-016**: O sistema DEVE aplicar o nível médio de simplificação e de
+  suavização aplicado ao traçado entre as predefinições `low`, `medium` e
+  `high`.
+- **FR-016**: O sistema DEVE aplicar o nível `medium` de simplificação e de
   suavização quando o usuário não informar um nível explícito.
 - **FR-017**: O sistema DEVE calcular a distância total do trajeto após o
   tratamento dos pontos.
@@ -317,19 +337,19 @@ geral do trajeto original.
 - **SC-005**: Um trajeto de até 20.000 pontos (equivalente a uma atividade de
   várias horas com registro a cada segundo) tem seu resumo apresentado em menos
   de 5 segundos.
-- **SC-006**: Para um mesmo trajeto de entrada, aplicar os níveis baixo, médio
-  e alto de simplificação produz quantidades de pontos finais visivelmente
-  diferentes e decrescentes entre si (baixo > médio > alto).
-- **SC-007**: Para um mesmo trajeto de entrada, aplicar os níveis baixo, médio
-  e alto de suavização produz traçados com visivelmente menos variação brusca
-  ponto a ponto à medida que o nível aumenta.
+- **SC-006**: Para um mesmo trajeto de entrada, aplicar os níveis `low`,
+  `medium` e `high` de simplificação produz quantidades de pontos finais
+  visivelmente diferentes e decrescentes entre si (`low` > `medium` > `high`).
+- **SC-007**: Para um mesmo trajeto de entrada, aplicar os níveis `low`,
+  `medium` e `high` de suavização produz traçados com visivelmente menos
+  variação brusca ponto a ponto à medida que o nível aumenta.
 
 ## Suposições
 
-- Os formatos GPX e TCX (ver FR-003) são baseados em texto estruturado (XML),
-  o que permite identificá-los pelo conteúdo sem ambiguidade. Formatos
-  adicionais (por exemplo, FIT) podem ser suportados em etapas futuras sem
-  alterar esta especificação.
+- O formato GPX (ver FR-003) é baseado em texto estruturado (XML), o que
+  permite identificá-lo pelo conteúdo sem ambiguidade. Formatos adicionais
+  (por exemplo, TCX, FIT) podem ser suportados em etapas futuras sem alterar
+  a arquitetura desta especificação.
 - Um arquivo com menos de dois pontos válidos é considerado insuficiente, pois
   não é possível calcular distância, área ou traçado a partir de um único
   ponto.
@@ -347,8 +367,13 @@ geral do trajeto original.
   já que a ferramenta deve se comportar de forma idêntica para qualquer região
   do planeta, sem preferência de unidade por localidade.
 - Os níveis de simplificação e de suavização são escolhidos pelo usuário entre
-  as predefinições baixo, médio e alto (ver FR-014, FR-015 e FR-016); o nível
-  médio é aplicado quando o usuário não informa um nível explícito.
+  as predefinições `low`, `medium` e `high` (ver FR-014, FR-015 e FR-016); o
+  nível `medium` é aplicado quando o usuário não informa um nível explícito.
+- Toda entrada e saída em tempo de execução da ferramenta (valores de flag,
+  texto do resumo, mensagens de erro) é em inglês, independentemente de os
+  demais artefatos desta funcionalidade (esta especificação, o plano, etc.)
+  serem escritos em português do Brasil (ver nota de escopo em
+  `## Clarifications`).
 - Conforme informado pelo usuário, ficam fora do escopo desta etapa: dados de
   mapa, dados de relevo, renderização, geração de vídeo, interface gráfica e
   API — o resultado desta etapa é exclusivamente o trajeto lido, tratado, e o
