@@ -164,10 +164,11 @@ sem dependência externa (Princípio I):
 | `Duration` | Diferença entre o tempo do primeiro e do último ponto; segundo retorno indica se havia dado de tempo. | FR-020, FR-021 |
 | `ComputeBoundingBox` | Área geográfica ocupada, com tratamento de antimeridiano. | FR-022, FR-023, FR-024 |
 
-## DTOs da camada de aplicação
+## DTOs da camada de serviço
 
-Vivem em `internal/application`, não em `internal/domain` — são a forma de
-entrada/saída do caso de uso, não conceitos de negócio por si só.
+Vivem em `internal/application` (a *service layer* do projeto), não em
+`internal/domain` — são a forma de entrada/saída do serviço
+`InspectTrackService`, não conceitos de negócio por si só.
 
 ### InspectTrackInput
 

@@ -3,8 +3,8 @@
 **Feature**: `001-gps-track-processing` | **Data**: 2026-09-13
 
 Este é o único contrato externo desta etapa: o comando de linha de comando que
-expõe o caso de uso `InspectTrack` (`internal/infra/inbound/cli`). Não há API
-HTTP nem GUI nesta etapa (fora de escopo, ver `spec.md`).
+expõe o serviço `InspectTrackService` (`internal/infra/inbound/cli`). Não há
+API HTTP nem GUI nesta etapa (fora de escopo, ver `spec.md`).
 
 ## Comando
 
@@ -70,10 +70,10 @@ constituição) — o núcleo nunca chama `os.Exit` nem conhece códigos de saí
 
 ## Reuso futuro
 
-O caso de uso `InspectTrack` (`internal/application`) não conhece este
+O serviço `InspectTrackService` (`internal/application`) não conhece este
 contrato de CLI: ele recebe `InspectTrackInput` e devolve `InspectTrackOutput`
 como dados puros (ver `data-model.md`). Um futuro adapter HTTP construirá o
-mesmo `InspectTrackInput` a partir de uma requisição, chamará o mesmo caso de
-uso, e traduzirá `InspectTrackOutput` e os mesmos erros sentinela para um
-corpo de resposta e um status HTTP — sem duplicar nenhuma regra de negócio
-(Princípio III).
+mesmo `InspectTrackInput` a partir de uma requisição, chamará o mesmo serviço,
+e traduzirá `InspectTrackOutput` e os mesmos erros sentinela para um corpo de
+resposta e um status HTTP — sem duplicar nenhuma regra de negócio (Princípio
+III).
