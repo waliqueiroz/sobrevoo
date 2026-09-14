@@ -57,11 +57,22 @@ adapter.
   internos fixos: mínimo de pontos, velocidade máxima plausível, nível
   padrão — ainda sem fonte de configuração externa, mas o ponto de extensão
   já existe, conforme o Princípio VIII da constituição).
-- **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra. O único lugar
-  que toca o filesystem (`os.Open`) e traduz erros sentinela do domínio em
-  códigos de saída de processo (`exit_code.go`); ver
-  `specs/001-gps-track-processing/contracts/cli.md` para o mapeamento
-  exato.
+- **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
+  traduz erros sentinela do domínio em códigos de saída de processo
+  (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
+  `specs/002-geo-data-registry/contracts/cli.md` para o mapeamento exato.
+  Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
+  para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
+  isso não é mais universal: adapters de saída que precisam de acesso
+  posicional a um arquivo — `geodatainspector` (lê SQLite/TIFF por
+  caminho), `geodatastore/jsonfile` (lê/escreve o registro) e `filechecker`
+  (`os.Stat`) — abrem o arquivo eles mesmos, dado apenas o caminho; a CLI
+  continua sendo quem abre o arquivo só quando o DTO de entrada do serviço
+  exige um `io.Reader` (`register` não abre nada, pois passa um caminho;
+  `check` abre, pois `CheckCoverageInput` exige um `Reader`, igual a
+  `inspect`). Ambos os padrões respeitam os Princípios I e II da
+  constituição — é só uma questão de qual adapter concreto faz a chamada de
+  I/O real (`specs/002-geo-data-registry/research.md`, item 8).
 - **`cmd/sobrevoo/main.go`** — composition root; o único lugar que conecta
   todos os adapters concretos entre si.
 

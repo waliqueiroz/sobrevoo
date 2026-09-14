@@ -86,24 +86,9 @@ func NewInspectTrackService(
 }
 
 func (s *inspectTrackService) Execute(input InspectTrackInput) (InspectTrackOutput, error) {
-	track, err := s.parser.Parse(input.Reader)
+	track, points, discarded, err := cleanTrack(s.parser, s.minPoints, s.maxPlausibleSpeedKmh, input.Reader)
 	if err != nil {
 		return InspectTrackOutput{}, err
-	}
-
-	if len(track.Points) < s.minPoints {
-		return InspectTrackOutput{}, domain.ErrInsufficientPoints
-	}
-
-	points := domain.ReorderByTime(track.Points)
-
-	var discarded domain.DiscardStats
-	points, discarded.ImpossibleCoordinates = domain.DiscardImpossibleCoordinates(points)
-	points, discarded.ConsecutiveDuplicates = domain.DiscardConsecutiveDuplicates(points)
-	points, discarded.ImplausibleJumps = domain.DiscardImplausibleJumps(points, s.maxPlausibleSpeedKmh)
-
-	if len(points) < s.minPoints {
-		return InspectTrackOutput{}, domain.ErrInsufficientPointsAfterCleaning
 	}
 
 	points = s.simplifier.Simplify(points, input.SimplificationLevel)
