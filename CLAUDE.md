@@ -6,10 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). A única feature implementada até agora
-(`specs/001-gps-track-processing/`) lê um trajeto GPX, trata ele (descarta
+Relive/Strava). Duas features estão implementadas até agora:
+`specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
-resumo — ainda sem mapa, câmera ou renderização de vídeo.
+resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
+registro local de mapas base e dados de relevo que o usuário já baixou, e
+verifica se um trajeto está coberto por eles (comandos `geodata
+register|list|remove|check`) — ainda sem câmera ou renderização de vídeo.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -85,13 +88,26 @@ adapter.
 - **`cmd/sobrevoo/main.go`** — composition root; o único lugar que conecta
   todos os adapters concretos entre si.
 
-### Portas e nomenclatura da service layer (Princípios I, II e IX da constituição)
+### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
+
+Estas convenções são regra permanente do projeto — Princípio IX da
+constituição — não algo específico da etapa 2; aplique-as desde o primeiro
+rascunho de qualquer feature nova, sem esperar por um pedido de ajuste. A
+referência de estilo é `waliqueiroz/mystery-gifter-api`
+(`internal/domain`, `internal/application`); `specs/002-geo-data-registry/research.md`
+(itens 10.1, 13, 14, 16) registra o histórico de como o projeto chegou até
+aqui, inclusive um engano real (uma interface de método único por caso de
+uso) que a redação anterior da constituição permitia.
 
 - Nada de `ports.go`/`interfaces.go`. Uma porta ligada a uma única entidade
   fica no arquivo dessa entidade (`TrackParser` é declarada em `track.go`,
   já que produz `Track`). Uma porta sem entidade dona ganha seu próprio
   arquivo, nomeado pelo conceito que representa (`Simplifier` em
-  `simplification.go`, `Smoother` em `smoothing.go`).
+  `simplification.go`, `Smoother` em `smoothing.go`). Toda porta é nomeada
+  pelo papel arquitetural que exerce, não pelo dado que manipula: uma porta
+  de persistência é `XRepository` (nunca `XRegistry`, `XStore`, ou
+  similar), com o campo correspondente na struct do serviço seguindo o
+  mesmo nome (`xRepository domain.XRepository`) — ex.: `GeoDataRepository`.
 - `XService` (interface exportada) / `xService` (struct não exportada) /
   `NewXService(...)` (construtor) é **um serviço por recurso/agregado, não
   um serviço por caso de uso**: `X` nomeia o que o serviço gerencia (ex.:
@@ -106,10 +122,7 @@ adapter.
   serviço de aplicação (não só de portas do domínio) quando isso faz
   sentido — ver `GroupInviteService` dependendo de `UserService` no mesmo
   repositório de referência. Adapters de entrada dependem só da interface,
-  nunca da struct concreta. (`InspectTrackService`/`GeoDataService`, em
-  `internal/application`, seguem esse padrão; ver
-  `specs/002-geo-data-registry/research.md` item 13 para o histórico dessa
-  decisão.)
+  nunca da struct concreta.
 - **Onde vive a regra de negócio**: DTOs de saída não triviais e qualquer
   lógica que não seja "chamar uma porta na ordem certa" vivem em
   `internal/domain`, nunca em `internal/application` — nem como DTO
@@ -123,9 +136,12 @@ adapter.
   (`Group.AddUser`, `Group.GenerateMatches`) quanto função livre operando
   sobre coleções (`ComputeBoundingBox`, `Haversine`, `ComputeCoverage`) —
   o segundo já é o padrão deste projeto desde a etapa 1, e o repositório de
-  referência do usuário usa os dois conforme o caso. Ver
-  `specs/002-geo-data-registry/research.md` item 14 para o histórico dessa
-  decisão.
+  referência do usuário usa os dois conforme o caso.
+- Uma chamada direta a uma função pura da biblioteca padrão do Go (ex.:
+  `time.Now()`) não é dependência externa (Princípio II) e não precisa de
+  porta nem de abstração — não reintroduza algo como um `Clock` só para
+  poder mockar isso; só exige porta o que de fato faz I/O real ou depende
+  de estado fora do processo.
 - Mocks são gerados com `go.uber.org/mock/mockgen` via diretiva
   `//go:generate` posicionada diretamente acima da interface que ela
   mocka — nunca em um arquivo central. A saída vai para um subpacote
