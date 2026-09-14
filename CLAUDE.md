@@ -41,20 +41,21 @@ adapter.
 
 - **`internal/domain`** — entidades (`TrackPoint`, `Track`, `Route`,
   `BoundingBox`, `Level`, `DiscardStats`, `GeoDataSource`, `GeoDataSummary`,
-  `CoverageReport`), construtores que carregam regra de negócio
-  (`NewGeoDataSource`), funções puras (distância de Haversine, ganho de
-  elevação, duração, cálculo de bounding box — incluindo o "unwrap" de
-  longitude no antimeridiano —, as funções de limpeza de pontos, e o
-  algoritmo de verificação de cobertura, `ComputeCoverage`), erros
-  sentinela (`ErrEmptyFile`, `ErrUnsupportedFormat`,
-  `ErrInsufficientPoints[AfterCleaning]`), e as portas `TrackParser`,
-  `Simplifier`, `Smoother`, `GeoDataInspector`, `GeoDataRegistry`,
-  `FileChecker`. Qualquer DTO de saída que não seja um valor trivial (ex.:
-  `GeoDataSummary`, `CoverageReport`) também é um tipo de domínio comum —
-  não um DTO de `internal/application` — e qualquer lógica não trivial
-  (construir uma entidade, calcular algo a partir de uma coleção) é
-  construtor ou função pura de domínio, nunca um helper solto na camada de
-  aplicação; ver "Onde vive a regra de negócio" abaixo.
+  `CoverageReport`, `TrackSummary`), construtores que carregam regra de
+  negócio (`NewGeoDataSource`, `SummarizeTrack`), funções puras (distância
+  de Haversine, ganho de elevação, duração, cálculo de bounding box —
+  incluindo o "unwrap" de longitude no antimeridiano —, `ReorderByTime` e
+  os `Discard*` compostos em `CleanTrack`, e o algoritmo de verificação de
+  cobertura, `ComputeCoverage`), erros sentinela (`ErrEmptyFile`,
+  `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`), e as
+  portas `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
+  `GeoDataRegistry`, `FileChecker`. Qualquer DTO de saída que não seja um
+  valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
+  também é um tipo de domínio comum — não um DTO de `internal/application`
+  — e qualquer lógica não trivial (construir uma entidade, calcular algo a
+  partir de uma coleção) é construtor ou função pura de domínio, nunca um
+  helper solto na camada de aplicação; ver "Onde vive a regra de negócio"
+  abaixo.
 - **`internal/application`** — a *service layer*. Orquestra portas e
   construtores/funções puras do domínio; não conhece Cobra, arquivo, nem
   código de saída, e não decide nenhuma regra de negócio por conta própria

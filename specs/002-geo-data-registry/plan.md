@@ -49,7 +49,9 @@ da constituição)
 
 **Testes**: mesmo padrão já estabelecido — `go test` com `testify`, formato
 given/when/then (`// given`/`// when`/`// then`, sem tabelas de casos),
-builders em `build_domain`/`build_application` para as novas entidades/DTOs,
+builders em `build_domain` para as novas entidades/DTOs (todas de domínio —
+`internal/application/build_application` deixou de existir, research.md
+item 15),
 mocks gerados com `go.uber.org/mock` para as três novas portas do domínio
 (`GeoDataInspector`, `GeoDataRegistry`, `FileChecker`) e para o novo
 `GeoDataService`; `domain.NewGeoDataSource` testa `RegisteredAt` com uma
@@ -141,18 +143,19 @@ internal/
 ├── domain/
 │   ├── geo_data_source.go                        # (novo) entidade GeoDataSource + construtor NewGeoDataSource + GeoDataSummary + DataType + DataFormat + portas GeoDataInspector e GeoDataRegistry
 │   ├── geo_data_coverage.go                       # (novo) CoverageReport + UncoveredSegment + CoverageStatus + MissingDataType + função pura ComputeCoverage (research.md item 14)
+│   ├── track_summary.go                           # (novo) TrackSummary (antes InspectTrackOutput) + função pura SummarizeTrack (research.md item 15)
+│   ├── cleaning.go                                # (estendido) + função pura CleanTrack, compondo ReorderByTime + os três Discard* (research.md item 15)
 │   ├── file_checker.go                           # (novo) porta FileChecker (sem entidade dona)
 │   ├── bounding_box.go                           # (estendido) + Contains(lat, lon float64) bool, + AreaDegrees() float64
 │   ├── errors.go                                 # (estendido) + 5 novos erros sentinela
 │   ├── build_domain/
-│   │   └── geo_data_source_builder.go            # (novo) test data builder
+│   │   ├── geo_data_source_builder.go            # (novo) test data builder
+│   │   └── track_summary_builder.go               # (novo, movido de build_application) test data builder
 │   └── mock_domain/                              # (estendido) + geo_data_inspector.go, geo_data_registry.go, file_checker.go
 │
 ├── application/
 │   ├── geo_data_service.go                       # (novo) GeoDataService: Register + List + Remove + CheckCoverage num único serviço, só orquestração (research.md itens 13-14)
-│   ├── track_loading.go                          # (novo) helper interno compartilhado (parse + reordenação + descarte), extraído de inspect_track_service.go
-│   ├── inspect_track_service.go                  # (ajustado) passa a chamar o helper de track_loading.go em vez de repetir a lógica; método renomeado de Execute para Inspect
-│   ├── build_application/                        # (estendido) builders para os novos DTOs de saída, se necessário
+│   ├── inspect_track_service.go                  # (ajustado) só orquestração: parser.Parse → domain.CleanTrack → Simplifier/Smoother → domain.SummarizeTrack; método renomeado de Execute para Inspect, InspectTrackInput/Output removidos (research.md item 15)
 │   └── mock_application/                         # (estendido) + geo_data_service.go
 │
 └── infra/
@@ -221,18 +224,27 @@ via porta, delega a regra de negócio para um construtor ou função de
 domínio (`domain.NewGeoDataSource`, `domain.ComputeCoverage`), salva/devolve
 — a mesma divisão de responsabilidade de `GroupService.AddUser`, que busca
 via repositório e delega a regra para `domain.Group.AddUser` (research.md
-item 14). Para não duplicar a lógica de leitura e limpeza de trajeto (parse
-+ reordenação por tempo + descarte de pontos problemáticos) entre
-`InspectTrackService` e `GeoDataService.CheckCoverage`, essa lógica é
-extraída para uma função interna não exportada em `track_loading.go`,
-chamada por ambos — um ajuste pontual em `inspect_track_service.go` para
-remover a duplicação, sem alterar seu comportamento observável (o método
-`Execute` foi renomeado para `Inspect`, pelo mesmo motivo do item 13:
-verbos nomeados por operação, não `Execute` genérico).
+item 14).
+
+A lógica de limpeza de trajeto (reordenação por tempo + descarte de pontos
+problemáticos), compartilhada por `InspectTrackService.Inspect` e
+`GeoDataService.CheckCoverage`, não é um helper de `internal/application`
+— é a função pura `domain.CleanTrack`, em `internal/domain/cleaning.go`,
+ao lado de `ReorderByTime`/`Discard*`, que ela compõe (research.md item
+15). Cada serviço chama `parser.Parse` (a única parte que de fato usa uma
+porta) e depois `domain.CleanTrack` diretamente — sem um arquivo
+`track_loading.go` compartilhado, que existiu numa versão anterior deste
+plano e foi removido. `InspectTrackService` também foi ajustado no mesmo
+pedido: `InspectTrackInput`/`InspectTrackOutput` foram removidos (o método,
+renomeado de `Execute` para `Inspect` pelo mesmo motivo do item 13, agora
+recebe argumentos simples e devolve `domain.TrackSummary`, construído pela
+nova função pura `domain.SummarizeTrack`).
 
 Testes de unidade continuam no formato given/when/then, sem tabelas de
-casos, com builders em `build_domain`/`build_application` para as novas
-entidades/DTOs sempre que um literal de struct repetido prejudicaria a
+casos, com builders em `build_domain` (o pacote `build_application` não
+tem mais nenhum builder — `InspectTrackOutputBuilder` virou
+`build_domain.TrackSummaryBuilder`, já que `TrackSummary` é um tipo de
+domínio) sempre que um literal de struct repetido prejudicaria a
 legibilidade — mesma convenção já em vigor.
 
 ## Rastreamento de Complexidade

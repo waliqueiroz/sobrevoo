@@ -129,10 +129,15 @@ func (s *geoDataService) Remove(name string) error {
 }
 
 func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport, error) {
+	track, err := s.parser.Parse(reader)
+	if err != nil {
+		return domain.CoverageReport{}, err
+	}
+
 	// The route used for coverage is cleaned but not simplified/smoothed:
 	// those two steps are rendering preparation and could shift points,
 	// masking a real coverage gap (research.md item 9).
-	_, points, _, err := cleanTrack(s.parser, s.minPoints, s.maxPlausibleSpeedKmh, reader)
+	points, _, err := domain.CleanTrack(track.Points, s.minPoints, s.maxPlausibleSpeedKmh)
 	if err != nil {
 		return domain.CoverageReport{}, err
 	}

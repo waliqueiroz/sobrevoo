@@ -226,6 +226,13 @@ clarificada.
   tecnicamente incorreto); duplicar a lógica de limpeza dentro do novo
   serviço em vez de extraí-la (rejeitada — viola DRY e arrisca as duas
   cópias divergirem com futuras mudanças).
+- **Atualização (item 15)**: o mecanismo de extração descrito acima —
+  `internal/application/track_loading.go` — foi substituído por
+  `domain.CleanTrack`, uma função pura de domínio. A decisão de **não**
+  simplificar/suavizar a rota usada na verificação de cobertura, e o
+  racional para isso, continuam valendo sem mudança nenhuma — só onde a
+  composição "reorder + discard" mora é que mudou. Ver item 15 para o
+  histórico completo.
 
 ## 10. Critério de desempate como área em graus (não área geodésica real)
 
@@ -404,3 +411,58 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   regra de negócio com orquestração na mesma camada, e contraria o padrão
   já usado tanto pelo domínio deste projeto quanto pelo repositório de
   referência do usuário).
+
+## 15. `InspectTrackService` (etapa 1) alinhado ao mesmo padrão; `track_loading.go` removido
+
+- **Decisão**: por pedido explícito do usuário, o mesmo tratamento do item
+  14 foi aplicado a `InspectTrackService`, da etapa 1 — não só ao que esta
+  etapa introduziu:
+  - `InspectTrackInput`/`InspectTrackOutput` deixam de existir.
+    `Inspect` passa a receber argumentos simples
+    (`reader io.Reader, simplificationLevel, smoothingLevel domain.Level`)
+    em vez de um DTO de entrada — mesmo estilo de `GeoDataService.Register(name,
+    path string)` e de `Create(ctx, name, description, ownerID string)` em
+    `waliqueiroz/mystery-gifter-api`. `InspectTrackOutput` vira
+    `domain.TrackSummary`, construído por uma nova função pura de domínio,
+    `domain.SummarizeTrack(track, route, discarded)`, em
+    `internal/domain/track_summary.go` — a mesma lógica que antes era o
+    método privado `buildOutput` do serviço.
+  - `internal/application/track_loading.go` (o helper `cleanTrack`,
+    compartilhado por `InspectTrackService` e `GeoDataService.CheckCoverage`)
+    é removido inteiramente. A parte que chamava a porta `TrackParser`
+    permanece em cada serviço (é orquestração de verdade — chama uma porta);
+    a parte que **compunha** `ReorderByTime` + os três `Discard*` + a
+    checagem de mínimo de pontos (antes e depois) — ou seja, a regra "o que
+    significa limpar um trajeto" — virou uma função pura de domínio nova,
+    `domain.CleanTrack(points, minPoints, maxPlausibleSpeedKmh)`, em
+    `internal/domain/cleaning.go`, ao lado das funções que ela já compõe
+    (`ReorderByTime`, `DiscardImpossibleCoordinates`, ...). Cada serviço
+    agora só faz `parser.Parse(reader)` seguido de `domain.CleanTrack(...)`
+    — duas linhas, sem precisar de um helper compartilhado.
+  - O builder de teste correspondente também migrou:
+    `internal/application/build_application/inspect_track_output_builder.go`
+    virou `internal/domain/build_domain/track_summary_builder.go`
+    (`TrackSummaryBuilder`), e o pacote `build_application` — que não tinha
+    mais nenhum outro arquivo — deixou de existir.
+- **Racional**: a pergunta do usuário ("o `track_loading` precisa ficar na
+  camada de aplicação mesmo?") aponta exatamente a distinção que já valia
+  para `ComputeCoverage`/`NewGeoDataSource` (item 14): `cleanTrack` como um
+  todo *parecia* orquestração só porque chamava `parser.Parse` no início,
+  mas a maior parte do seu corpo — a sequência reorder→discard→discard→discard
+  e a semântica dos dois erros de "pontos insuficientes" — é regra de
+  negócio pura sobre `[]TrackPoint`, sem nenhuma porta envolvida. Separar
+  as duas coisas deixa cada uma no lugar certo: a chamada de porta
+  (`parser.Parse`) é orquestração e fica no serviço; a composição de regras
+  de limpeza (`domain.CleanTrack`) é domínio e fica com as funções que ela
+  já usa. Isso também elimina o único "helper solto" que ainda restava em
+  `internal/application` depois do item 14.
+- **Alternativas consideradas**: manter `cleanTrack` como estava, um helper
+  de pacote em `internal/application` chamado por ambos os serviços
+  (decisão original, superada — exatamente o tipo de função solta na
+  camada de aplicação que o usuário pediu para eliminar; também escondia
+  regra de negócio real, não só orquestração, atrás de uma assinatura que
+  recebia uma porta); manter `cleanTrack` completo (parse + limpeza) como
+  função de domínio, recebendo `TrackParser` como parâmetro (rejeitada —
+  domínio nunca recebe nem chama uma porta; isso é o próprio papel da
+  camada de aplicação, igual a nenhuma entidade/função de domínio em
+  `waliqueiroz/mystery-gifter-api` receber um repositório como argumento).

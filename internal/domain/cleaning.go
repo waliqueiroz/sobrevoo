@@ -86,3 +86,31 @@ func isImplausibleJump(prev, curr TrackPoint, maxPlausibleSpeedKmh float64) bool
 
 	return distanceKm/elapsedHours > maxPlausibleSpeedKmh
 }
+
+// CleanTrack turns a track's raw parsed points into a trustworthy route,
+// composing the functions above in the one order that makes sense (FR-006
+// through FR-010, FR-027): reorder by time, then discard impossible
+// coordinates, consecutive duplicates and implausible jumps. The minimum
+// point count is checked both before and after, as two distinguishable
+// error cases — shared by every use case that needs a cleaned route from a
+// parsed track (InspectTrackService, GeoDataService.CheckCoverage), so
+// this composition itself, not just its parts, lives here instead of being
+// duplicated or reinvented by each service (Constitution Principle III).
+func CleanTrack(points []TrackPoint, minPoints int, maxPlausibleSpeedKmh float64) ([]TrackPoint, DiscardStats, error) {
+	if len(points) < minPoints {
+		return nil, DiscardStats{}, ErrInsufficientPoints
+	}
+
+	points = ReorderByTime(points)
+
+	var discarded DiscardStats
+	points, discarded.ImpossibleCoordinates = DiscardImpossibleCoordinates(points)
+	points, discarded.ConsecutiveDuplicates = DiscardConsecutiveDuplicates(points)
+	points, discarded.ImplausibleJumps = DiscardImplausibleJumps(points, maxPlausibleSpeedKmh)
+
+	if len(points) < minPoints {
+		return nil, DiscardStats{}, ErrInsufficientPointsAfterCleaning
+	}
+
+	return points, discarded, nil
+}

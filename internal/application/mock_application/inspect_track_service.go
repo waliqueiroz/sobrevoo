@@ -10,9 +10,10 @@
 package mock_application
 
 import (
+	io "io"
 	reflect "reflect"
 
-	application "github.com/waliqueiroz/sobrevoo/internal/application"
+	domain "github.com/waliqueiroz/sobrevoo/internal/domain"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,16 +42,16 @@ func (m *MockInspectTrackService) EXPECT() *MockInspectTrackServiceMockRecorder 
 }
 
 // Inspect mocks base method.
-func (m *MockInspectTrackService) Inspect(input application.InspectTrackInput) (application.InspectTrackOutput, error) {
+func (m *MockInspectTrackService) Inspect(reader io.Reader, simplificationLevel, smoothingLevel domain.Level) (domain.TrackSummary, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Inspect", input)
-	ret0, _ := ret[0].(application.InspectTrackOutput)
+	ret := m.ctrl.Call(m, "Inspect", reader, simplificationLevel, smoothingLevel)
+	ret0, _ := ret[0].(domain.TrackSummary)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Inspect indicates an expected call of Inspect.
-func (mr *MockInspectTrackServiceMockRecorder) Inspect(input any) *gomock.Call {
+func (mr *MockInspectTrackServiceMockRecorder) Inspect(reader, simplificationLevel, smoothingLevel any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inspect", reflect.TypeOf((*MockInspectTrackService)(nil).Inspect), input)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inspect", reflect.TypeOf((*MockInspectTrackService)(nil).Inspect), reader, simplificationLevel, smoothingLevel)
 }

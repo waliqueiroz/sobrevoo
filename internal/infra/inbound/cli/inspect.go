@@ -63,16 +63,12 @@ func runInspect(cmd *cobra.Command, inspectTrackService application.InspectTrack
 	}
 	defer file.Close()
 
-	output, err := inspectTrackService.Inspect(application.InspectTrackInput{
-		Reader:              file,
-		SimplificationLevel: simplificationLevel,
-		SmoothingLevel:      smoothingLevel,
-	})
+	summary, err := inspectTrackService.Inspect(file, simplificationLevel, smoothingLevel)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprint(cmd.OutOrStdout(), formatSummary(output))
+	fmt.Fprint(cmd.OutOrStdout(), formatSummary(summary))
 
 	return nil
 }
@@ -104,21 +100,22 @@ func parseLevel(name string) (domain.Level, error) {
 	}
 }
 
-// formatSummary renders an InspectTrackOutput as the English, human-readable
-// summary described in contracts/cli.md (FR-025). All runtime I/O of the
-// tool is in English, independently of the language used by the project's
-// specification artifacts (see spec.md's scope note on this).
-func formatSummary(output application.InspectTrackOutput) string {
+// formatSummary renders a domain.TrackSummary as the English,
+// human-readable summary described in contracts/cli.md (FR-025). All
+// runtime I/O of the tool is in English, independently of the language
+// used by the project's specification artifacts (see spec.md's scope note
+// on this).
+func formatSummary(summary domain.TrackSummary) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "Format: %s\n", output.Format)
-	fmt.Fprintf(&b, "Points: %d -> %d (original -> treated)\n", output.PointCountOriginal, output.PointCountTreated)
-	fmt.Fprintf(&b, "Distance: %.2f km\n", output.TotalDistanceMeters/1000)
-	fmt.Fprintf(&b, "Elevation gain: %s\n", formatElevationGain(output.ElevationGainMeters))
-	fmt.Fprintf(&b, "Duration: %s\n", formatDuration(output))
-	fmt.Fprintf(&b, "Bounding box: %s\n", formatBoundingBox(output.BoundingBox))
+	fmt.Fprintf(&b, "Format: %s\n", summary.Format)
+	fmt.Fprintf(&b, "Points: %d -> %d (original -> treated)\n", summary.PointCountOriginal, summary.PointCountTreated)
+	fmt.Fprintf(&b, "Distance: %.2f km\n", summary.TotalDistanceMeters/1000)
+	fmt.Fprintf(&b, "Elevation gain: %s\n", formatElevationGain(summary.ElevationGainMeters))
+	fmt.Fprintf(&b, "Duration: %s\n", formatDuration(summary))
+	fmt.Fprintf(&b, "Bounding box: %s\n", formatBoundingBox(summary.BoundingBox))
 	fmt.Fprintf(&b, "Discarded points: %d (impossible coordinates: %d, consecutive duplicates: %d, implausible jumps: %d)\n",
-		output.Discarded.Total(), output.Discarded.ImpossibleCoordinates, output.Discarded.ConsecutiveDuplicates, output.Discarded.ImplausibleJumps)
+		summary.Discarded.Total(), summary.Discarded.ImpossibleCoordinates, summary.Discarded.ConsecutiveDuplicates, summary.Discarded.ImplausibleJumps)
 
 	return b.String()
 }
@@ -130,11 +127,11 @@ func formatElevationGain(gain *float64) string {
 	return fmt.Sprintf("%.1f m", *gain)
 }
 
-func formatDuration(output application.InspectTrackOutput) string {
-	if output.Duration == nil {
+func formatDuration(summary domain.TrackSummary) string {
+	if summary.Duration == nil {
 		return "not available (no time data)"
 	}
-	return output.Duration.String()
+	return summary.Duration.String()
 }
 
 func formatBoundingBox(box domain.BoundingBox) string {

@@ -276,6 +276,26 @@ func Test_geoDataService_CheckCoverage(t *testing.T) {
 		assert.ErrorIs(t, err, wantErr)
 	})
 
+	t.Run("should propagate domain.CleanTrack's error unchanged", func(t *testing.T) {
+		// given: domain/cleaning_test.go covers CleanTrack's own rules in
+		// detail — this only checks the service does not swallow it.
+		track := build_domain.NewTrackBuilder().WithPoints(
+			build_domain.NewTrackPointBuilder().Build(),
+		).Build()
+
+		mockCtrl := gomock.NewController(t)
+		parser := mock_domain.NewMockTrackParser(mockCtrl)
+		parser.EXPECT().Parse(gomock.Any()).Return(track, nil)
+
+		service := application.NewGeoDataService(nil, nil, nil, parser, testMinPoints, testMaxPlausibleSpeedKmh)
+
+		// when
+		_, err := service.CheckCoverage(strings.NewReader(""))
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInsufficientPoints)
+	})
+
 	t.Run("should propagate the registry's List error unchanged", func(t *testing.T) {
 		// given
 		wantErr := errors.New("boom")

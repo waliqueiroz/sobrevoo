@@ -268,12 +268,50 @@ repositório, delega para `domain.Group.AddUser`, salva, devolve;
 - **`Remove`**: recusa com `ErrDataSourceNotRegistered` se `name` não
   existir (via `GeoDataRegistry.FindByName`); caso contrário chama
   `GeoDataRegistry.Delete`. O arquivo original nunca é tocado (FR-011).
-- **`CheckCoverage`**: obtém a rota limpa (não simplificada/suavizada) via
-  o helper compartilhado de `track_loading.go` (mesmo `TrackParser` e
-  mesmas funções puras de limpeza da etapa 1); lista os registros via
-  `GeoDataRegistry.List`; filtra os que `FileChecker.Exists` reporta como
-  ausentes (FR-017, único filtro que exige uma porta, por isso fica no
+- **`CheckCoverage`**: chama `TrackParser.Parse(reader)`, depois
+  `domain.CleanTrack(track.Points, minPoints, maxPlausibleSpeedKmh)` para
+  obter a rota limpa — não simplificada/suavizada, e sem os pontos
+  descartados (mesma função de domínio que `InspectTrackService.Inspect`
+  usa — ver "Limpeza e resumo de um trajeto" abaixo); lista os registros
+  via `GeoDataRegistry.List`; filtra os que `FileChecker.Exists` reporta
+  como ausentes (FR-017, único filtro que exige uma porta, por isso fica no
   serviço e não em `domain.ComputeCoverage`); delega o cálculo de
   cobertura em si para `domain.ComputeCoverage(route, baseMaps, elevations)`
   (ver seção "Cobertura de um trajeto" acima) e devolve o `CoverageReport`
   resultante sem alterá-lo.
+
+## Limpeza e resumo de um trajeto (`InspectTrackService`, etapa 1)
+
+Por pedido do usuário, `InspectTrackService` (etapa 1) foi alinhado ao
+mesmo padrão desta etapa (`research.md` item 15) — registrado aqui porque é
+o próximo elo da mesma refatoração, embora o serviço em si pertença à
+etapa 1.
+
+```go
+func CleanTrack(points []TrackPoint, minPoints int, maxPlausibleSpeedKmh float64) ([]TrackPoint, DiscardStats, error)
+func SummarizeTrack(track Track, route Route, discarded DiscardStats) TrackSummary
+```
+
+Ambas em `internal/domain` (`cleaning.go` e `track_summary.go`, respectivamente):
+
+- `CleanTrack` compõe `ReorderByTime` + os três `Discard*` + a checagem de
+  mínimo de pontos (antes e depois, com os dois erros sentinela
+  distinguíveis) — a regra de negócio "o que significa limpar um trajeto",
+  não apenas suas partes. Usada por **ambos** os serviços que precisam de
+  uma rota limpa: `InspectTrackService.Inspect` e
+  `GeoDataService.CheckCoverage`.
+- `SummarizeTrack` monta um `TrackSummary` (antes `InspectTrackOutput`, um
+  DTO de `internal/application`) a partir de `Track` + `Route` +
+  `DiscardStats`, chamando `TotalDistance`, `ComputeBoundingBox`,
+  `ElevationGain` e `Duration` — a mesma lógica que antes era o método
+  privado `buildOutput` do serviço.
+
+`InspectTrackService.Inspect(reader io.Reader, simplificationLevel,
+smoothingLevel domain.Level) (domain.TrackSummary, error)` — sem mais
+`InspectTrackInput`/`InspectTrackOutput` — chama `TrackParser.Parse`,
+`domain.CleanTrack`, `Simplifier.Simplify`, `Smoother.Smooth` (essas duas,
+via porta, só fazem sentido para esta etapa — `CheckCoverage` não as usa,
+research.md item 9) e `domain.SummarizeTrack`, nessa ordem. Não existe mais
+um helper `track_loading.go` compartilhado: a parte que chamava a porta
+`TrackParser` (orquestração de verdade) ficou em cada serviço; a parte que
+compunha as regras de limpeza virou `domain.CleanTrack`.

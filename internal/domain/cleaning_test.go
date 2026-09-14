@@ -251,6 +251,59 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 	})
 }
 
+func Test_CleanTrack(t *testing.T) {
+	start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
+
+	t.Run("should reject fewer than the minimum points before any cleaning", func(t *testing.T) {
+		// given
+		points := []domain.TrackPoint{
+			build_domain.NewTrackPointBuilder().Build(),
+		}
+
+		// when
+		_, _, err := domain.CleanTrack(points, 2, 130)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInsufficientPoints)
+	})
+
+	t.Run("should reject a track with enough raw points but too few after cleaning, with a distinguishable error", func(t *testing.T) {
+		// given: two of the three points have an impossible latitude
+		points := []domain.TrackPoint{
+			build_domain.NewTrackPointBuilder().WithLatitude(0).Build(),
+			build_domain.NewTrackPointBuilder().WithLatitude(200).Build(),
+			build_domain.NewTrackPointBuilder().WithLatitude(300).Build(),
+		}
+
+		// when
+		_, _, err := domain.CleanTrack(points, 2, 130)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInsufficientPointsAfterCleaning)
+		assert.NotErrorIs(t, err, domain.ErrInsufficientPoints, "the two errors must be distinguishable (FR-006)")
+	})
+
+	t.Run("should reorder by time before discarding, and report discard counts by reason", func(t *testing.T) {
+		// given: out of chronological order; the earliest point has an
+		// impossible coordinate. Spaced an hour apart so the ~111km/degree
+		// of latitude between the two kept points stays a plausible pace
+		// (~111 km/h), not an implausible jump.
+		points := []domain.TrackPoint{
+			build_domain.NewTrackPointBuilder().WithLatitude(3).WithLongitude(0).WithTime(start.Add(2 * time.Hour)).Build(),
+			build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(-300).WithTime(start).Build(), // impossible longitude
+			build_domain.NewTrackPointBuilder().WithLatitude(2).WithLongitude(0).WithTime(start.Add(time.Hour)).Build(),
+		}
+
+		// when
+		kept, discarded, err := domain.CleanTrack(points, 2, 130)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, 1, discarded.ImpossibleCoordinates)
+		assert.Equal(t, []float64{2, 3}, latitudesOf(kept), "reordered chronologically, then the impossible point removed")
+	})
+}
+
 func latitudesOf(points []domain.TrackPoint) []float64 {
 	lats := make([]float64, len(points))
 	for i, p := range points {

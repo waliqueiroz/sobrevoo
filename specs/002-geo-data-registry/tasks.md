@@ -53,6 +53,19 @@ estendido ao longo de todas elas.
 > `internal/domain`; a service layer só orquestra) — ver `research.md`
 > item 14. `internal/application/geo_data_service.go` ficou só com
 > orquestração de portas.
+>
+> Uma terceira rodada do mesmo pedido estendeu isso para a etapa 1: T019
+> (`InspectTrackService`) passou a expor `Inspect(reader io.Reader,
+> simplificationLevel, smoothingLevel domain.Level) (domain.TrackSummary,
+> error)` — sem `InspectTrackInput`/`InspectTrackOutput` — e T033 (o
+> helper `track_loading.go`) foi eliminado: a composição
+> reorder+discard+discard+discard, que ele escondia atrás de uma porta
+> `TrackParser` recebida por parâmetro, virou a função pura
+> `domain.CleanTrack`, em `internal/domain/cleaning.go`; o que antes era o
+> método privado `buildOutput` virou `domain.SummarizeTrack`, em
+> `internal/domain/track_summary.go`. `InspectTrackOutputBuilder`
+> (`build_application`) virou `build_domain.TrackSummaryBuilder` — ver
+> `research.md` item 15.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 
