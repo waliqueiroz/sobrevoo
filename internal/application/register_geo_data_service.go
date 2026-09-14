@@ -1,6 +1,10 @@
 package application
 
-import "github.com/waliqueiroz/sobrevoo/internal/domain"
+import (
+	"time"
+
+	"github.com/waliqueiroz/sobrevoo/internal/domain"
+)
 
 // RegisterGeoDataInput is the input for RegisterGeoDataService.Execute.
 type RegisterGeoDataInput struct {
@@ -31,16 +35,14 @@ type RegisterGeoDataService interface {
 type registerGeoDataService struct {
 	registry  domain.GeoDataRegistry
 	inspector domain.GeoDataInspector
-	clock     domain.Clock
 }
 
 // NewRegisterGeoDataService creates a RegisterGeoDataService backed by the
 // given ports.
-func NewRegisterGeoDataService(registry domain.GeoDataRegistry, inspector domain.GeoDataInspector, clock domain.Clock) RegisterGeoDataService {
+func NewRegisterGeoDataService(registry domain.GeoDataRegistry, inspector domain.GeoDataInspector) RegisterGeoDataService {
 	return &registerGeoDataService{
 		registry:  registry,
 		inspector: inspector,
-		clock:     clock,
 	}
 }
 
@@ -64,7 +66,7 @@ func (s *registerGeoDataService) Execute(input RegisterGeoDataInput) (RegisterGe
 		Type:         inspected.Type,
 		Format:       inspected.Format,
 		BoundingBox:  inspected.BoundingBox,
-		RegisteredAt: s.clock.Now(),
+		RegisteredAt: time.Now(),
 	}
 
 	if err := s.registry.Save(source); err != nil {

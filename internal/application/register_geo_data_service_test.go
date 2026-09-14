@@ -21,7 +21,7 @@ func Test_registerGeoDataService_Execute(t *testing.T) {
 		registry := mock_domain.NewMockGeoDataRegistry(mockCtrl)
 		registry.EXPECT().FindByName("europa-central-mapa").Return(domain.GeoDataSource{Name: "europa-central-mapa"}, true, nil)
 
-		service := application.NewRegisterGeoDataService(registry, nil, nil)
+		service := application.NewRegisterGeoDataService(registry, nil)
 
 		// when
 		_, err := service.Execute(application.RegisterGeoDataInput{Name: "europa-central-mapa", Path: "/data/mapa.mbtiles"})
@@ -38,7 +38,7 @@ func Test_registerGeoDataService_Execute(t *testing.T) {
 		registry := mock_domain.NewMockGeoDataRegistry(mockCtrl)
 		registry.EXPECT().FindByName(gomock.Any()).Return(domain.GeoDataSource{}, false, wantErr)
 
-		service := application.NewRegisterGeoDataService(registry, nil, nil)
+		service := application.NewRegisterGeoDataService(registry, nil)
 
 		// when
 		_, err := service.Execute(application.RegisterGeoDataInput{Name: "x", Path: "/data/mapa.mbtiles"})
@@ -58,7 +58,7 @@ func Test_registerGeoDataService_Execute(t *testing.T) {
 		inspector := mock_domain.NewMockGeoDataInspector(mockCtrl)
 		inspector.EXPECT().Inspect("/data/mapa.mbtiles").Return(domain.InspectedGeoData{}, wantErr)
 
-		service := application.NewRegisterGeoDataService(registry, inspector, nil)
+		service := application.NewRegisterGeoDataService(registry, inspector)
 
 		// when
 		_, err := service.Execute(application.RegisterGeoDataInput{Name: "europa-central-mapa", Path: "/data/mapa.mbtiles"})
@@ -69,7 +69,6 @@ func Test_registerGeoDataService_Execute(t *testing.T) {
 
 	t.Run("should register a source with the type, format and area discovered by the inspector, stamped with the current time", func(t *testing.T) {
 		// given
-		registeredAt := time.Date(2026, time.March, 4, 10, 30, 0, 0, time.UTC)
 		inspected := domain.InspectedGeoData{
 			Format:      domain.DataFormatMBTiles,
 			Type:        domain.DataTypeBaseMap,
@@ -83,27 +82,29 @@ func Test_registerGeoDataService_Execute(t *testing.T) {
 		inspector := mock_domain.NewMockGeoDataInspector(mockCtrl)
 		inspector.EXPECT().Inspect("/data/mapa.mbtiles").Return(inspected, nil)
 
-		clock := mock_domain.NewMockClock(mockCtrl)
-		clock.EXPECT().Now().Return(registeredAt)
+		var saved domain.GeoDataSource
+		registry.EXPECT().Save(gomock.Any()).DoAndReturn(func(source domain.GeoDataSource) error {
+			saved = source
+			return nil
+		})
 
-		wantSource := domain.GeoDataSource{
-			Name:         "europa-central-mapa",
-			Path:         "/data/mapa.mbtiles",
-			Type:         domain.DataTypeBaseMap,
-			Format:       domain.DataFormatMBTiles,
-			BoundingBox:  inspected.BoundingBox,
-			RegisteredAt: registeredAt,
-		}
-		registry.EXPECT().Save(wantSource).Return(nil)
-
-		service := application.NewRegisterGeoDataService(registry, inspector, clock)
+		service := application.NewRegisterGeoDataService(registry, inspector)
+		before := time.Now()
 
 		// when
 		output, err := service.Execute(application.RegisterGeoDataInput{Name: "europa-central-mapa", Path: "/data/mapa.mbtiles"})
 
 		// then
+		after := time.Now()
 		require.NoError(t, err)
-		assert.Equal(t, wantSource, output.Source)
+		assert.Equal(t, "europa-central-mapa", output.Source.Name)
+		assert.Equal(t, "/data/mapa.mbtiles", output.Source.Path)
+		assert.Equal(t, domain.DataTypeBaseMap, output.Source.Type)
+		assert.Equal(t, domain.DataFormatMBTiles, output.Source.Format)
+		assert.Equal(t, inspected.BoundingBox, output.Source.BoundingBox)
+		assert.False(t, output.Source.RegisteredAt.Before(before))
+		assert.False(t, output.Source.RegisteredAt.After(after))
+		assert.Equal(t, output.Source, saved)
 	})
 
 	t.Run("should propagate the registry's Save error unchanged", func(t *testing.T) {
@@ -118,10 +119,7 @@ func Test_registerGeoDataService_Execute(t *testing.T) {
 		inspector := mock_domain.NewMockGeoDataInspector(mockCtrl)
 		inspector.EXPECT().Inspect(gomock.Any()).Return(domain.InspectedGeoData{}, nil)
 
-		clock := mock_domain.NewMockClock(mockCtrl)
-		clock.EXPECT().Now().Return(time.Now())
-
-		service := application.NewRegisterGeoDataService(registry, inspector, clock)
+		service := application.NewRegisterGeoDataService(registry, inspector)
 
 		// when
 		_, err := service.Execute(application.RegisterGeoDataInput{Name: "europa-central-mapa", Path: "/data/mapa.mbtiles"})

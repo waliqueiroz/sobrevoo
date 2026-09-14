@@ -42,10 +42,12 @@ type GeoDataSource struct {
 	// automatically from the file's content at registration time (FR-003).
 	BoundingBox BoundingBox
 
-	// RegisteredAt is when this source was registered, obtained from the
-	// Clock port. Used only to break ties deterministically between
-	// overlapping sources of the same type (FR-016) — not business data by
-	// itself.
+	// RegisteredAt is when this source was registered (time.Now(), stamped
+	// by RegisterGeoDataService — not worth a Clock port, since time.Now()
+	// is a stdlib call, not an external dependency in the Constitution's
+	// sense, and RegisteredAt is only ever compared to itself). Used only
+	// to break ties deterministically between overlapping sources of the
+	// same type (FR-016) — not business data by itself.
 	RegisteredAt time.Time
 }
 

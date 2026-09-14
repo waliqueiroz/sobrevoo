@@ -19,7 +19,7 @@ Um registro de dado geográfico local declarado pelo usuário (Entidade-Chave
 | `Type` | `DataType` (enum) | `DataTypeBaseMap` ou `DataTypeElevation`, determinado automaticamente a partir do conteúdo do arquivo (FR-002). |
 | `Format` | `DataFormat` (enum) | `DataFormatMBTiles` ou `DataFormatGeoTIFF` — o formato de arquivo concreto identificado. Guardado separadamente de `Type` pelo mesmo motivo que `Track.Format` existe desde a etapa 1: um segundo formato para o mesmo tipo (ex.: um segundo formato de mapa base) pode ser adicionado no futuro sem alterar esta entidade. |
 | `BoundingBox` | `BoundingBox` | Área geográfica coberta, determinada automaticamente a partir do conteúdo do arquivo (FR-003). |
-| `RegisteredAt` | `time.Time` | Instante em que o registro foi criado, obtido da porta `Clock` no momento do `register`. Usado apenas para o desempate determinístico entre fontes sobrepostas (FR-016, ver `research.md` item 10) — não é exibido como informação de negócio por si só. |
+| `RegisteredAt` | `time.Time` | Instante em que o registro foi criado, obtido de `time.Now()` diretamente por `RegisterGeoDataService` — sem uma porta dedicada (`research.md` item 10.1: `time` é biblioteca padrão, não uma dependência externa no sentido do Princípio II, e o campo nunca é exibido ao usuário). Usado apenas para o desempate determinístico entre fontes sobrepostas (FR-016, ver `research.md` item 10). |
 
 Note-se que a entidade **não** guarda se o arquivo ainda existe: essa é uma
 informação dinâmica, recalculada a cada `list`/`check` via a porta
@@ -129,25 +129,16 @@ type FileChecker interface {
 Implementação em `internal/infra/outbound/filechecker`, baseada em
 `os.Stat` (FR-010, FR-017, ver `research.md` item 7).
 
-### Clock (declarada em `clock.go`, arquivo próprio — não pertence a uma única entidade)
-
-```go
-type Clock interface {
-    Now() time.Time
-}
-```
-
-Implementação em `internal/infra/outbound/clock`, baseada em `time.Now()`.
-Isola `RegisterGeoDataService` da hora real do sistema, tornando
-`GeoDataSource.RegisteredAt` determinístico e testável nos testes do
-núcleo (Princípio VI).
+Não há porta `Clock`: `RegisterGeoDataService` chama `time.Now()`
+diretamente (`research.md` item 10.1) — `time` é biblioteca padrão, não
+uma dependência externa no sentido do Princípio II.
 
 ### Mocks
 
 Gerados com `go.uber.org/mock/mockgen` via `//go:generate` posicionado
 diretamente acima de cada interface, com saída em
 `internal/domain/mock_domain/` — um arquivo por porta: `geo_data_inspector.go`,
-`geo_data_registry.go`, `file_checker.go`, `clock.go`.
+`geo_data_registry.go`, `file_checker.go`.
 
 ## DTOs da camada de serviço
 
@@ -164,7 +155,7 @@ serviço, não conceitos de negócio por si só.
 
 `Execute`: recusa se `Name` já existe (`ErrDataSourceNameAlreadyUsed`),
 chama `GeoDataInspector.Inspect(Path)`, monta o `GeoDataSource` (com
-`RegisteredAt` vindo de `Clock.Now()`) e chama `GeoDataRegistry.Save`.
+`RegisteredAt` vindo de `time.Now()`) e chama `GeoDataRegistry.Save`.
 
 ### ListGeoDataService
 

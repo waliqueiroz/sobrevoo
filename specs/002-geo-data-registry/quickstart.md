@@ -195,7 +195,7 @@ da etapa 1 (o ajuste em `inspect_track_service.go` para reaproveitar
 `track_loading.go` não deve alterar nenhum comportamento observável já
 testado). Os testes do núcleo (`internal/domain` e `internal/application`)
 não tocam disco, rede, nem processo externo — as novas portas
-(`GeoDataInspector`, `GeoDataRegistry`, `FileChecker`, `Clock`) são
-substituídas por mocks gerados com `go.uber.org/mock` nos testes de
-`internal/application`; nenhum teste abre um MBTiles/GeoTIFF real ou toca o
-arquivo de registro de verdade.
+(`GeoDataInspector`, `GeoDataRegistry`, `FileChecker`) são substituídas por
+mocks gerados com `go.uber.org/mock` nos testes de `internal/application`;
+nenhum teste abre um MBTiles/GeoTIFF real ou toca o arquivo de registro de
+verdade.

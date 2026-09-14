@@ -234,8 +234,9 @@ clarificada.
   altura, com a mesma técnica de "unwrap" de longitude já usada para
   antimeridiano), não uma área geodésica real (que dependeria da
   latitude). Empate é resolvido por `RegisteredAt` mais antigo — um novo
-  campo persistido no registro, preenchido no momento do `register` a
-  partir de uma nova porta `Clock` (ver `data-model.md`).
+  campo persistido no registro, preenchido com `time.Now()` no momento do
+  `register`, chamado diretamente por `RegisterGeoDataService` (sem uma
+  porta `Clock` — ver item 10.1 abaixo).
 - **Racional**: a regra de desempate só precisa ser determinística e
   produzir uma ordenação relativa e explicável (Clarification do spec) —
   não uma medida de área fisicamente exata. Área em graus é suficiente
@@ -245,6 +246,32 @@ clarificada.
   (rejeitada — complexidade desnecessária para uma comparação puramente
   relativa/ordinal, sem nenhum requisito do spec exigindo precisão de área
   absoluta).
+
+## 10.1. `RegisteredAt` via `time.Now()` direto, sem porta `Clock`
+
+- **Decisão**: `RegisterGeoDataService` chama `time.Now()` diretamente para
+  preencher `RegisteredAt`, em vez de receber esse valor de uma porta
+  `Clock` dedicada. Decisão revisada em relação à primeira versão desta
+  etapa, que introduziu `domain.Clock` + um adapter
+  `internal/infra/outbound/clock` — ambos removidos.
+- **Racional**: os "dependências externas" do Princípio II da constituição
+  são explicitamente parser de arquivo, renderizador, filesystem, processo
+  externo, browser — `time` é biblioteca padrão da linguagem, não um
+  desses casos, e o núcleo já importa outras bibliotecas padrão puras
+  diretamente (`math` em `bounding_box.go`, `sort` em `cleaning.go`) sem
+  porta. `time.Now()` é impuro (não determinístico), mas `RegisteredAt` não
+  é um dado de negócio exposto ao usuário — é usado apenas internamente
+  para desempate — então a precisão exigida do teste é baixa: comparar
+  `RegisteredAt` contra um intervalo `[antes, depois]` em torno da chamada
+  (como o teste de `register_geo_data_service_test.go` já faz) é
+  suficiente, sem precisar de um mock. O custo da porta (arquivo de porta,
+  mock gerado, adapter, mais um parâmetro no construtor) não se pagava para
+  esse ganho.
+- **Alternativas consideradas**: manter a porta `Clock` (decisão original
+  desta etapa, superada — ver Princípio II acima: não é uma dependência
+  externa no sentido que a constituição usa o termo, e o ganho de precisão
+  no teste não compensava a abstração extra para um campo que nunca é
+  exibido ao usuário).
 
 ## 11. Granularidade do relatório de cobertura
 

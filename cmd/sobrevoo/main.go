@@ -10,7 +10,6 @@ import (
 
 	"github.com/waliqueiroz/sobrevoo/internal/application"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/inbound/cli"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/clock"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/config"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/filechecker"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/geodatainspector"
@@ -38,9 +37,8 @@ func run() int {
 
 	geoDataInspector := geodatainspector.New()
 	geoDataRegistry := jsonfile.New(cfg.RegistryPath)
-	systemClock := clock.New()
 	geoDataFileChecker := filechecker.New()
-	registerGeoDataService := application.NewRegisterGeoDataService(geoDataRegistry, geoDataInspector, systemClock)
+	registerGeoDataService := application.NewRegisterGeoDataService(geoDataRegistry, geoDataInspector)
 	checkCoverageService := application.NewCheckCoverageService(parser, geoDataRegistry, geoDataFileChecker, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 	listGeoDataService := application.NewListGeoDataService(geoDataRegistry, geoDataFileChecker)
 	removeGeoDataService := application.NewRemoveGeoDataService(geoDataRegistry)

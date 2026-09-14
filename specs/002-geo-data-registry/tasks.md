@@ -49,7 +49,7 @@ desta etapa (o módulo Go, o `Makefile` e a estrutura raiz já existem desde a
 etapa 1).
 
 - [X] T001 [P] Adicionar a dependência `modernc.org/sqlite` via `go get`, atualizando `go.mod`/`go.sum` (research.md item 2)
-- [X] T002 [P] Criar o esqueleto de diretórios para os novos pacotes: `internal/infra/outbound/geodatainspector/`, `internal/infra/outbound/geodatastore/jsonfile/`, `internal/infra/outbound/filechecker/`, `internal/infra/outbound/clock/`, conforme a árvore em `plan.md`
+- [X] T002 [P] Criar o esqueleto de diretórios para os novos pacotes: `internal/infra/outbound/geodatainspector/`, `internal/infra/outbound/geodatastore/jsonfile/`, `internal/infra/outbound/filechecker/`, conforme a árvore em `plan.md`
 
 **Checkpoint**: dependência e diretórios prontos.
 
@@ -92,20 +92,20 @@ inexistente, um conteúdo não reconhecido, e um nome já usado.
 ### Implementação da História de Usuário 1
 
 - [X] T009 [P] [US1] Estender `internal/domain/geo_data_source.go`: adicionar a struct `InspectedGeoData` (`Format`, `Type`, `BoundingBox`) e a porta `GeoDataInspector` (`Inspect(path string) (InspectedGeoData, error)`), com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_inspector.go . GeoDataInspector` (depende de T003)
-- [X] T010 [P] [US1] Criar a porta `Clock` (`Now() time.Time`) em `internal/domain/clock.go`, com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/clock.go . Clock`
-- [X] T011 [P] [US1] Gerar os mocks de `GeoDataInspector` e `Clock` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/geo_data_inspector.go` e `internal/domain/mock_domain/clock.go` (depende de T009, T010)
+- [X] ~~T010 [P] [US1] Criar a porta `Clock` (`Now() time.Time`) em `internal/domain/clock.go`, com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/clock.go . Clock`~~ Feita e depois revertida: `time` é biblioteca padrão, não uma dependência externa no sentido do Princípio II, e `RegisteredAt` nunca é exibido ao usuário — a porta não compensava o custo da abstração. `RegisterGeoDataService` chama `time.Now()` diretamente (research.md item 10.1).
+- [X] T011 [P] [US1] Gerar o mock de `GeoDataInspector` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/geo_data_inspector.go` (depende de T009)
 - [X] T012 [P] [US1] Criar fixtures de MBTiles de teste em `test/helper/mbtiles_fixture.go`: um MBTiles válido com a chave `bounds` na tabela `metadata`, um MBTiles sem `bounds`, e um conteúdo que não é um banco SQLite
 - [X] T013 [P] [US1] Criar fixtures de GeoTIFF de teste em `test/helper/geotiff_fixture.go`: um GeoTIFF válido em CRS geográfico (WGS84), um GeoTIFF em CRS projetado, e um conteúdo que não é TIFF
 - [X] T014 [P] [US1] Implementar a leitura de MBTiles em `internal/infra/outbound/geodatainspector/mbtiles.go`: abrir o arquivo via `modernc.org/sqlite`, consultar a chave `bounds` da tabela `metadata`, converter `"minLon,minLat,maxLon,maxLat"` para `domain.BoundingBox`; devolver `domain.ErrUnsupportedDataFormat` quando a chave `bounds` estiver ausente; testes em `mbtiles_test.go` usando as fixtures de T012 (research.md itens 1-2) (depende de T012)
 - [X] T015 [P] [US1] Implementar a leitura de tags GeoTIFF em `internal/infra/outbound/geodatainspector/geotiff.go`: parser próprio de cabeçalho TIFF + IFD via `encoding/binary`/`io.ReaderAt` (sem biblioteca externa), extraindo `ImageWidth`, `ImageLength`, `ModelPixelScaleTag`, `ModelTiepointTag` (ou `ModelTransformationTag`) e `GeoKeyDirectoryTag`; confirmar CRS geográfico (`GTModelTypeGeoKey = 2`) e computar a `BoundingBox`; devolver `domain.ErrUnsupportedDataFormat` para CRS projetado ou tags de georreferenciamento ausentes; testes em `geotiff_test.go` usando as fixtures de T013 (research.md itens 3-4) (depende de T013)
 - [X] T016 [US1] Implementar o adapter dispatcher em `internal/infra/outbound/geodatainspector/geodatainspector.go`: identificar o formato pela assinatura do conteúdo (cabeçalho SQLite → `mbtiles.go`/mapa base; cabeçalho TIFF → `geotiff.go`/relevo), traduzir erros de abertura de arquivo do SO para `domain.ErrDataFileNotFound`/`domain.ErrDataFileUnreadable`, assinatura não reconhecida → `domain.ErrUnsupportedDataFormat`, implementando `domain.GeoDataInspector` (research.md item 8); testes em `geodatainspector_test.go` (depende de T009, T014, T015)
-- [X] T017 [P] [US1] Implementar o adapter `Clock` em `internal/infra/outbound/clock/clock.go` usando `time.Now()` (depende de T010)
-- [X] T018 [US1] Implementar `RegisterGeoDataService` em `internal/application/register_geo_data_service.go`: `RegisterGeoDataInput{Name, Path}` / `RegisterGeoDataOutput{Source}`; recusa com `domain.ErrDataSourceNameAlreadyUsed` quando `GeoDataRegistry.FindByName` já encontra o nome; chama `GeoDataInspector.Inspect`; monta o `GeoDataSource` com `RegisteredAt` vindo de `Clock.Now()`; chama `GeoDataRegistry.Save`; testes usando os mocks de `GeoDataRegistry`, `GeoDataInspector` e `Clock` (depende de T005, T011, T016, T017)
+- [X] ~~T017 [P] [US1] Implementar o adapter `Clock` em `internal/infra/outbound/clock/clock.go` usando `time.Now()` (depende de T010)~~ Feita e depois revertida junto com T010 — ver nota acima.
+- [X] T018 [US1] Implementar `RegisterGeoDataService` em `internal/application/register_geo_data_service.go`: `RegisterGeoDataInput{Name, Path}` / `RegisterGeoDataOutput{Source}`; recusa com `domain.ErrDataSourceNameAlreadyUsed` quando `GeoDataRegistry.FindByName` já encontra o nome; chama `GeoDataInspector.Inspect`; monta o `GeoDataSource` com `RegisteredAt` vindo de `time.Now()`; chama `GeoDataRegistry.Save`; testes usando os mocks de `GeoDataRegistry` e `GeoDataInspector`, com `RegisteredAt` verificado por uma janela `[antes, depois]` em torno da chamada (depende de T005, T011, T016)
 - [X] T019 [P] [US1] Gerar o mock de `RegisterGeoDataService` em `internal/application/mock_application/register_geo_data_service.go` (depende de T018)
 - [X] T020 [P] [US1] Implementar o comando pai Cobra `geodata` em `internal/infra/inbound/cli/geodata.go` (mesmo padrão de `root.go`, agrupa os subcomandos desta feature)
 - [X] T021 [US1] Implementar o subcomando `register` em `internal/infra/inbound/cli/geodata_register.go`: argumento posicional `<arquivo>` + flag `--name` (obrigatória), chama `RegisterGeoDataService.Execute`, formata a confirmação em inglês descrita em `contracts/cli.md` (nome, tipo, área geográfica), anexa ao comando `geodata` (depende de T018, T020)
 - [X] T022 [P] [US1] Estender `internal/infra/inbound/cli/exit_code.go`: mapear `domain.ErrDataFileNotFound`→`5`, `domain.ErrDataFileUnreadable`→`6`, `domain.ErrUnsupportedDataFormat`→`7`, `domain.ErrDataSourceNameAlreadyUsed`→`8` (contracts/cli.md) (depende de T004)
-- [X] T023 [US1] Conectar em `cmd/sobrevoo/main.go`: `geodatainspector.New()`, `clock.New()`, `jsonfile.New(cfg.RegistryPath)`, `application.NewRegisterGeoDataService(...)`, e anexar o comando `geodata` (com o subcomando `register`) ao comando raiz (depende de T008, T014, T015, T016, T017, T018, T020, T021, T022)
+- [X] T023 [US1] Conectar em `cmd/sobrevoo/main.go`: `geodatainspector.New()`, `jsonfile.New(cfg.RegistryPath)`, `application.NewRegisterGeoDataService(...)`, e anexar o comando `geodata` (com o subcomando `register`) ao comando raiz (depende de T008, T014, T015, T016, T018, T020, T021, T022)
 - [X] T024 [US1] Teste de contrato em `internal/infra/inbound/cli/geodata_register_test.go`: MBTiles válido → confirmação com tipo "base map" e área corretos, código de saída `0` (depende de T021)
 - [X] T025 [US1] Teste de contrato em `geodata_register_test.go`: caminho inexistente → código de saída `5` (depende de T022)
 - [X] T026 [US1] Teste de contrato em `geodata_register_test.go`: arquivo existente mas sem permissão de leitura → código de saída `6` (depende de T022)
@@ -208,7 +208,7 @@ independente.
 **Propósito**: qualidade final que atravessa todas as histórias.
 
 - [X] T061 [P] Rodar `go vet ./...` e corrigir qualquer problema encontrado no repositório
-- [X] T062 [P] Adicionar comentários de documentação de pacote (`// Package ...`) em `internal/infra/outbound/geodatainspector`, `internal/infra/outbound/geodatastore/jsonfile`, `internal/infra/outbound/filechecker` e `internal/infra/outbound/clock`
+- [X] T062 [P] Adicionar comentários de documentação de pacote (`// Package ...`) em `internal/infra/outbound/geodatainspector`, `internal/infra/outbound/geodatastore/jsonfile` e `internal/infra/outbound/filechecker`
 - [X] T063 Executar manualmente todos os cenários de `quickstart.md` contra o binário compilado (`make build`) e registrar qualquer divergência encontrada
 - [X] T064 [P] Rodar `go test ./... -cover` e confirmar cobertura alta em `internal/domain` e `internal/application` (Princípio VI da constituição), adicionando casos que faltarem
 - [X] T065 [P] Atualizar o parágrafo de arquitetura do `CLAUDE.md` (item `internal/infra/inbound/cli`) para refletir que, a partir desta etapa, os adapters de saída `geodatainspector`, `geodatastore/jsonfile` e `filechecker` também tocam o sistema de arquivos — não só a CLI —, conforme justificado em `research.md` item 8
@@ -273,7 +273,6 @@ independente.
 ```bash
 # Disparar as portas/fixtures independentes juntas:
 Task: "Estender geo_data_source.go com InspectedGeoData e GeoDataInspector"
-Task: "Criar a porta Clock em internal/domain/clock.go"
 Task: "Criar fixtures de MBTiles em test/helper/mbtiles_fixture.go"
 Task: "Criar fixtures de GeoTIFF em test/helper/geotiff_fixture.go"
 
