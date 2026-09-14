@@ -40,28 +40,48 @@ configuração, terminal) é acessada por uma porta implementada por um
 adapter.
 
 - **`internal/domain`** — entidades (`TrackPoint`, `Track`, `Route`,
-  `BoundingBox`, `Level`, `DiscardStats`), funções puras (distância de
-  Haversine, ganho de elevação, duração, cálculo de bounding box —
-  incluindo o "unwrap" de longitude no antimeridiano — e as funções de
-  limpeza de pontos), erros sentinela (`ErrEmptyFile`,
+  `BoundingBox`, `Level`, `DiscardStats`, `GeoDataSource`, `GeoDataSummary`,
+  `CoverageReport`, `TrackSummary`), construtores que carregam regra de
+  negócio (`NewGeoDataSource`, `SummarizeTrack`), funções puras (distância
+  de Haversine, ganho de elevação, duração, cálculo de bounding box —
+  incluindo o "unwrap" de longitude no antimeridiano —, `ReorderByTime` e
+  os `Discard*` compostos em `CleanTrack`, e o algoritmo de verificação de
+  cobertura, `ComputeCoverage`), erros sentinela (`ErrEmptyFile`,
   `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`), e as
-  portas `TrackParser`, `Simplifier`, `Smoother`.
-- **`internal/application`** — a *service layer*. Uma interface exportada
-  por caso de uso (`InspectTrackService`), implementada por uma struct não
-  exportada (`inspectTrackService`), construída por
-  `NewInspectTrackService(...)`. Orquestra portas e funções puras do
-  domínio; não conhece Cobra, arquivo, nem código de saída.
+  portas `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
+  `GeoDataRepository`, `FileChecker`. Qualquer DTO de saída que não seja um
+  valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
+  também é um tipo de domínio comum — não um DTO de `internal/application`
+  — e qualquer lógica não trivial (construir uma entidade, calcular algo a
+  partir de uma coleção) é construtor ou função pura de domínio, nunca um
+  helper solto na camada de aplicação; ver "Onde vive a regra de negócio"
+  abaixo.
+- **`internal/application`** — a *service layer*. Orquestra portas e
+  construtores/funções puras do domínio; não conhece Cobra, arquivo, nem
+  código de saída, e não decide nenhuma regra de negócio por conta própria
+  — só decide qual porta/função de domínio chamar, e em qual ordem.
 - **`internal/infra/outbound/*`** — adapters que implementam as portas do
   domínio: `trackparser` (GPX via `tkrajina/gpxgo`),
   `simplifier/douglaspeucker`, `smoother/catmullrom`, `config` (limiares
   internos fixos: mínimo de pontos, velocidade máxima plausível, nível
   padrão — ainda sem fonte de configuração externa, mas o ponto de extensão
   já existe, conforme o Princípio VIII da constituição).
-- **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra. O único lugar
-  que toca o filesystem (`os.Open`) e traduz erros sentinela do domínio em
-  códigos de saída de processo (`exit_code.go`); ver
-  `specs/001-gps-track-processing/contracts/cli.md` para o mapeamento
-  exato.
+- **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
+  traduz erros sentinela do domínio em códigos de saída de processo
+  (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
+  `specs/002-geo-data-registry/contracts/cli.md` para o mapeamento exato.
+  Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
+  para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
+  isso não é mais universal: adapters de saída que precisam de acesso
+  posicional a um arquivo — `geodatainspector` (lê SQLite/TIFF por
+  caminho), `geodatastore/jsonfile` (lê/escreve o registro) e `filechecker`
+  (`os.Stat`) — abrem o arquivo eles mesmos, dado apenas o caminho; a CLI
+  continua sendo quem abre o arquivo só quando o método do serviço exige um
+  `io.Reader` (`register` não abre nada, pois passa um caminho;
+  `check` abre, pois `GeoDataService.CheckCoverage` exige um `Reader`,
+  igual a `inspect`). Ambos os padrões respeitam os Princípios I e II da
+  constituição — é só uma questão de qual adapter concreto faz a chamada de
+  I/O real (`specs/002-geo-data-registry/research.md`, item 8).
 - **`cmd/sobrevoo/main.go`** — composition root; o único lugar que conecta
   todos os adapters concretos entre si.
 
@@ -72,9 +92,40 @@ adapter.
   já que produz `Track`). Uma porta sem entidade dona ganha seu próprio
   arquivo, nomeado pelo conceito que representa (`Simplifier` em
   `simplification.go`, `Smoother` em `smoothing.go`).
-- Casos de uso são `XService` (interface exportada) / `xService` (struct
-  não exportada) / `NewXService(...)` (construtor). Adapters de entrada
-  dependem só da interface, nunca da struct concreta.
+- `XService` (interface exportada) / `xService` (struct não exportada) /
+  `NewXService(...)` (construtor) é **um serviço por recurso/agregado, não
+  um serviço por caso de uso**: `X` nomeia o que o serviço gerencia (ex.:
+  `GeoDataService`), e cada caso de uso vira um método nomeado pela
+  operação (`Register`, `List`, `Remove`, `CheckCoverage` — nunca um
+  `Execute` genérico, nunca uma interface por método). Vários casos de uso
+  que operam sobre o mesmo recurso pertencem à mesma interface e à mesma
+  struct — padrão espelhado de `waliqueiroz/mystery-gifter-api`
+  (`internal/application/group_service.go`: `GroupService` reúne
+  `Create`/`GetByID`/`Search`/`AddUser`/`RemoveUser`/`GenerateMatches`/
+  `Reopen`/`Archive`/`GetUserMatch`). Um serviço pode depender de outro
+  serviço de aplicação (não só de portas do domínio) quando isso faz
+  sentido — ver `GroupInviteService` dependendo de `UserService` no mesmo
+  repositório de referência. Adapters de entrada dependem só da interface,
+  nunca da struct concreta. (`InspectTrackService`/`GeoDataService`, em
+  `internal/application`, seguem esse padrão; ver
+  `specs/002-geo-data-registry/research.md` item 13 para o histórico dessa
+  decisão.)
+- **Onde vive a regra de negócio**: DTOs de saída não triviais e qualquer
+  lógica que não seja "chamar uma porta na ordem certa" vivem em
+  `internal/domain`, nunca em `internal/application` — nem como DTO
+  próprio da camada de aplicação, nem como função solta no pacote
+  `application`. Um método de serviço busca/checa via porta, delega a
+  regra para um construtor (`domain.NewGeoDataSource`) ou função pura de
+  domínio (`domain.ComputeCoverage`), e devolve o resultado — a mesma
+  divisão de `GroupService.AddUser` (busca via repositório, delega para
+  `domain.Group.AddUser`) em `waliqueiroz/mystery-gifter-api`. Dentro do
+  domínio, tanto faz a lógica virar método de uma entidade
+  (`Group.AddUser`, `Group.GenerateMatches`) quanto função livre operando
+  sobre coleções (`ComputeBoundingBox`, `Haversine`, `ComputeCoverage`) —
+  o segundo já é o padrão deste projeto desde a etapa 1, e o repositório de
+  referência do usuário usa os dois conforme o caso. Ver
+  `specs/002-geo-data-registry/research.md` item 14 para o histórico dessa
+  decisão.
 - Mocks são gerados com `go.uber.org/mock/mockgen` via diretiva
   `//go:generate` posicionada diretamente acima da interface que ela
   mocka — nunca em um arquivo central. A saída vai para um subpacote

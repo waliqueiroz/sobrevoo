@@ -23,4 +23,24 @@ var (
 	// enough points originally, but falls below the minimum required after
 	// discarding invalid points (FR-006).
 	ErrInsufficientPointsAfterCleaning = errors.New("track has insufficient points after cleaning")
+
+	// ErrDataFileNotFound is returned when a geo data file path does not
+	// exist (FR-004).
+	ErrDataFileNotFound = errors.New("geo data file not found")
+
+	// ErrDataFileUnreadable is returned when a geo data file exists but
+	// cannot be opened/read (FR-005).
+	ErrDataFileUnreadable = errors.New("geo data file cannot be read")
+
+	// ErrUnsupportedDataFormat is returned when a geo data file's content
+	// does not match any recognized base map or elevation format (FR-006).
+	ErrUnsupportedDataFormat = errors.New("unsupported geo data file format")
+
+	// ErrDataSourceNameAlreadyUsed is returned when registering a name that
+	// already identifies another registered source (FR-007).
+	ErrDataSourceNameAlreadyUsed = errors.New("geo data source name already in use")
+
+	// ErrDataSourceNotRegistered is returned when a name does not match any
+	// registered geo data source (FR-012).
+	ErrDataSourceNotRegistered = errors.New("geo data source not registered")
 )

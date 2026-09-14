@@ -110,3 +110,97 @@ func Test_ComputeBoundingBox(t *testing.T) {
 		assert.InDelta(t, 0.5, boundingBox.MaxLatitude, 0.0001)
 	})
 }
+
+func Test_BoundingBox_Contains(t *testing.T) {
+	t.Run("should report true for a point inside a box that does not cross the antimeridian", func(t *testing.T) {
+		// given
+		box := domain.BoundingBox{MinLatitude: 40.0, MaxLatitude: 50.0, MinLongitude: 10.0, MaxLongitude: 20.0}
+
+		// when
+		contains := box.Contains(45.0, 15.0)
+
+		// then
+		assert.True(t, contains)
+	})
+
+	t.Run("should report false for a point outside a box that does not cross the antimeridian", func(t *testing.T) {
+		// given
+		box := domain.BoundingBox{MinLatitude: 40.0, MaxLatitude: 50.0, MinLongitude: 10.0, MaxLongitude: 20.0}
+
+		// when
+		contains := box.Contains(45.0, 25.0)
+
+		// then
+		assert.False(t, contains)
+	})
+
+	t.Run("should report false for a point whose latitude falls outside the box", func(t *testing.T) {
+		// given
+		box := domain.BoundingBox{MinLatitude: 40.0, MaxLatitude: 50.0, MinLongitude: 10.0, MaxLongitude: 20.0}
+
+		// when
+		contains := box.Contains(60.0, 15.0)
+
+		// then
+		assert.False(t, contains)
+	})
+
+	t.Run("should report true for a point on the far side of a box that crosses the antimeridian", func(t *testing.T) {
+		// given: occupied longitude range goes from 170 to 180 and from -180 to -170
+		box := domain.BoundingBox{MinLatitude: -1, MaxLatitude: 1, MinLongitude: 170, MaxLongitude: -170, CrossesAntimeridian: true}
+
+		// when
+		contains := box.Contains(0, -175.0)
+
+		// then
+		assert.True(t, contains)
+	})
+
+	t.Run("should report false for a point in the excluded middle of a box that crosses the antimeridian", func(t *testing.T) {
+		// given: 0 degrees longitude is on the "inside" arc, not covered by the box
+		box := domain.BoundingBox{MinLatitude: -1, MaxLatitude: 1, MinLongitude: 170, MaxLongitude: -170, CrossesAntimeridian: true}
+
+		// when
+		contains := box.Contains(0, 0)
+
+		// then
+		assert.False(t, contains)
+	})
+}
+
+func Test_BoundingBox_AreaDegrees(t *testing.T) {
+	t.Run("should compute width times height for a box that does not cross the antimeridian", func(t *testing.T) {
+		// given
+		box := domain.BoundingBox{MinLatitude: 40.0, MaxLatitude: 50.0, MinLongitude: 10.0, MaxLongitude: 20.0}
+
+		// when
+		area := box.AreaDegrees()
+
+		// then
+		assert.InDelta(t, 100.0, area, 0.0001)
+	})
+
+	t.Run("should unwrap the longitude span for a box that crosses the antimeridian", func(t *testing.T) {
+		// given: 10 degrees on each side of the antimeridian (170->180, -180->-170)
+		box := domain.BoundingBox{MinLatitude: 0.0, MaxLatitude: 1.0, MinLongitude: 170, MaxLongitude: -170, CrossesAntimeridian: true}
+
+		// when
+		area := box.AreaDegrees()
+
+		// then
+		assert.InDelta(t, 20.0, area, 0.0001)
+	})
+
+	t.Run("should report a smaller area for a more specific (narrower) box", func(t *testing.T) {
+		// given
+		wide := domain.BoundingBox{MinLatitude: 0.0, MaxLatitude: 10.0, MinLongitude: 0.0, MaxLongitude: 10.0}
+		narrow := domain.BoundingBox{MinLatitude: 0.0, MaxLatitude: 1.0, MinLongitude: 0.0, MaxLongitude: 1.0}
+
+		// when
+		wideArea := wide.AreaDegrees()
+		narrowArea := narrow.AreaDegrees()
+
+		// then
+		assert.Less(t, narrowArea, wideArea)
+	})
+}

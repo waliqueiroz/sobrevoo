@@ -3,11 +3,12 @@
 **Feature**: `002-geo-data-registry` | **Data**: 2026-09-13
 
 Este é o único contrato externo desta etapa: o comando pai `geodata` e seus
-quatro subcomandos, que expõem `RegisterGeoDataService`,
-`ListGeoDataService`, `RemoveGeoDataService` e `CheckCoverageService`
-(`internal/infra/inbound/cli`). Não há API HTTP nem GUI nesta etapa (fora de
-escopo, ver `spec.md`). O contrato de `sobrevoo inspect` da etapa 1
-(`specs/001-gps-track-processing/contracts/cli.md`) permanece inalterado.
+quatro subcomandos, que expõem os quatro métodos de `GeoDataService`
+(`Register`, `List`, `Remove`, `CheckCoverage` — ver `data-model.md`)
+através de `internal/infra/inbound/cli`. Não há API HTTP nem GUI nesta
+etapa (fora de escopo, ver `spec.md`). O contrato de `sobrevoo inspect` da
+etapa 1 (`specs/001-gps-track-processing/contracts/cli.md`) permanece
+inalterado.
 
 ## `sobrevoo geodata register`
 
@@ -153,10 +154,9 @@ códigos de saída.
 
 ## Reuso futuro
 
-Nenhum dos quatro novos serviços conhece este contrato de CLI: cada um
-recebe seu próprio DTO de entrada e devolve seu próprio DTO de saída como
-dado puro (ver `data-model.md`). Um futuro adapter HTTP construirá os
-mesmos DTOs de entrada a partir de uma requisição, chamará os mesmos
-serviços, e traduzirá os DTOs de saída e os mesmos erros sentinela para um
-corpo de resposta e um status HTTP — sem duplicar nenhuma regra de negócio
-(Princípio III).
+`GeoDataService` não conhece este contrato de CLI: cada método recebe
+argumentos simples ou devolve dado puro (entidade de domínio ou DTO — ver
+`data-model.md`). Um futuro adapter HTTP chamará os mesmos métodos a partir
+de uma requisição, e traduzirá o retorno e os mesmos erros sentinela para
+um corpo de resposta e um status HTTP — sem duplicar nenhuma regra de
+negócio (Princípio III).

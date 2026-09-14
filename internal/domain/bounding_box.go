@@ -72,3 +72,38 @@ func normalizeLongitude(degrees float64) float64 {
 	}
 	return wrapped - 180
 }
+
+// Contains reports whether the geographic point (lat, lon) falls inside b,
+// used by CheckCoverageService to decide whether a registered source
+// covers a given route point (FR-018). CrossesAntimeridian is handled the
+// same way ComputeBoundingBox produces it: when b crosses the antimeridian,
+// the occupied longitude range is the one going from MinLongitude to 180°
+// and from -180° to MaxLongitude — not the direct span between the two
+// values.
+func (b BoundingBox) Contains(lat, lon float64) bool {
+	if lat < b.MinLatitude || lat > b.MaxLatitude {
+		return false
+	}
+
+	if b.CrossesAntimeridian {
+		return lon >= b.MinLongitude || lon <= b.MaxLongitude
+	}
+
+	return lon >= b.MinLongitude && lon <= b.MaxLongitude
+}
+
+// AreaDegrees returns b's approximate area in square degrees (width ×
+// height, with the same antimeridian "unwrap" as ComputeBoundingBox). It is
+// not a true geodesic area — it exists only to compare how "specific" two
+// overlapping sources of the same type are, to break ties deterministically
+// (FR-016, research.md item 10).
+func (b BoundingBox) AreaDegrees() float64 {
+	height := b.MaxLatitude - b.MinLatitude
+
+	width := b.MaxLongitude - b.MinLongitude
+	if b.CrossesAntimeridian {
+		width += 360
+	}
+
+	return width * height
+}

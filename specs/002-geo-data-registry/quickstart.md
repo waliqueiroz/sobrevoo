@@ -191,11 +191,13 @@ go test ./... -cover
 ```
 
 **Resultado esperado**: todos os testes passam, incluindo os já existentes
-da etapa 1 (o ajuste em `inspect_track_service.go` para reaproveitar
-`track_loading.go` não deve alterar nenhum comportamento observável já
-testado). Os testes do núcleo (`internal/domain` e `internal/application`)
+da etapa 1 — reescritos para o `InspectTrackService.Inspect` reorganizado
+(argumentos simples em vez de `InspectTrackInput`, `domain.TrackSummary`
+em vez de `InspectTrackOutput`), mas sem alterar nenhum comportamento
+observável do comando `inspect` em si (research.md item 15). Os testes do
+núcleo (`internal/domain` e `internal/application`)
 não tocam disco, rede, nem processo externo — as novas portas
-(`GeoDataInspector`, `GeoDataRegistry`, `FileChecker`, `Clock`) são
-substituídas por mocks gerados com `go.uber.org/mock` nos testes de
-`internal/application`; nenhum teste abre um MBTiles/GeoTIFF real ou toca o
-arquivo de registro de verdade.
+(`GeoDataInspector`, `GeoDataRepository`, `FileChecker`) são substituídas por
+mocks gerados com `go.uber.org/mock` nos testes de `internal/application`;
+nenhum teste abre um MBTiles/GeoTIFF real ou toca o arquivo de registro de
+verdade.
