@@ -51,12 +51,40 @@ type GeoDataSource struct {
 	RegisteredAt time.Time
 }
 
+// NewGeoDataSource builds a GeoDataSource from what a GeoDataInspector
+// discovered about the file at path, stamping RegisteredAt with the
+// current time — the same way domain.NewGroup stamps CreatedAt in
+// waliqueiroz/mystery-gifter-api: time.Now() is a stdlib call, not an
+// external dependency in the Constitution's sense (Princípio II), so it is
+// called directly here rather than through a Clock port (research.md item
+// 10.1).
+func NewGeoDataSource(name, path string, inspected InspectedGeoData) GeoDataSource {
+	return GeoDataSource{
+		Name:         name,
+		Path:         path,
+		Type:         inspected.Type,
+		Format:       inspected.Format,
+		BoundingBox:  inspected.BoundingBox,
+		RegisteredAt: time.Now(),
+	}
+}
+
 // InspectedGeoData is what a GeoDataInspector discovers by examining a
 // geographic data file's content.
 type InspectedGeoData struct {
 	Format      DataFormat
 	Type        DataType
 	BoundingBox BoundingBox
+}
+
+// GeoDataSummary is one registered source together with its live file
+// availability (FR-010), as reported by GeoDataService.List.
+type GeoDataSummary struct {
+	Source GeoDataSource
+
+	// Available is false when the file is no longer found at Source.Path
+	// (FR-010).
+	Available bool
 }
 
 //go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_inspector.go . GeoDataInspector

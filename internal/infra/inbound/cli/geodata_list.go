@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/waliqueiroz/sobrevoo/internal/application"
+	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
 // NewGeoDataListCommand creates the "geodata list" command, which exposes
@@ -38,9 +39,9 @@ func runGeoDataList(cmd *cobra.Command, geoDataService application.GeoDataServic
 	return nil
 }
 
-// formatGeoDataList renders a []GeoDataSummary as the English,
+// formatGeoDataList renders a []domain.GeoDataSummary as the English,
 // human-readable listing described in contracts/cli.md (FR-009, FR-010).
-func formatGeoDataList(summaries []application.GeoDataSummary) string {
+func formatGeoDataList(summaries []domain.GeoDataSummary) string {
 	if len(summaries) == 0 {
 		return "No geo data registered.\n"
 	}

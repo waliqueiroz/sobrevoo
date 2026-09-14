@@ -57,10 +57,10 @@ func runGeoDataCheck(cmd *cobra.Command, geoDataService application.GeoDataServi
 	return nil
 }
 
-// formatCoverage renders a CheckCoverageOutput as the English,
+// formatCoverage renders a domain.CoverageReport as the English,
 // human-readable report described in contracts/cli.md (FR-013 through
 // FR-017).
-func formatCoverage(output application.CheckCoverageOutput) string {
+func formatCoverage(output domain.CoverageReport) string {
 	var b strings.Builder
 
 	fmt.Fprintf(&b, "Coverage: %s\n", output.Status)

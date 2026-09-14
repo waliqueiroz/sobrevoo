@@ -56,8 +56,8 @@ func Test_GeoDataCheckCommand_Args(t *testing.T) {
 func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 	t.Run("should report full coverage with the sources used", func(t *testing.T) {
 		// given
-		output := application.CheckCoverageOutput{
-			Status:               application.CoverageStatusFull,
+		output := domain.CoverageReport{
+			Status:               domain.CoverageStatusFull,
 			BaseMapSourcesUsed:   []domain.GeoDataSource{{Name: "europa-mapa"}},
 			ElevationSourcesUsed: []domain.GeoDataSource{{Name: "europa-relevo"}},
 		}
@@ -79,10 +79,10 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 	t.Run("should report a missing-elevation verdict when only a base map covers the track", func(t *testing.T) {
 		// given
-		output := application.CheckCoverageOutput{
-			Status: application.CoverageStatusPartial,
-			UncoveredSegments: []application.UncoveredSegment{
-				{StartLatitude: 45, StartLongitude: 15, EndLatitude: 46, EndLongitude: 16, Missing: application.MissingElevation},
+		output := domain.CoverageReport{
+			Status: domain.CoverageStatusPartial,
+			UncoveredSegments: []domain.UncoveredSegment{
+				{StartLatitude: 45, StartLongitude: 15, EndLatitude: 46, EndLongitude: 16, Missing: domain.MissingElevation},
 			},
 			BaseMapSourcesUsed: []domain.GeoDataSource{{Name: "europa-mapa"}},
 		}
@@ -102,10 +102,10 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 	t.Run("should report a missing-base-map verdict when only an elevation source covers the track", func(t *testing.T) {
 		// given
-		output := application.CheckCoverageOutput{
-			Status: application.CoverageStatusPartial,
-			UncoveredSegments: []application.UncoveredSegment{
-				{StartLatitude: 45, StartLongitude: 15, EndLatitude: 46, EndLongitude: 16, Missing: application.MissingBaseMap},
+		output := domain.CoverageReport{
+			Status: domain.CoverageStatusPartial,
+			UncoveredSegments: []domain.UncoveredSegment{
+				{StartLatitude: 45, StartLongitude: 15, EndLatitude: 46, EndLongitude: 16, Missing: domain.MissingBaseMap},
 			},
 			ElevationSourcesUsed: []domain.GeoDataSource{{Name: "europa-relevo"}},
 		}
@@ -125,10 +125,10 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 	t.Run("should print the uncovered segment's start and end coordinates", func(t *testing.T) {
 		// given
-		output := application.CheckCoverageOutput{
-			Status: application.CoverageStatusPartial,
-			UncoveredSegments: []application.UncoveredSegment{
-				{StartLatitude: 60, StartLongitude: 30, EndLatitude: 61, EndLongitude: 31, Missing: application.MissingBoth},
+		output := domain.CoverageReport{
+			Status: domain.CoverageStatusPartial,
+			UncoveredSegments: []domain.UncoveredSegment{
+				{StartLatitude: 60, StartLongitude: 30, EndLatitude: 61, EndLongitude: 31, Missing: domain.MissingBoth},
 			},
 		}
 
@@ -149,8 +149,8 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 		// given: the resolution itself (smaller area wins) is verified at
 		// the application layer (geo_data_service_test.go) — this only
 		// checks the CLI surfaces whichever source the service picked.
-		output := application.CheckCoverageOutput{
-			Status:             application.CoverageStatusFull,
+		output := domain.CoverageReport{
+			Status:             domain.CoverageStatusFull,
 			BaseMapSourcesUsed: []domain.GeoDataSource{{Name: "regiao-especifica"}},
 		}
 
@@ -170,8 +170,8 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 		// given: antimeridian handling itself is verified at the
 		// application layer (geo_data_service_test.go) and in
 		// BoundingBox.Contains/AreaDegrees (bounding_box_test.go).
-		output := application.CheckCoverageOutput{
-			Status:               application.CoverageStatusFull,
+		output := domain.CoverageReport{
+			Status:               domain.CoverageStatusFull,
 			BaseMapSourcesUsed:   []domain.GeoDataSource{{Name: "antimeridiano-mapa"}},
 			ElevationSourcesUsed: []domain.GeoDataSource{{Name: "antimeridiano-relevo"}},
 		}
@@ -192,10 +192,10 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 		// given: excluding the source itself is verified at the
 		// application layer (geo_data_service_test.go) — this only checks
 		// the CLI never prints a source the service did not report.
-		output := application.CheckCoverageOutput{
-			Status: application.CoverageStatusPartial,
-			UncoveredSegments: []application.UncoveredSegment{
-				{Missing: application.MissingBaseMap},
+		output := domain.CoverageReport{
+			Status: domain.CoverageStatusPartial,
+			UncoveredSegments: []domain.UncoveredSegment{
+				{Missing: domain.MissingBaseMap},
 			},
 			ElevationSourcesUsed: []domain.GeoDataSource{{Name: "europa-relevo"}},
 		}
@@ -215,9 +215,9 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 	t.Run("should report no coverage when nothing is registered", func(t *testing.T) {
 		// given
-		output := application.CheckCoverageOutput{
-			Status:            application.CoverageStatusNone,
-			UncoveredSegments: []application.UncoveredSegment{{Missing: application.MissingBoth}},
+		output := domain.CoverageReport{
+			Status:            domain.CoverageStatusNone,
+			UncoveredSegments: []domain.UncoveredSegment{{Missing: domain.MissingBoth}},
 		}
 
 		mockCtrl := gomock.NewController(t)
@@ -236,7 +236,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(application.CheckCoverageOutput{}, domain.ErrEmptyFile)
+		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(domain.CoverageReport{}, domain.ErrEmptyFile)
 
 		// when
 		_, err := executeGeoDataCheckCommand(t, mockedService)

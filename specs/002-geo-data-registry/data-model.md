@@ -19,11 +19,33 @@ Um registro de dado geográfico local declarado pelo usuário (Entidade-Chave
 | `Type` | `DataType` (enum) | `DataTypeBaseMap` ou `DataTypeElevation`, determinado automaticamente a partir do conteúdo do arquivo (FR-002). |
 | `Format` | `DataFormat` (enum) | `DataFormatMBTiles` ou `DataFormatGeoTIFF` — o formato de arquivo concreto identificado. Guardado separadamente de `Type` pelo mesmo motivo que `Track.Format` existe desde a etapa 1: um segundo formato para o mesmo tipo (ex.: um segundo formato de mapa base) pode ser adicionado no futuro sem alterar esta entidade. |
 | `BoundingBox` | `BoundingBox` | Área geográfica coberta, determinada automaticamente a partir do conteúdo do arquivo (FR-003). |
-| `RegisteredAt` | `time.Time` | Instante em que o registro foi criado, obtido de `time.Now()` diretamente por `GeoDataService.Register` — sem uma porta dedicada (`research.md` item 10.1: `time` é biblioteca padrão, não uma dependência externa no sentido do Princípio II, e o campo nunca é exibido ao usuário). Usado apenas para o desempate determinístico entre fontes sobrepostas (FR-016, ver `research.md` item 10). |
+| `RegisteredAt` | `time.Time` | Instante em que o registro foi criado, obtido de `time.Now()` diretamente por `NewGeoDataSource` — sem uma porta dedicada (`research.md` item 10.1: `time` é biblioteca padrão, não uma dependência externa no sentido do Princípio II, e o campo nunca é exibido ao usuário). Usado apenas para o desempate determinístico entre fontes sobrepostas (FR-016, ver `research.md` item 10). |
 
 Note-se que a entidade **não** guarda se o arquivo ainda existe: essa é uma
 informação dinâmica, recalculada a cada `list`/`check` via a porta
 `FileChecker` (FR-010, FR-017), nunca persistida junto do registro.
+
+```go
+func NewGeoDataSource(name, path string, inspected InspectedGeoData) GeoDataSource
+```
+
+Constrói um `GeoDataSource` a partir do que um `GeoDataInspector`
+descobriu, já com `RegisteredAt: time.Now()` — a mesma forma que
+`domain.NewGroup` monta `CreatedAt`/`UpdatedAt` em
+`waliqueiroz/mystery-gifter-api` (`research.md` item 14). A regra de
+negócio "como um `GeoDataSource` nasce" vive aqui, não em
+`GeoDataService.Register`, que só orquestra: verifica duplicidade de nome,
+chama `GeoDataInspector.Inspect`, chama este construtor, salva.
+
+## GeoDataSummary
+
+Um registro junto da sua disponibilidade de arquivo em tempo real, como
+reportado por `GeoDataService.List` (FR-009, FR-010).
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `Source` | `GeoDataSource` | O registro. |
+| `Available` | `bool` | `false` quando o arquivo não é mais encontrado no caminho registrado (FR-010). |
 
 ## DataType
 
@@ -51,8 +73,68 @@ Esta feature adiciona dois métodos, sem alterar seus campos:
 
 | Método | Assinatura | Descrição |
 |---|---|---|
-| `Contains` | `func (b BoundingBox) Contains(lat, lon float64) bool` | Reporta se o ponto geográfico `(lat, lon)` está dentro da área coberta por `b`, tratando corretamente o caso `CrossesAntimeridian` (FR-018). Usada por `GeoDataService.CheckCoverage` para decidir, ponto a ponto, se um `GeoDataSource` cobre aquele ponto. |
+| `Contains` | `func (b BoundingBox) Contains(lat, lon float64) bool` | Reporta se o ponto geográfico `(lat, lon)` está dentro da área coberta por `b`, tratando corretamente o caso `CrossesAntimeridian` (FR-018). Usada por `ComputeCoverage` (abaixo) para decidir, ponto a ponto, se um `GeoDataSource` cobre aquele ponto. |
 | `AreaDegrees` | `func (b BoundingBox) AreaDegrees() float64` | Área aproximada de `b` em graus quadrados (largura × altura, com a mesma técnica de "unwrap" de longitude usada para o antimeridiano), usada apenas como medida relativa de especificidade no desempate entre fontes sobrepostas (FR-016, ver `research.md` item 10) — não é uma área geodésica real. |
+
+## Cobertura de um trajeto
+
+Os tipos de saída e o algoritmo de verificação de cobertura são objetos de
+domínio comuns — não DTOs de `internal/application` — pelo mesmo motivo que
+`GroupSummary`/`SearchResult[T]` vivem em `internal/domain` no repositório
+de referência do usuário (`waliqueiroz/mystery-gifter-api`; ver
+`research.md` item 14). Vivem em `internal/domain/geo_data_coverage.go`.
+
+| Tipo | Campo | Descrição |
+|---|---|---|
+| `CoverageReport` | `Status CoverageStatus` | Veredito geral: `CoverageStatusFull`, `CoverageStatusPartial` ou `CoverageStatusNone` (SC-003). |
+| | `UncoveredSegments []UncoveredSegment` | Subtrechos contínuos não cobertos (vazio quando `Status == CoverageStatusFull`). |
+| | `BaseMapSourcesUsed []GeoDataSource` | Conjunto (sem repetição) de registros de mapa base que cobriram pelo menos um ponto do trajeto. |
+| | `ElevationSourcesUsed []GeoDataSource` | Conjunto (sem repetição) de registros de relevo que cobriram pelo menos um ponto do trajeto. |
+| `UncoveredSegment` | `StartLatitude, StartLongitude float64` | Coordenadas do primeiro ponto do subtrecho não coberto. |
+| | `EndLatitude, EndLongitude float64` | Coordenadas do último ponto do subtrecho não coberto. |
+| | `Missing MissingDataType` | O que falta nesse subtrecho: `MissingBaseMap`, `MissingElevation` ou `MissingBoth`. |
+
+```go
+func ComputeCoverage(route []TrackPoint, baseMaps, elevations []GeoDataSource) CoverageReport
+```
+
+Função pura (sem porta, sem I/O) que implementa FR-013 a FR-018: para cada
+ponto de `route`, escolhe o `GeoDataSource` de mapa base e o de relevo que
+o cobrem (via `BoundingBox.Contains`), desempatando por
+`BoundingBox.AreaDegrees` (menor área vence) e depois por `RegisteredAt`
+mais antigo (FR-016, Clarification — spec.md); agrupa pontos consecutivos
+com o mesmo status de cobertura em `UncoveredSegment` (FR-015,
+Clarification — spec.md); e agrega os conjuntos de fontes usadas. Os
+helpers privados (`pickCoverageWinner`, `isMoreSpecific`,
+`missingDataType`, `sortedSources`) são funções livres no mesmo arquivo —
+mesmo padrão de `ComputeBoundingBox`/`Haversine` no domínio, não métodos,
+já que nenhum deles precisa de estado além dos parâmetros recebidos.
+
+**Regra de decisão entre `CoverageStatusFull`, `CoverageStatusPartial` e
+`CoverageStatusNone`** (resolve a ambiguidade apontada pela análise de
+`/speckit-analyze` — ver Cenário de Aceitação 2 da História de Usuário 2 em
+`spec.md`, agora alinhado a esta regra): o veredito é calculado a partir do
+status de cobertura por ponto (totalmente coberto / falta mapa base / falta
+relevo / falta ambos), nunca de uma média ou de "qual tipo falta com mais
+frequência":
+
+- **`CoverageStatusFull`**: todo ponto da rota está totalmente coberto (nenhum
+  `UncoveredSegment`).
+- **`CoverageStatusNone`**: nenhum ponto da rota tem cobertura de nenhum dos
+  dois tipos em nenhum lugar do trajeto — equivalente a `BaseMapSourcesUsed`
+  e `ElevationSourcesUsed` virem ambos vazios. Inclui o caso de nenhum
+  registro cadastrado (Cenário de Aceitação 4).
+- **`CoverageStatusPartial`**: todo o restante — ou seja, existe pelo menos
+  um ponto totalmente coberto, ou pelo menos um dos dois conjuntos de fontes
+  usadas (`BaseMapSourcesUsed`/`ElevationSourcesUsed`) não está vazio, mas
+  nem todo ponto está totalmente coberto. Em particular, um trajeto com mapa
+  base cobrindo 100% da extensão mas nenhum registro de relevo em lugar
+  nenhum é `Partial` (há cobertura real, só que incompleta), não `None`.
+
+`ComputeCoverage` não sabe se um `GeoDataSource` ainda existe em disco:
+filtrar as fontes indisponíveis (via `FileChecker.Exists`, FR-017) antes de
+chamar esta função é responsabilidade de `GeoDataService.CheckCoverage`
+(orquestração, não regra de negócio).
 
 ## Erros sentinela do domínio (novos)
 
@@ -156,90 +238,42 @@ naturalmente juntos:
 ```go
 type GeoDataService interface {
     Register(name, path string) (domain.GeoDataSource, error)
-    List() ([]GeoDataSummary, error)
+    List() ([]domain.GeoDataSummary, error)
     Remove(name string) error
-    CheckCoverage(reader io.Reader) (CheckCoverageOutput, error)
+    CheckCoverage(reader io.Reader) (domain.CoverageReport, error)
 }
 ```
 
-Vive em `internal/application/geo_data_service.go`, junto dos tipos de
-saída abaixo (dado puro, como `InspectTrackOutput` — nenhum campo é
-`io.Writer`, nenhuma formatação de texto acontece na camada de serviço; a
-apresentação é responsabilidade exclusiva do adapter de entrada, a CLI).
+Vive em `internal/application/geo_data_service.go`. Todo tipo que aparece
+nas assinaturas acima (`GeoDataSource`, `GeoDataSummary`,
+`CoverageReport`) é um tipo de domínio — não um DTO de `internal/application`
+— pelo mesmo motivo do item anterior: nenhum campo é `io.Writer`, nenhuma
+formatação de texto acontece na camada de serviço nem no domínio; a
+apresentação é responsabilidade exclusiva do adapter de entrada, a CLI.
 
-### `Register(name, path string) (domain.GeoDataSource, error)`
+Cada método **só orquestra** portas e delega a regra de negócio para um
+construtor ou função de domínio — a mesma divisão de responsabilidade de
+`GroupService.AddUser` em `waliqueiroz/mystery-gifter-api` (busca via
+repositório, delega para `domain.Group.AddUser`, salva, devolve;
+`research.md` item 14):
 
-Recusa se `name` já existe (`ErrDataSourceNameAlreadyUsed`), chama
-`GeoDataInspector.Inspect(path)`, monta o `GeoDataSource` (com
-`RegisteredAt` vindo de `time.Now()`) e chama `GeoDataRegistry.Save`. O
-registro criado é devolvido diretamente — sem um DTO de saída dedicado,
-já que `domain.GeoDataSource` já é exatamente o que há para reportar.
-
-### `List() ([]GeoDataSummary, error)`
-
-| Tipo | Campo | Descrição |
-|---|---|---|
-| `GeoDataSummary` | `Source domain.GeoDataSource` | O registro. |
-| | `Available bool` | `false` quando o arquivo não é mais encontrado no caminho registrado (FR-010). |
-
-Sem entrada; para cada registro de `GeoDataRegistry.List()`, preenche
-`Available` via `FileChecker.Exists`.
-
-### `Remove(name string) error`
-
-Recusa com `ErrDataSourceNotRegistered` se `name` não existir; caso
-contrário chama `GeoDataRegistry.Delete`. Não há tipo de saída além do
-erro — o arquivo original nunca é tocado (FR-011).
-
-### `CheckCoverage(reader io.Reader) (CheckCoverageOutput, error)`
-
-| Tipo | Campo | Descrição |
-|---|---|---|
-| `CheckCoverageOutput` | `Status CoverageStatus` | Veredito geral: `CoverageStatusFull`, `CoverageStatusPartial` ou `CoverageStatusNone` (SC-003). |
-| | `UncoveredSegments []UncoveredSegment` | Subtrechos contínuos não cobertos (vazio quando `Status == CoverageStatusFull`). |
-| | `BaseMapSourcesUsed []domain.GeoDataSource` | Conjunto (sem repetição) de registros de mapa base que cobriram pelo menos um ponto do trajeto. |
-| | `ElevationSourcesUsed []domain.GeoDataSource` | Conjunto (sem repetição) de registros de relevo que cobriram pelo menos um ponto do trajeto. |
-
-| Tipo auxiliar | Campo | Descrição |
-|---|---|---|
-| `UncoveredSegment` | `StartLatitude, StartLongitude float64` | Coordenadas do primeiro ponto do subtrecho não coberto. |
-| | `EndLatitude, EndLongitude float64` | Coordenadas do último ponto do subtrecho não coberto. |
-| | `Missing MissingDataType` | O que falta nesse subtrecho: `MissingBaseMap`, `MissingElevation` ou `MissingBoth`. |
-
-`reader` tem o mesmo formato de entrada de `InspectTrackInput.Reader`.
-`CheckCoverage` obtém a rota limpa (não simplificada/suavizada) via o
-helper compartilhado de `track_loading.go` (mesmo `TrackParser` e mesmas
-funções puras de limpeza da etapa 1); lista os registros via
-`GeoDataRegistry.List`, descartando os que `FileChecker.Exists` reporta
-como ausentes (FR-017); para cada ponto da rota, determina o
-`GeoDataSource` de mapa base e o de relevo que o cobrem (usando
-`BoundingBox.Contains`), escolhendo entre candidatos do mesmo tipo pelo
-critério de desempate de `BoundingBox.AreaDegrees` (menor área vence;
-empate por `RegisteredAt` mais antigo — FR-016); agrupa pontos
-consecutivos com o mesmo status de cobertura em `UncoveredSegment`
-(FR-015); e agrega os conjuntos de fontes usadas. A lógica interna que
-precisa do estado do serviço (`fileChecker`) vira método não exportado de
-`geoDataService`; a que é puramente algébrica (escolher o vencedor entre
-candidatos, decidir o que falta, ordenar fontes) continua função livre no
-mesmo arquivo — mesmo padrão das funções puras do domínio.
-
-**Regra de decisão entre `CoverageStatusFull`, `CoverageStatusPartial` e
-`CoverageStatusNone`** (resolve a ambiguidade apontada pela análise de
-`/speckit-analyze` — ver Cenário de Aceitação 2 da História de Usuário 2 em
-`spec.md`, agora alinhado a esta regra): o veredito é calculado a partir do
-status de cobertura por ponto (totalmente coberto / falta mapa base / falta
-relevo / falta ambos), nunca de uma média ou de "qual tipo falta com mais
-frequência":
-
-- **`CoverageStatusFull`**: todo ponto da rota está totalmente coberto (nenhum
-  `UncoveredSegment`).
-- **`CoverageStatusNone`**: nenhum ponto da rota tem cobertura de nenhum dos
-  dois tipos em nenhum lugar do trajeto — equivalente a `BaseMapSourcesUsed`
-  e `ElevationSourcesUsed` virem ambos vazios. Inclui o caso de nenhum
-  registro cadastrado (Cenário de Aceitação 4).
-- **`CoverageStatusPartial`**: todo o restante — ou seja, existe pelo menos
-  um ponto totalmente coberto, ou pelo menos um dos dois conjuntos de fontes
-  usadas (`BaseMapSourcesUsed`/`ElevationSourcesUsed`) não está vazio, mas
-  nem todo ponto está totalmente coberto. Em particular, um trajeto com mapa
-  base cobrindo 100% da extensão mas nenhum registro de relevo em lugar
-  nenhum é `Partial` (há cobertura real, só que incompleta), não `None`.
+- **`Register`**: recusa se `name` já existe (`ErrDataSourceNameAlreadyUsed`,
+  via `GeoDataRegistry.FindByName`); chama `GeoDataInspector.Inspect(path)`;
+  delega a construção do registro para `domain.NewGeoDataSource(name, path,
+  inspected)`; chama `GeoDataRegistry.Save`; devolve o registro criado.
+- **`List`**: chama `GeoDataRegistry.List`; para cada registro, monta um
+  `domain.GeoDataSummary{Source: source, Available: fileChecker.Exists(source.Path)}`
+  (FR-009, FR-010) — a única lógica aqui é a combinação de duas portas, não
+  uma regra de negócio própria.
+- **`Remove`**: recusa com `ErrDataSourceNotRegistered` se `name` não
+  existir (via `GeoDataRegistry.FindByName`); caso contrário chama
+  `GeoDataRegistry.Delete`. O arquivo original nunca é tocado (FR-011).
+- **`CheckCoverage`**: obtém a rota limpa (não simplificada/suavizada) via
+  o helper compartilhado de `track_loading.go` (mesmo `TrackParser` e
+  mesmas funções puras de limpeza da etapa 1); lista os registros via
+  `GeoDataRegistry.List`; filtra os que `FileChecker.Exists` reporta como
+  ausentes (FR-017, único filtro que exige uma porta, por isso fica no
+  serviço e não em `domain.ComputeCoverage`); delega o cálculo de
+  cobertura em si para `domain.ComputeCoverage(route, baseMaps, elevations)`
+  (ver seção "Cobertura de um trajeto" acima) e devolve o `CoverageReport`
+  resultante sem alterá-lo.

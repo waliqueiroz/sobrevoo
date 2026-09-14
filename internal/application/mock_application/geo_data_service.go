@@ -13,7 +13,6 @@ import (
 	io "io"
 	reflect "reflect"
 
-	application "github.com/waliqueiroz/sobrevoo/internal/application"
 	domain "github.com/waliqueiroz/sobrevoo/internal/domain"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -43,10 +42,10 @@ func (m *MockGeoDataService) EXPECT() *MockGeoDataServiceMockRecorder {
 }
 
 // CheckCoverage mocks base method.
-func (m *MockGeoDataService) CheckCoverage(reader io.Reader) (application.CheckCoverageOutput, error) {
+func (m *MockGeoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckCoverage", reader)
-	ret0, _ := ret[0].(application.CheckCoverageOutput)
+	ret0, _ := ret[0].(domain.CoverageReport)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -58,10 +57,10 @@ func (mr *MockGeoDataServiceMockRecorder) CheckCoverage(reader any) *gomock.Call
 }
 
 // List mocks base method.
-func (m *MockGeoDataService) List() ([]application.GeoDataSummary, error) {
+func (m *MockGeoDataService) List() ([]domain.GeoDataSummary, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List")
-	ret0, _ := ret[0].([]application.GeoDataSummary)
+	ret0, _ := ret[0].([]domain.GeoDataSummary)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

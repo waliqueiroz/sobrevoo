@@ -356,3 +356,51 @@ serviços de método único. Vale abrir um amendment dedicado (via
 métodos nomeados pela operação — não um objeto por caso de uso", com
 `waliqueiroz/mystery-gifter-api` como referência, para que as próximas
 etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
+
+## 14. DTOs e algoritmo de cobertura movidos para `internal/domain`
+
+- **Decisão**: os tipos que antes eram DTOs de `internal/application`
+  (`CheckCoverageOutput`, `CoverageStatus`, `MissingDataType`,
+  `UncoveredSegment`, `GeoDataSummary`) viraram tipos de domínio comuns, em
+  `internal/domain/geo_data_coverage.go` (o primeiro renomeado para
+  `CoverageReport`) e `internal/domain/geo_data_source.go`
+  (`GeoDataSummary`). O algoritmo de cobertura em si — escolher o vencedor
+  entre candidatos sobrepostos, decidir o que falta em cada ponto, agrupar
+  em subtrechos, decidir o veredito geral — virou uma função pura de
+  domínio, `domain.ComputeCoverage(route []TrackPoint, baseMaps,
+  elevations []GeoDataSource) CoverageReport`, com seus helpers privados
+  (`pickCoverageWinner`, `isMoreSpecific`, `missingDataType`,
+  `sortedSources`) como funções livres no mesmo arquivo — mesmo padrão já
+  usado por `ComputeBoundingBox`/`Haversine`/`ReorderByTime` no domínio.
+  `GeoDataSource` também ganhou um construtor, `domain.NewGeoDataSource(name,
+  path string, inspected InspectedGeoData) GeoDataSource`, que monta a
+  entidade (incluindo `RegisteredAt: time.Now()`) — antes montada como
+  literal de struct dentro do serviço de aplicação.
+  `internal/application/geo_data_service.go` ficou só com orquestração:
+  cada método chama as portas (`GeoDataRegistry`, `GeoDataInspector`,
+  `FileChecker`, `TrackParser`) e delega a regra de negócio para o
+  construtor/função de domínio correspondente — nunca decide nada sozinho
+  além de qual porta chamar em qual ordem.
+- **Racional**: decisão revisada por pedido explícito do usuário, apontando
+  novamente `waliqueiroz/mystery-gifter-api` como referência — lá, DTOs de
+  saída (`GroupSummary`, `SearchResult[T]`) e construtores com regra de
+  negócio (`NewGroup` já monta `CreatedAt`/`UpdatedAt: time.Now()`) vivem
+  em `internal/domain` junto das entidades, como qualquer outro objeto de
+  domínio; a camada de serviço (`group_service.go`) só orquestra — busca
+  via repositório, delega a regra para um método/construtor de domínio,
+  salva, devolve. Isso já era exatamente o estilo das funções puras que o
+  domínio deste projeto usa desde a etapa 1 (`ComputeBoundingBox`,
+  `Haversine`, `ReorderByTime`, os `Discard*`) — a etapa 2 só não tinha
+  seguido esse mesmo padrão para as regras novas (cobertura, construção de
+  `GeoDataSource`), deixando-as na camada de aplicação por engano. Mover
+  para o domínio também tem um efeito prático nos testes: os cenários de
+  cobertura (sobreposição, desempate, antimeridiano, segmentos) agora são
+  testados como função pura em `internal/domain/geo_data_coverage_test.go`,
+  sem nenhum mock — só `internal/application/geo_data_service_test.go`
+  ficou com testes de orquestração (propagação de erro de cada porta,
+  filtragem de fontes indisponíveis antes de chamar `ComputeCoverage`).
+- **Alternativas consideradas**: manter DTOs e algoritmo em
+  `internal/application` (decisão original desta etapa, superada — mistura
+  regra de negócio com orquestração na mesma camada, e contraria o padrão
+  já usado tanto pelo domínio deste projeto quanto pelo repositório de
+  referência do usuário).

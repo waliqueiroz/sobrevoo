@@ -40,6 +40,19 @@ estendido ao longo de todas elas.
 > `InspectTrackService.Execute` também foi renomeado para `Inspect` no
 > mesmo pedido, por consistência (métodos nomeados pela operação, nunca
 > `Execute`).
+>
+> Uma segunda rodada do mesmo pedido moveu os DTOs de saída
+> (`CheckCoverageOutput`→`domain.CoverageReport`, `UncoveredSegment`,
+> `CoverageStatus`, `MissingDataType`, `GeoDataSummary`) e o algoritmo de
+> cobertura (antes um conjunto de funções soltas em
+> `internal/application/check_coverage_service.go`) para
+> `internal/domain` (`geo_data_coverage.go` — função pura
+> `ComputeCoverage`; `GeoDataSummary` e o construtor `NewGeoDataSource` em
+> `geo_data_source.go`), seguindo o mesmo padrão de
+> `waliqueiroz/mystery-gifter-api` (DTOs e regra de negócio em
+> `internal/domain`; a service layer só orquestra) — ver `research.md`
+> item 14. `internal/application/geo_data_service.go` ficou só com
+> orquestração de portas.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 
