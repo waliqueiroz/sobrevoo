@@ -105,12 +105,12 @@ type GeoDataInspector interface {
 	Inspect(path string) (InspectedGeoData, error)
 }
 
-//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_registry.go . GeoDataRegistry
+//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_repository.go . GeoDataRepository
 
-// GeoDataRegistry persists and retrieves the set of registered
+// GeoDataRepository persists and retrieves the set of registered
 // GeoDataSource entries (FR-008). Implemented by
 // internal/infra/outbound/geodatastore/jsonfile.
-type GeoDataRegistry interface {
+type GeoDataRepository interface {
 	// Save adds or replaces the registered source with the same Name.
 	Save(source GeoDataSource) error
 

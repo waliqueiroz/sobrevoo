@@ -17,7 +17,7 @@ mapa base e relevo, em toda a sua extensão — pelos dados já disponíveis
 localmente, relatando com precisão qual trecho ficou de fora quando não
 estiver. A abordagem técnica mantém a arquitetura hexagonal já estabelecida:
 o núcleo ganha uma nova entidade (`GeoDataSource`) e três novas portas
-(`GeoDataInspector`, `GeoDataRegistry`, `FileChecker`); toda leitura de
+(`GeoDataInspector`, `GeoDataRepository`, `FileChecker`); toda leitura de
 arquivo de dados geográfico, toda persistência do registro e toda checagem
 de disponibilidade de arquivo acontece em adapters de saída dedicados,
 nunca no núcleo. Os quatro casos de uso desta etapa são expostos por um
@@ -53,7 +53,7 @@ builders em `build_domain` para as novas entidades/DTOs (todas de domínio —
 `internal/application/build_application` deixou de existir, research.md
 item 15),
 mocks gerados com `go.uber.org/mock` para as três novas portas do domínio
-(`GeoDataInspector`, `GeoDataRegistry`, `FileChecker`) e para o novo
+(`GeoDataInspector`, `GeoDataRepository`, `FileChecker`) e para o novo
 `GeoDataService`; `domain.NewGeoDataSource` testa `RegisteredAt` com uma
 janela `[antes, depois]` em torno de `time.Now()`, sem porta dedicada
 (research.md item 10.1); os cenários do algoritmo de cobertura são
@@ -102,15 +102,15 @@ superior definido); verificação de cobertura sobre um trajeto de até
 
 | Princípio | Avaliação | Como o design atende |
 |---|---|---|
-| I. Arquitetura Hexagonal | PASSA | A nova entidade `GeoDataSource`, os DTOs de domínio (`GeoDataSummary`, `CoverageReport`) e as novas portas (`GeoDataInspector`, `GeoDataRegistry`, `FileChecker`) vivem em `internal/domain`; nenhum desses arquivos importa `modernc.org/sqlite`, `encoding/json`/`os` para I/O real, ou qualquer pacote de `internal/infra`. `GeoDataService`, em `internal/application`, só orquestra essas portas e delega a regra de negócio para construtores/funções de domínio (`NewGeoDataSource`, `ComputeCoverage` — research.md item 14), sem tocar arquivo, rede, ou terminal diretamente. `NewGeoDataSource` chama `time.Now()` diretamente (biblioteca padrão, não infraestrutura; research.md item 10.1). |
-| II. Portas para Toda Dependência Externa | PASSA | Leitura de MBTiles/GeoTIFF, persistência do registro e checagem de existência de arquivo são acessadas exclusivamente via `GeoDataInspector`, `GeoDataRegistry` e `FileChecker`, declaradas no domínio e implementadas em `internal/infra/outbound/geodatainspector`, `internal/infra/outbound/geodatastore/jsonfile` e `internal/infra/outbound/filechecker`. |
+| I. Arquitetura Hexagonal | PASSA | A nova entidade `GeoDataSource`, os DTOs de domínio (`GeoDataSummary`, `CoverageReport`) e as novas portas (`GeoDataInspector`, `GeoDataRepository`, `FileChecker`) vivem em `internal/domain`; nenhum desses arquivos importa `modernc.org/sqlite`, `encoding/json`/`os` para I/O real, ou qualquer pacote de `internal/infra`. `GeoDataService`, em `internal/application`, só orquestra essas portas e delega a regra de negócio para construtores/funções de domínio (`NewGeoDataSource`, `ComputeCoverage` — research.md item 14), sem tocar arquivo, rede, ou terminal diretamente. `NewGeoDataSource` chama `time.Now()` diretamente (biblioteca padrão, não infraestrutura; research.md item 10.1). |
+| II. Portas para Toda Dependência Externa | PASSA | Leitura de MBTiles/GeoTIFF, persistência do registro e checagem de existência de arquivo são acessadas exclusivamente via `GeoDataInspector`, `GeoDataRepository` e `FileChecker`, declaradas no domínio e implementadas em `internal/infra/outbound/geodatainspector`, `internal/infra/outbound/geodatastore/jsonfile` e `internal/infra/outbound/filechecker`. |
 | III. Entrypoints Descartáveis | PASSA | `GeoDataService` (`Register`/`List`/`Remove`/`CheckCoverage`) recebe/devolve apenas dados (entidades de domínio ou DTOs simples); a CLI (`internal/infra/inbound/cli`, comando `geodata` e seus subcomandos) é o único adapter de entrada desta etapa, mas o serviço não conhece Cobra, flags, ou formatação de texto — pronto para um futuro adapter HTTP sem alteração. |
 | IV. Neutralidade Geográfica | PASSA | Nenhum dado de mapa/relevo/coordenada embutido; tipo e área de cada registro vêm exclusivamente do conteúdo do arquivo que o próprio usuário indicou. A comparação de área para desempate (`BoundingBox.AreaDegrees`) e a checagem de contenção (`BoundingBox.Contains`) reaproveitam o mesmo tratamento de antimeridiano já usado por `ComputeBoundingBox` na etapa 1 — nenhuma região recebe tratamento especial. |
 | V. Funcionamento Offline | PASSA | `modernc.org/sqlite` e o parser de GeoTIFF operam inteiramente sobre arquivos locais já baixados pelo usuário; o registro é um arquivo local; nenhuma chamada de rede em nenhum adapter desta etapa. |
-| VI. Testes Automatizados no Núcleo | PASSA | `internal/domain` (novas funções puras de `BoundingBox`) testado sem I/O; `internal/application` testado com `GeoDataInspector`, `GeoDataRegistry`, `FileChecker` e `TrackParser` mockados via `go.uber.org/mock`; nenhum teste do núcleo abre um arquivo MBTiles/GeoTIFF real nem toca o arquivo de registro. `GeoDataSource.RegisteredAt` (via `time.Now()` real, em `Register`) é verificado com uma janela `[antes, depois]`, não um mock — suficiente já que o campo nunca é exibido ao usuário (research.md item 10.1). |
+| VI. Testes Automatizados no Núcleo | PASSA | `internal/domain` (novas funções puras de `BoundingBox`) testado sem I/O; `internal/application` testado com `GeoDataInspector`, `GeoDataRepository`, `FileChecker` e `TrackParser` mockados via `go.uber.org/mock`; nenhum teste do núcleo abre um arquivo MBTiles/GeoTIFF real nem toca o arquivo de registro. `GeoDataSource.RegisteredAt` (via `time.Now()` real, em `Register`) é verificado com uma janela `[antes, depois]`, não um mock — suficiente já que o campo nunca é exibido ao usuário (research.md item 10.1). |
 | VII. Erros Sentinela no Domínio | PASSA | `ErrDataFileNotFound`, `ErrDataFileUnreadable`, `ErrUnsupportedDataFormat`, `ErrDataSourceNameAlreadyUsed`, `ErrDataSourceNotRegistered` declarados em `internal/domain/errors.go`, traduzidos pela CLI em novos códigos de saída de processo (ver `contracts/cli.md`); a verificação de cobertura reaproveita os sentinelas de trajeto já existentes (`ErrEmptyFile`, `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`) para os mesmos erros de trajeto inválido. |
 | VIII. Configuração Injetada | PASSA | O caminho do arquivo de registro é resolvido por `internal/infra/outbound/config` (estendido) e injetado na construção do adapter `geodatastore/jsonfile` em `cmd/sobrevoo`; o núcleo nunca lê `os.UserHomeDir()`, variável de ambiente, ou flag diretamente. |
-| IX. Organização de Portas, Service Layer e Mocks | PASSA | Nenhum `ports.go`/`interfaces.go` novo: `GeoDataInspector` e `GeoDataRegistry` — que produzem/manipulam `GeoDataSource` — ficam em `geo_data_source.go`, junto da entidade; `FileChecker`, sem entidade dona, ganha arquivo próprio (`file_checker.go`). Os quatro casos de uso desta etapa seguem `XService`/`xService`/`NewXService(...)` como uma única interface (`GeoDataService`/`geoDataService`/`NewGeoDataService(...)`) com um método por operação (`Register`/`List`/`Remove`/`CheckCoverage`) — um serviço por recurso, não um serviço por caso de uso (research.md item 13) — em `internal/application/geo_data_service.go`, que contém só orquestração: a regra de negócio (construção de `GeoDataSource`, cálculo de cobertura) vive em `internal/domain` como construtor/função pura (`NewGeoDataSource`, `ComputeCoverage` em `geo_data_coverage.go` — research.md item 14). Mocks gerados com `go.uber.org/mock/mockgen` via `//go:generate` acima de cada interface, em `mock_domain`/`mock_application`. |
+| IX. Organização de Portas, Service Layer e Mocks | PASSA | Nenhum `ports.go`/`interfaces.go` novo: `GeoDataInspector` e `GeoDataRepository` — que produzem/manipulam `GeoDataSource` — ficam em `geo_data_source.go`, junto da entidade; `FileChecker`, sem entidade dona, ganha arquivo próprio (`file_checker.go`). Os quatro casos de uso desta etapa seguem `XService`/`xService`/`NewXService(...)` como uma única interface (`GeoDataService`/`geoDataService`/`NewGeoDataService(...)`) com um método por operação (`Register`/`List`/`Remove`/`CheckCoverage`) — um serviço por recurso, não um serviço por caso de uso (research.md item 13) — em `internal/application/geo_data_service.go`, que contém só orquestração: a regra de negócio (construção de `GeoDataSource`, cálculo de cobertura) vive em `internal/domain` como construtor/função pura (`NewGeoDataSource`, `ComputeCoverage` em `geo_data_coverage.go` — research.md item 14). Mocks gerados com `go.uber.org/mock/mockgen` via `//go:generate` acima de cada interface, em `mock_domain`/`mock_application`. |
 | X. Testes: Given/When/Then, Builders e Isolamento por Camada | PASSA | Todo teste novo usa `t.Run("should ...")` com comentários `// given`/`// when`/`// then`, sem tabelas de casos, agrupados por método (`Test_geoDataService_Register`, `Test_geoDataService_List`, `Test_ComputeCoverage`, ...) no mesmo arquivo de teste — mesmo padrão de `GroupService`/`group_service_test.go` em `waliqueiroz/mystery-gifter-api`. Um novo builder `GeoDataSourceBuilder` em `build_domain` evita literais de struct repetidos. Os cenários do algoritmo de cobertura (sobreposição, desempate, antimeridiano, segmentos) são testados como função pura em `internal/domain/geo_data_coverage_test.go`, sem nenhum mock; `internal/application/geo_data_service_test.go` testa só orquestração (propagação de erro de cada porta). Cada camada continua isolada: domínio/serviço com portas mockadas, CLI com `GeoDataService` mockado (`mock_application`) — nunca com a implementação real nem com os adapters de saída reais. |
 | Idioma dos Artefatos | PASSA | Este plano, `research.md`, `data-model.md`, `contracts/cli.md` e `quickstart.md` estão em português do Brasil; identificadores, nomes de pacote/arquivo e comentários de código permanecem em inglês. Seguindo a mesma decisão já registrada na etapa 1 (`research.md` item 11), todo o I/O em tempo de execução dos novos comandos (nomes de flag, texto de saída, mensagens de erro) também é em inglês. |
 
@@ -141,7 +141,7 @@ cmd/
 
 internal/
 ├── domain/
-│   ├── geo_data_source.go                        # (novo) entidade GeoDataSource + construtor NewGeoDataSource + GeoDataSummary + DataType + DataFormat + portas GeoDataInspector e GeoDataRegistry
+│   ├── geo_data_source.go                        # (novo) entidade GeoDataSource + construtor NewGeoDataSource + GeoDataSummary + DataType + DataFormat + portas GeoDataInspector e GeoDataRepository
 │   ├── geo_data_coverage.go                       # (novo) CoverageReport + UncoveredSegment + CoverageStatus + MissingDataType + função pura ComputeCoverage (research.md item 14)
 │   ├── track_summary.go                           # (novo) TrackSummary (antes InspectTrackOutput) + função pura SummarizeTrack (research.md item 15)
 │   ├── cleaning.go                                # (estendido) + função pura CleanTrack, compondo ReorderByTime + os três Discard* (research.md item 15)
@@ -168,7 +168,7 @@ internal/
     │   │   └── geotiff.go                         # (novo) leitura de tipo/área de um GeoTIFF (relevo) via parser de tags próprio
     │   ├── geodatastore/
     │   │   └── jsonfile/
-    │   │       └── jsonfile.go                    # (novo) adapter GeoDataRegistry: registro persistido em JSON, escrita atômica
+    │   │       └── jsonfile.go                    # (novo) adapter GeoDataRepository: registro persistido em JSON, escrita atômica
     │   └── filechecker/
     │       └── filechecker.go                     # (novo) adapter FileChecker via os.Stat
     │
@@ -205,7 +205,7 @@ Princípio II — `domain.NewGeoDataSource` chama `time.Now()` diretamente
 `time.Now()` em `waliqueiroz/mystery-gifter-api`.
 
 Nenhum arquivo genérico `ports.go`/`interfaces.go` é criado: `GeoDataInspector`
-e `GeoDataRegistry` — que produzem/manipulam a entidade `GeoDataSource` —
+e `GeoDataRepository` — que produzem/manipulam a entidade `GeoDataSource` —
 ficam no arquivo dessa entidade (`geo_data_source.go`), assim como
 `TrackParser` fica em `track.go` na etapa 1. `FileChecker`, sem
 entidade dona, ganha seu próprio arquivo nomeado pelo conceito que

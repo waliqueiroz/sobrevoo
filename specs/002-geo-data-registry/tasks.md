@@ -66,6 +66,17 @@ estendido ao longo de todas elas.
 > `internal/domain/track_summary.go`. `InspectTrackOutputBuilder`
 > (`build_application`) virou `build_domain.TrackSummaryBuilder` — ver
 > `research.md` item 15.
+>
+> Uma quarta pergunta do usuário ("dá pra gente passar a chamar registry
+> de repository...?") renomeou a porta de persistência de T003/T005/T008
+> de `GeoDataRegistry` para `GeoDataRepository` (mock:
+> `mock_domain/geo_data_repository.go`; campo/parâmetro `registry`→
+> `repository` em `geoDataService`/`NewGeoDataService`) — mesmo
+> vocabulário de `GroupRepository`/`UserRepository` em
+> `waliqueiroz/mystery-gifter-api`. O conceito de "registro" em si
+> (`RegistryPath`, `registry.json`, o texto de ajuda da CLI, o nome desta
+> feature) não muda — só o nome do tipo Go da porta e o que dele deriva —
+> ver `research.md` item 16.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 
@@ -265,7 +276,8 @@ independente.
 - **Setup (Phase 1)**: sem dependências — pode começar imediatamente.
 - **Foundational (Phase 2)**: depende da conclusão do Setup — BLOQUEIA todas
   as histórias de usuário, já que todas leem e/ou escrevem o mesmo
-  `GeoDataRegistry`.
+  `GeoDataRepository` (`GeoDataRegistry` ao tempo desta tarefa — ver
+  `research.md` item 16).
 - **User Stories (Phase 3–6)**: todas dependem da conclusão da fase
   Foundational.
   - Diferente da etapa 1, as quatro histórias implementam quatro comandos

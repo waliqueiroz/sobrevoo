@@ -8,7 +8,7 @@ import (
 
 //go:generate go run go.uber.org/mock/mockgen -destination mock_application/geo_data_service.go . GeoDataService
 
-// GeoDataService manages the local registry of geo data sources — base
+// GeoDataService manages the local repository of geo data sources — base
 // maps and elevation files the user has already downloaded — and checks
 // whether a GPS track is covered by them (FR-001 through FR-018). It
 // depends only on ports declared in the domain, so it can be reused
@@ -43,7 +43,7 @@ type GeoDataService interface {
 }
 
 type geoDataService struct {
-	registry    domain.GeoDataRegistry
+	repository  domain.GeoDataRepository
 	inspector   domain.GeoDataInspector
 	fileChecker domain.FileChecker
 	parser      domain.TrackParser
@@ -59,7 +59,7 @@ type geoDataService struct {
 // NewGeoDataService creates a GeoDataService backed by the given ports and
 // thresholds.
 func NewGeoDataService(
-	registry domain.GeoDataRegistry,
+	repository domain.GeoDataRepository,
 	inspector domain.GeoDataInspector,
 	fileChecker domain.FileChecker,
 	parser domain.TrackParser,
@@ -67,7 +67,7 @@ func NewGeoDataService(
 	maxPlausibleSpeedKmh float64,
 ) GeoDataService {
 	return &geoDataService{
-		registry:             registry,
+		repository:           repository,
 		inspector:            inspector,
 		fileChecker:          fileChecker,
 		parser:               parser,
@@ -77,7 +77,7 @@ func NewGeoDataService(
 }
 
 func (s *geoDataService) Register(name, path string) (domain.GeoDataSource, error) {
-	_, found, err := s.registry.FindByName(name)
+	_, found, err := s.repository.FindByName(name)
 	if err != nil {
 		return domain.GeoDataSource{}, err
 	}
@@ -92,7 +92,7 @@ func (s *geoDataService) Register(name, path string) (domain.GeoDataSource, erro
 
 	source := domain.NewGeoDataSource(name, path, inspected)
 
-	if err := s.registry.Save(source); err != nil {
+	if err := s.repository.Save(source); err != nil {
 		return domain.GeoDataSource{}, err
 	}
 
@@ -100,7 +100,7 @@ func (s *geoDataService) Register(name, path string) (domain.GeoDataSource, erro
 }
 
 func (s *geoDataService) List() ([]domain.GeoDataSummary, error) {
-	sources, err := s.registry.List()
+	sources, err := s.repository.List()
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +117,7 @@ func (s *geoDataService) List() ([]domain.GeoDataSummary, error) {
 }
 
 func (s *geoDataService) Remove(name string) error {
-	_, found, err := s.registry.FindByName(name)
+	_, found, err := s.repository.FindByName(name)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (s *geoDataService) Remove(name string) error {
 		return domain.ErrDataSourceNotRegistered
 	}
 
-	return s.registry.Delete(name)
+	return s.repository.Delete(name)
 }
 
 func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport, error) {
@@ -142,7 +142,7 @@ func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport,
 		return domain.CoverageReport{}, err
 	}
 
-	sources, err := s.registry.List()
+	sources, err := s.repository.List()
 	if err != nil {
 		return domain.CoverageReport{}, err
 	}

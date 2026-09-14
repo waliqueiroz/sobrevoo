@@ -1,4 +1,4 @@
-// Package jsonfile implements the domain.GeoDataRegistry port as a single
+// Package jsonfile implements the domain.GeoDataRepository port as a single
 // JSON file on disk (research.md item 5).
 package jsonfile
 
@@ -11,7 +11,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// Store implements domain.GeoDataRegistry, persisting registered sources as
+// Store implements domain.GeoDataRepository, persisting registered sources as
 // a single JSON file at Path.
 type Store struct {
 	path string

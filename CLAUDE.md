@@ -49,7 +49,7 @@ adapter.
   cobertura, `ComputeCoverage`), erros sentinela (`ErrEmptyFile`,
   `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`), e as
   portas `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
-  `GeoDataRegistry`, `FileChecker`. Qualquer DTO de saída que não seja um
+  `GeoDataRepository`, `FileChecker`. Qualquer DTO de saída que não seja um
   valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
   também é um tipo de domínio comum — não um DTO de `internal/application`
   — e qualquer lógica não trivial (construir uma entidade, calcular algo a

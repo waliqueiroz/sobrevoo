@@ -173,7 +173,7 @@ clarificada.
   checagem atrás de duas portas diferentes para os dois casos de uso que
   precisam exatamente da mesma informação.
 - **Alternativas consideradas**: embutir a checagem de existência dentro do
-  próprio `GeoDataRegistry` (rejeitada — misturaria duas responsabilidades
+  próprio `GeoDataRepository` (rejeitada — misturaria duas responsabilidades
   distintas — persistência do registro e verificação do sistema de
   arquivos — na mesma porta).
 
@@ -384,7 +384,7 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   entidade (incluindo `RegisteredAt: time.Now()`) — antes montada como
   literal de struct dentro do serviço de aplicação.
   `internal/application/geo_data_service.go` ficou só com orquestração:
-  cada método chama as portas (`GeoDataRegistry`, `GeoDataInspector`,
+  cada método chama as portas (`GeoDataRepository`, `GeoDataInspector`,
   `FileChecker`, `TrackParser`) e delega a regra de negócio para o
   construtor/função de domínio correspondente — nunca decide nada sozinho
   além de qual porta chamar em qual ordem.
@@ -466,3 +466,44 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   domínio nunca recebe nem chama uma porta; isso é o próprio papel da
   camada de aplicação, igual a nenhuma entidade/função de domínio em
   `waliqueiroz/mystery-gifter-api` receber um repositório como argumento).
+
+## 16. `GeoDataRegistry` renomeada para `GeoDataRepository`
+
+- **Decisão**: a porta de persistência do registro de dados geográficos,
+  declarada em `internal/domain/geo_data_source.go`, passou a se chamar
+  `GeoDataRepository` (era `GeoDataRegistry`). Acompanham a mudança: o mock
+  gerado (`mock_domain/geo_data_repository.go`, era `geo_data_registry.go`,
+  com `MockGeoDataRepository`/`NewMockGeoDataRepository`), o campo/parâmetro
+  correspondente em `geoDataService`/`NewGeoDataService`
+  (`internal/application/geo_data_service.go`, era `registry`, agora
+  `repository`) e a variável local equivalente em `cmd/sobrevoo/main.go`
+  (era `geoDataRegistry`, agora `geoDataRepository`). Não muda: o nome do
+  pacote adapter (`internal/infra/outbound/geodatastore/jsonfile`, já
+  neutro), o struct `Store` que o implementa, o caminho do arquivo
+  persistido (`~/.sobrevoo/registry.json`, campo `Config.RegistryPath`), o
+  texto de ajuda da CLI ("local geographic data registry") e o nome desta
+  feature (`002-geo-data-registry`) — todos esses continuam descrevendo
+  "registro" como conceito de domínio (o conjunto de fontes registradas, e
+  o arquivo que o guarda), não o nome do tipo Go da porta.
+- **Racional**: pergunta direta do usuário ("dá pra gente passar a chamar
+  registry de repository porque envolve persistência e fica mais fácil de
+  ler?"). `GeoDataRepository` nomeia a porta pelo que ela é
+  arquiteturalmente — uma porta de persistência — o mesmo papel de
+  `GroupRepository`/`UserRepository` em
+  `waliqueiroz/mystery-gifter-api` (`internal/domain/group.go`,
+  `internal/domain/user.go`), incluindo o nome do campo correspondente em
+  `groupService` (`groupRepository domain.GroupRepository`, em
+  `internal/application/group_service.go`) — mesma convenção que este
+  projeto já vem espelhando desde os itens 13 e 14. "Registry" descrevia
+  bem o dado em si (um registro de fontes), mas não o papel arquitetural da
+  porta que o acessa; "Repository" é o termo já consagrado nesse papel,
+  inclusive no repositório de referência do próprio usuário.
+- **Alternativas consideradas**: manter `GeoDataRegistry` (decisão original,
+  superada — funcionava, mas divergia sem necessidade do vocabulário que o
+  resto do projeto usa para portas de persistência); renomear também o
+  conceito de "registro" em si (pacote `geodatastore`, `RegistryPath`,
+  `registry.json`, texto de ajuda da CLI, nome da feature) — rejeitada: o
+  pedido do usuário era especificamente sobre o nome do tipo/porta, não
+  sobre o vocabulário do domínio, e "registro"/"registry" continuam nomes
+  corretos para o dado persistido e para a feature, independente de como a
+  porta que o acessa se chama.

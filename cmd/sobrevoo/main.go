@@ -36,9 +36,9 @@ func run() int {
 	inspectTrackService := application.NewInspectTrackService(parser, simplifier, smoother, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
 	geoDataInspector := geodatainspector.New()
-	geoDataRegistry := jsonfile.New(cfg.RegistryPath)
+	geoDataRepository := jsonfile.New(cfg.RegistryPath)
 	geoDataFileChecker := filechecker.New()
-	geoDataService := application.NewGeoDataService(geoDataRegistry, geoDataInspector, geoDataFileChecker, parser, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+	geoDataService := application.NewGeoDataService(geoDataRepository, geoDataInspector, geoDataFileChecker, parser, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
 	geoDataCommand := cli.NewGeoDataCommand()
 	geoDataCommand.AddCommand(cli.NewGeoDataRegisterCommand(geoDataService))

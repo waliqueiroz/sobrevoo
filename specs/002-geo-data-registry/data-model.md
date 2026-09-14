@@ -184,10 +184,10 @@ formato (FR-002, FR-003, FR-006). Erros de sistema de arquivo encontrados ao
 abrir `path` são traduzidos aqui para `ErrDataFileNotFound`/
 `ErrDataFileUnreadable` (ver `research.md` item 8).
 
-### GeoDataRegistry (declarada em `geo_data_source.go`, junto da entidade `GeoDataSource`)
+### GeoDataRepository (declarada em `geo_data_source.go`, junto da entidade `GeoDataSource`)
 
 ```go
-type GeoDataRegistry interface {
+type GeoDataRepository interface {
     Save(source GeoDataSource) error
     FindByName(name string) (GeoDataSource, bool, error)
     List() ([]GeoDataSource, error)
@@ -198,7 +198,9 @@ type GeoDataRegistry interface {
 Implementação em `internal/infra/outbound/geodatastore/jsonfile`: um único
 arquivo JSON em local fixo do SO, com escrita atômica (FR-008, ver
 `research.md` item 5). `FindByName` devolve `(GeoDataSource{}, false, nil)`
-quando não há registro com aquele nome (não é um erro).
+quando não há registro com aquele nome (não é um erro). Chamada
+`GeoDataRepository` — não `GeoDataRegistry` — porque é uma porta de
+persistência (`research.md` item 16).
 
 ### FileChecker (declarada em `file_checker.go`, arquivo próprio — não pertence a uma única entidade)
 
@@ -220,7 +222,7 @@ uma dependência externa no sentido do Princípio II.
 Gerados com `go.uber.org/mock/mockgen` via `//go:generate` posicionado
 diretamente acima de cada interface, com saída em
 `internal/domain/mock_domain/` — um arquivo por porta: `geo_data_inspector.go`,
-`geo_data_registry.go`, `file_checker.go`.
+`geo_data_repository.go`, `file_checker.go`.
 
 ## Camada de serviço: `GeoDataService`
 
@@ -258,22 +260,22 @@ repositório, delega para `domain.Group.AddUser`, salva, devolve;
 `research.md` item 14):
 
 - **`Register`**: recusa se `name` já existe (`ErrDataSourceNameAlreadyUsed`,
-  via `GeoDataRegistry.FindByName`); chama `GeoDataInspector.Inspect(path)`;
+  via `GeoDataRepository.FindByName`); chama `GeoDataInspector.Inspect(path)`;
   delega a construção do registro para `domain.NewGeoDataSource(name, path,
-  inspected)`; chama `GeoDataRegistry.Save`; devolve o registro criado.
-- **`List`**: chama `GeoDataRegistry.List`; para cada registro, monta um
+  inspected)`; chama `GeoDataRepository.Save`; devolve o registro criado.
+- **`List`**: chama `GeoDataRepository.List`; para cada registro, monta um
   `domain.GeoDataSummary{Source: source, Available: fileChecker.Exists(source.Path)}`
   (FR-009, FR-010) — a única lógica aqui é a combinação de duas portas, não
   uma regra de negócio própria.
 - **`Remove`**: recusa com `ErrDataSourceNotRegistered` se `name` não
-  existir (via `GeoDataRegistry.FindByName`); caso contrário chama
-  `GeoDataRegistry.Delete`. O arquivo original nunca é tocado (FR-011).
+  existir (via `GeoDataRepository.FindByName`); caso contrário chama
+  `GeoDataRepository.Delete`. O arquivo original nunca é tocado (FR-011).
 - **`CheckCoverage`**: chama `TrackParser.Parse(reader)`, depois
   `domain.CleanTrack(track.Points, minPoints, maxPlausibleSpeedKmh)` para
   obter a rota limpa — não simplificada/suavizada, e sem os pontos
   descartados (mesma função de domínio que `InspectTrackService.Inspect`
   usa — ver "Limpeza e resumo de um trajeto" abaixo); lista os registros
-  via `GeoDataRegistry.List`; filtra os que `FileChecker.Exists` reporta
+  via `GeoDataRepository.List`; filtra os que `FileChecker.Exists` reporta
   como ausentes (FR-017, único filtro que exige uma porta, por isso fica no
   serviço e não em `domain.ComputeCoverage`); delega o cálculo de
   cobertura em si para `domain.ComputeCoverage(route, baseMaps, elevations)`
