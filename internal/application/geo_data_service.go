@@ -3,19 +3,23 @@ package application
 import (
 	"io"
 	"sort"
+	"time"
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// CheckCoverageInput is the input for CheckCoverageService.Execute.
-type CheckCoverageInput struct {
-	// Reader is the track file's content to check, in the same format
-	// InspectTrackInput accepts.
-	Reader io.Reader
+// GeoDataSummary is one registered source as reported by
+// GeoDataService.List, with its live file availability (FR-010).
+type GeoDataSummary struct {
+	Source domain.GeoDataSource
+
+	// Available is false when the file is no longer found at Source.Path
+	// (FR-010).
+	Available bool
 }
 
-// CoverageStatus is CheckCoverageService's overall verdict for a track
-// (SC-003). See CheckCoverageOutput for the exact rule that decides
+// CoverageStatus is GeoDataService.CheckCoverage's overall verdict for a
+// track (SC-003). See CheckCoverageOutput for the exact rule that decides
 // between the three values.
 type CoverageStatus string
 
@@ -43,7 +47,7 @@ type UncoveredSegment struct {
 	Missing                       MissingDataType
 }
 
-// CheckCoverageOutput is the verdict produced by CheckCoverageService.Execute.
+// CheckCoverageOutput is the verdict produced by GeoDataService.CheckCoverage.
 //
 // Status decision rule (resolves the ambiguity flagged by /speckit-analyze —
 // see data-model.md):
@@ -60,50 +64,136 @@ type CheckCoverageOutput struct {
 	ElevationSourcesUsed []domain.GeoDataSource
 }
 
-//go:generate go run go.uber.org/mock/mockgen -destination mock_application/check_coverage_service.go . CheckCoverageService
+//go:generate go run go.uber.org/mock/mockgen -destination mock_application/geo_data_service.go . GeoDataService
 
-// CheckCoverageService verifies whether a GPS track is covered by the
-// registered geo data sources (FR-013 through FR-018). It depends only on
-// ports declared in the domain, so it can be reused unchanged by any
-// future entrypoint without duplicating any business rule (Constitution
-// Principle III).
-type CheckCoverageService interface {
-	Execute(input CheckCoverageInput) (CheckCoverageOutput, error)
+// GeoDataService manages the local registry of geo data sources — base
+// maps and elevation files the user has already downloaded — and checks
+// whether a GPS track is covered by them (FR-001 through FR-018). It
+// depends only on ports declared in the domain, so it can be reused
+// unchanged by any future entrypoint without duplicating any business rule
+// (Constitution Principle III).
+//
+// A single service groups every operation on this one resource (register,
+// list, remove, check coverage) — not one interface per use case — the
+// same way GroupService groups Create/GetByID/AddUser/... in
+// waliqueiroz/mystery-gifter-api.
+type GeoDataService interface {
+	// Register registers a local map or elevation data file under name,
+	// discovering its type, format and geographic area from its content
+	// (FR-001 through FR-008).
+	Register(name, path string) (domain.GeoDataSource, error)
+
+	// List returns every registered source, each with its live file
+	// availability (FR-009, FR-010).
+	List() ([]GeoDataSummary, error)
+
+	// Remove deletes the registered source with the given name, without
+	// touching the underlying data file on disk (FR-011, FR-012).
+	Remove(name string) error
+
+	// CheckCoverage verifies whether the track read from reader is covered
+	// by the registered sources (FR-013 through FR-018).
+	CheckCoverage(reader io.Reader) (CheckCoverageOutput, error)
 }
 
-type checkCoverageService struct {
-	parser      domain.TrackParser
+type geoDataService struct {
 	registry    domain.GeoDataRegistry
+	inspector   domain.GeoDataInspector
 	fileChecker domain.FileChecker
+	parser      domain.TrackParser
 
+	// minPoints and maxPlausibleSpeedKmh are the same track-cleaning
+	// thresholds InspectTrackService uses, resolved by an outbound
+	// configuration adapter and injected here by whoever assembles the
+	// service (Constitution Principle VIII).
 	minPoints            int
 	maxPlausibleSpeedKmh float64
 }
 
-// NewCheckCoverageService creates a CheckCoverageService backed by the
-// given ports and thresholds (the same ones used by InspectTrackService,
-// so both services clean a track identically — research.md item 9).
-func NewCheckCoverageService(
-	parser domain.TrackParser,
+// NewGeoDataService creates a GeoDataService backed by the given ports and
+// thresholds.
+func NewGeoDataService(
 	registry domain.GeoDataRegistry,
+	inspector domain.GeoDataInspector,
 	fileChecker domain.FileChecker,
+	parser domain.TrackParser,
 	minPoints int,
 	maxPlausibleSpeedKmh float64,
-) CheckCoverageService {
-	return &checkCoverageService{
-		parser:               parser,
+) GeoDataService {
+	return &geoDataService{
 		registry:             registry,
+		inspector:            inspector,
 		fileChecker:          fileChecker,
+		parser:               parser,
 		minPoints:            minPoints,
 		maxPlausibleSpeedKmh: maxPlausibleSpeedKmh,
 	}
 }
 
-func (s *checkCoverageService) Execute(input CheckCoverageInput) (CheckCoverageOutput, error) {
+func (s *geoDataService) Register(name, path string) (domain.GeoDataSource, error) {
+	_, found, err := s.registry.FindByName(name)
+	if err != nil {
+		return domain.GeoDataSource{}, err
+	}
+	if found {
+		return domain.GeoDataSource{}, domain.ErrDataSourceNameAlreadyUsed
+	}
+
+	inspected, err := s.inspector.Inspect(path)
+	if err != nil {
+		return domain.GeoDataSource{}, err
+	}
+
+	source := domain.GeoDataSource{
+		Name:         name,
+		Path:         path,
+		Type:         inspected.Type,
+		Format:       inspected.Format,
+		BoundingBox:  inspected.BoundingBox,
+		RegisteredAt: time.Now(),
+	}
+
+	if err := s.registry.Save(source); err != nil {
+		return domain.GeoDataSource{}, err
+	}
+
+	return source, nil
+}
+
+func (s *geoDataService) List() ([]GeoDataSummary, error) {
+	sources, err := s.registry.List()
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]GeoDataSummary, len(sources))
+	for i, source := range sources {
+		summaries[i] = GeoDataSummary{
+			Source:    source,
+			Available: s.fileChecker.Exists(source.Path),
+		}
+	}
+
+	return summaries, nil
+}
+
+func (s *geoDataService) Remove(name string) error {
+	_, found, err := s.registry.FindByName(name)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return domain.ErrDataSourceNotRegistered
+	}
+
+	return s.registry.Delete(name)
+}
+
+func (s *geoDataService) CheckCoverage(reader io.Reader) (CheckCoverageOutput, error) {
 	// The route used for coverage is cleaned but not simplified/smoothed:
 	// those two steps are rendering preparation and could shift points,
 	// masking a real coverage gap (research.md item 9).
-	_, points, _, err := cleanTrack(s.parser, s.minPoints, s.maxPlausibleSpeedKmh, input.Reader)
+	_, points, _, err := cleanTrack(s.parser, s.minPoints, s.maxPlausibleSpeedKmh, reader)
 	if err != nil {
 		return CheckCoverageOutput{}, err
 	}
@@ -113,16 +203,16 @@ func (s *checkCoverageService) Execute(input CheckCoverageInput) (CheckCoverageO
 		return CheckCoverageOutput{}, err
 	}
 
-	baseMaps, elevations := partitionAvailableSources(sources, s.fileChecker)
+	baseMaps, elevations := s.partitionAvailableSources(sources)
 
-	return buildCoverageOutput(points, baseMaps, elevations), nil
+	return s.buildCoverageOutput(points, baseMaps, elevations), nil
 }
 
 // partitionAvailableSources splits sources into base map and elevation
 // candidates, excluding any whose file is no longer found (FR-017).
-func partitionAvailableSources(sources []domain.GeoDataSource, fileChecker domain.FileChecker) (baseMaps, elevations []domain.GeoDataSource) {
+func (s *geoDataService) partitionAvailableSources(sources []domain.GeoDataSource) (baseMaps, elevations []domain.GeoDataSource) {
 	for _, source := range sources {
-		if !fileChecker.Exists(source.Path) {
+		if !s.fileChecker.Exists(source.Path) {
 			continue
 		}
 		switch source.Type {
@@ -135,7 +225,7 @@ func partitionAvailableSources(sources []domain.GeoDataSource, fileChecker domai
 	return baseMaps, elevations
 }
 
-func buildCoverageOutput(points []domain.TrackPoint, baseMaps, elevations []domain.GeoDataSource) CheckCoverageOutput {
+func (s *geoDataService) buildCoverageOutput(points []domain.TrackPoint, baseMaps, elevations []domain.GeoDataSource) CheckCoverageOutput {
 	baseMapUsed := map[string]domain.GeoDataSource{}
 	elevationUsed := map[string]domain.GeoDataSource{}
 
@@ -143,8 +233,8 @@ func buildCoverageOutput(points []domain.TrackPoint, baseMaps, elevations []doma
 	segmentOpen := false
 
 	for _, point := range points {
-		baseMap, hasBaseMap := pickWinner(baseMaps, point.Latitude, point.Longitude)
-		elevation, hasElevation := pickWinner(elevations, point.Latitude, point.Longitude)
+		baseMap, hasBaseMap := pickCoverageWinner(baseMaps, point.Latitude, point.Longitude)
+		elevation, hasElevation := pickCoverageWinner(elevations, point.Latitude, point.Longitude)
 
 		if hasBaseMap {
 			baseMapUsed[baseMap.Name] = baseMap
@@ -210,11 +300,11 @@ func missingDataType(hasBaseMap, hasElevation bool) (missing MissingDataType, fu
 	}
 }
 
-// pickWinner returns the candidate covering (lat, lon) that wins the
-// determinism rule (FR-016, Clarification — spec.md): the smallest
+// pickCoverageWinner returns the candidate covering (lat, lon) that wins
+// the determinism rule (FR-016, Clarification — spec.md): the smallest
 // BoundingBox.AreaDegrees (most specific); ties broken by the oldest
 // RegisteredAt.
-func pickWinner(candidates []domain.GeoDataSource, lat, lon float64) (domain.GeoDataSource, bool) {
+func pickCoverageWinner(candidates []domain.GeoDataSource, lat, lon float64) (domain.GeoDataSource, bool) {
 	var winner domain.GeoDataSource
 	found := false
 
@@ -241,9 +331,8 @@ func isMoreSpecific(a, b domain.GeoDataSource) bool {
 	return a.RegisteredAt.Before(b.RegisteredAt)
 }
 
-// sortedSources returns used's values sorted by Name, so
-// CheckCoverageOutput is deterministic regardless of map iteration order
-// (SC-005).
+// sortedSources returns used's values sorted by Name, so CheckCoverageOutput
+// is deterministic regardless of map iteration order (SC-005).
 func sortedSources(used map[string]domain.GeoDataSource) []domain.GeoDataSource {
 	sources := make([]domain.GeoDataSource, 0, len(used))
 	for _, source := range used {

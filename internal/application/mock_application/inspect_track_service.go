@@ -40,17 +40,17 @@ func (m *MockInspectTrackService) EXPECT() *MockInspectTrackServiceMockRecorder 
 	return m.recorder
 }
 
-// Execute mocks base method.
-func (m *MockInspectTrackService) Execute(input application.InspectTrackInput) (application.InspectTrackOutput, error) {
+// Inspect mocks base method.
+func (m *MockInspectTrackService) Inspect(input application.InspectTrackInput) (application.InspectTrackOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Execute", input)
+	ret := m.ctrl.Call(m, "Inspect", input)
 	ret0, _ := ret[0].(application.InspectTrackOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Execute indicates an expected call of Execute.
-func (mr *MockInspectTrackServiceMockRecorder) Execute(input any) *gomock.Call {
+// Inspect indicates an expected call of Inspect.
+func (mr *MockInspectTrackServiceMockRecorder) Inspect(input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockInspectTrackService)(nil).Execute), input)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inspect", reflect.TypeOf((*MockInspectTrackService)(nil).Inspect), input)
 }

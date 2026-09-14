@@ -52,7 +52,7 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		_, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("")})
+		_, err := service.Inspect(application.InspectTrackInput{Reader: strings.NewReader("")})
 
 		// then
 		assert.ErrorIs(t, err, wantErr)
@@ -73,7 +73,7 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		output, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
+		output, err := service.Inspect(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
 
 		// then
 		require.NoError(t, err)
@@ -101,7 +101,7 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		output, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
+		output, err := service.Inspect(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
 
 		// then
 		require.NoError(t, err)
@@ -122,7 +122,7 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		_, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
+		_, err := service.Inspect(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrInsufficientPoints)
@@ -143,7 +143,7 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		_, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
+		_, err := service.Inspect(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrInsufficientPointsAfterCleaning)
@@ -166,7 +166,7 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		output, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
+		output, err := service.Inspect(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
 
 		// then
 		require.NoError(t, err)
@@ -202,7 +202,7 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, mockedSimplifier, mockedSmoother, testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		output, err := service.Execute(application.InspectTrackInput{
+		output, err := service.Inspect(application.InspectTrackInput{
 			Reader:              strings.NewReader("irrelevant"),
 			SimplificationLevel: domain.LevelHigh,
 			SmoothingLevel:      domain.LevelLow,

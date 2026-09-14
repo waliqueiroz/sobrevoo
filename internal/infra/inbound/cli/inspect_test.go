@@ -77,7 +77,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeInspectCommand(t, mockedService)
@@ -100,7 +100,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeInspectCommand(t, mockedService)
@@ -116,7 +116,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeInspectCommand(t, mockedService)
@@ -137,7 +137,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeInspectCommand(t, mockedService)
@@ -154,7 +154,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeInspectCommand(t, mockedService)
@@ -168,7 +168,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrEmptyFile)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrEmptyFile)
 
 		// when
 		stdout, err := executeInspectCommand(t, mockedService)
@@ -182,7 +182,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrEmptyFile)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrEmptyFile)
 
 		// when
 		_, err := executeInspectCommand(t, mockedService)
@@ -196,7 +196,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrUnsupportedFormat)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrUnsupportedFormat)
 
 		// when
 		_, err := executeInspectCommand(t, mockedService)
@@ -210,7 +210,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrInsufficientPoints)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrInsufficientPoints)
 
 		// when
 		_, err := executeInspectCommand(t, mockedService)
@@ -224,7 +224,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrInsufficientPointsAfterCleaning)
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(application.InspectTrackOutput{}, domain.ErrInsufficientPointsAfterCleaning)
 
 		// when
 		_, err := executeInspectCommand(t, mockedService)
@@ -238,7 +238,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(application.InspectTrackOutput{}, errors.New("boom"))
+		mockedService.EXPECT().Inspect(gomock.Any()).Return(application.InspectTrackOutput{}, errors.New("boom"))
 
 		// when
 		_, err := executeInspectCommand(t, mockedService)
@@ -269,7 +269,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).DoAndReturn(func(input application.InspectTrackInput) (application.InspectTrackOutput, error) {
+		mockedService.EXPECT().Inspect(gomock.Any()).DoAndReturn(func(input application.InspectTrackInput) (application.InspectTrackOutput, error) {
 			assert.Equal(t, domain.LevelHigh, input.SimplificationLevel)
 			assert.Equal(t, domain.LevelLow, input.SmoothingLevel)
 			return build_application.NewInspectTrackOutputBuilder().Build(), nil
@@ -289,7 +289,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mock_application.NewMockInspectTrackService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).DoAndReturn(func(input application.InspectTrackInput) (application.InspectTrackOutput, error) {
+		mockedService.EXPECT().Inspect(gomock.Any()).DoAndReturn(func(input application.InspectTrackInput) (application.InspectTrackOutput, error) {
 			assert.Equal(t, domain.LevelHigh, input.SimplificationLevel)
 			assert.Equal(t, domain.LevelHigh, input.SmoothingLevel)
 			return build_application.NewInspectTrackOutputBuilder().Build(), nil

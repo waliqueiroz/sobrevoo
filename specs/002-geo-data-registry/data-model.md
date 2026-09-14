@@ -19,7 +19,7 @@ Um registro de dado geográfico local declarado pelo usuário (Entidade-Chave
 | `Type` | `DataType` (enum) | `DataTypeBaseMap` ou `DataTypeElevation`, determinado automaticamente a partir do conteúdo do arquivo (FR-002). |
 | `Format` | `DataFormat` (enum) | `DataFormatMBTiles` ou `DataFormatGeoTIFF` — o formato de arquivo concreto identificado. Guardado separadamente de `Type` pelo mesmo motivo que `Track.Format` existe desde a etapa 1: um segundo formato para o mesmo tipo (ex.: um segundo formato de mapa base) pode ser adicionado no futuro sem alterar esta entidade. |
 | `BoundingBox` | `BoundingBox` | Área geográfica coberta, determinada automaticamente a partir do conteúdo do arquivo (FR-003). |
-| `RegisteredAt` | `time.Time` | Instante em que o registro foi criado, obtido de `time.Now()` diretamente por `RegisterGeoDataService` — sem uma porta dedicada (`research.md` item 10.1: `time` é biblioteca padrão, não uma dependência externa no sentido do Princípio II, e o campo nunca é exibido ao usuário). Usado apenas para o desempate determinístico entre fontes sobrepostas (FR-016, ver `research.md` item 10). |
+| `RegisteredAt` | `time.Time` | Instante em que o registro foi criado, obtido de `time.Now()` diretamente por `GeoDataService.Register` — sem uma porta dedicada (`research.md` item 10.1: `time` é biblioteca padrão, não uma dependência externa no sentido do Princípio II, e o campo nunca é exibido ao usuário). Usado apenas para o desempate determinístico entre fontes sobrepostas (FR-016, ver `research.md` item 10). |
 
 Note-se que a entidade **não** guarda se o arquivo ainda existe: essa é uma
 informação dinâmica, recalculada a cada `list`/`check` via a porta
@@ -51,7 +51,7 @@ Esta feature adiciona dois métodos, sem alterar seus campos:
 
 | Método | Assinatura | Descrição |
 |---|---|---|
-| `Contains` | `func (b BoundingBox) Contains(lat, lon float64) bool` | Reporta se o ponto geográfico `(lat, lon)` está dentro da área coberta por `b`, tratando corretamente o caso `CrossesAntimeridian` (FR-018). Usada por `CheckCoverageService` para decidir, ponto a ponto, se um `GeoDataSource` cobre aquele ponto. |
+| `Contains` | `func (b BoundingBox) Contains(lat, lon float64) bool` | Reporta se o ponto geográfico `(lat, lon)` está dentro da área coberta por `b`, tratando corretamente o caso `CrossesAntimeridian` (FR-018). Usada por `GeoDataService.CheckCoverage` para decidir, ponto a ponto, se um `GeoDataSource` cobre aquele ponto. |
 | `AreaDegrees` | `func (b BoundingBox) AreaDegrees() float64` | Área aproximada de `b` em graus quadrados (largura × altura, com a mesma técnica de "unwrap" de longitude usada para o antimeridiano), usada apenas como medida relativa de especificidade no desempate entre fontes sobrepostas (FR-016, ver `research.md` item 10) — não é uma área geodésica real. |
 
 ## Erros sentinela do domínio (novos)
@@ -129,7 +129,7 @@ type FileChecker interface {
 Implementação em `internal/infra/outbound/filechecker`, baseada em
 `os.Stat` (FR-010, FR-017, ver `research.md` item 7).
 
-Não há porta `Clock`: `RegisterGeoDataService` chama `time.Now()`
+Não há porta `Clock`: `GeoDataService.Register` chama `time.Now()`
 diretamente (`research.md` item 10.1) — `time` é biblioteca padrão, não
 uma dependência externa no sentido do Princípio II.
 
@@ -140,49 +140,61 @@ diretamente acima de cada interface, com saída em
 `internal/domain/mock_domain/` — um arquivo por porta: `geo_data_inspector.go`,
 `geo_data_registry.go`, `file_checker.go`.
 
-## DTOs da camada de serviço
+## Camada de serviço: `GeoDataService`
 
-Vivem em `internal/application` — a forma de entrada/saída de cada novo
-serviço, não conceitos de negócio por si só.
+Ao contrário do que uma versão anterior deste documento descrevia (quatro
+serviços de método único — `RegisterGeoDataService`, `ListGeoDataService`,
+`RemoveGeoDataService`, `CheckCoverageService`, cada um com um único
+`Execute`), os quatro casos de uso desta etapa são expostos por uma única
+interface, `GeoDataService`, com um método nomeado por operação — o mesmo
+padrão de service layer já usado em `waliqueiroz/mystery-gifter-api`
+(`GroupService` reúne `Create`/`GetByID`/`AddUser`/... numa só interface;
+ver `research.md` item 13). Os quatro casos de uso desta etapa operam sobre
+o mesmo recurso — o registro de dados geográficos — então cabem
+naturalmente juntos:
 
-### RegisterGeoDataService
+```go
+type GeoDataService interface {
+    Register(name, path string) (domain.GeoDataSource, error)
+    List() ([]GeoDataSummary, error)
+    Remove(name string) error
+    CheckCoverage(reader io.Reader) (CheckCoverageOutput, error)
+}
+```
 
-| Tipo | Campo | Descrição |
-|---|---|---|
-| `RegisterGeoDataInput` | `Name string` | Nome escolhido pelo usuário. |
-| | `Path string` | Caminho do arquivo a registrar. |
-| `RegisterGeoDataOutput` | `Source domain.GeoDataSource` | O registro criado, com tipo, formato e área já determinados. |
+Vive em `internal/application/geo_data_service.go`, junto dos tipos de
+saída abaixo (dado puro, como `InspectTrackOutput` — nenhum campo é
+`io.Writer`, nenhuma formatação de texto acontece na camada de serviço; a
+apresentação é responsabilidade exclusiva do adapter de entrada, a CLI).
 
-`Execute`: recusa se `Name` já existe (`ErrDataSourceNameAlreadyUsed`),
-chama `GeoDataInspector.Inspect(Path)`, monta o `GeoDataSource` (com
-`RegisteredAt` vindo de `time.Now()`) e chama `GeoDataRegistry.Save`.
+### `Register(name, path string) (domain.GeoDataSource, error)`
 
-### ListGeoDataService
+Recusa se `name` já existe (`ErrDataSourceNameAlreadyUsed`), chama
+`GeoDataInspector.Inspect(path)`, monta o `GeoDataSource` (com
+`RegisteredAt` vindo de `time.Now()`) e chama `GeoDataRegistry.Save`. O
+registro criado é devolvido diretamente — sem um DTO de saída dedicado,
+já que `domain.GeoDataSource` já é exatamente o que há para reportar.
+
+### `List() ([]GeoDataSummary, error)`
 
 | Tipo | Campo | Descrição |
 |---|---|---|
 | `GeoDataSummary` | `Source domain.GeoDataSource` | O registro. |
 | | `Available bool` | `false` quando o arquivo não é mais encontrado no caminho registrado (FR-010). |
-| `ListGeoDataOutput` | `Sources []GeoDataSummary` | Todos os registros, na ordem devolvida por `GeoDataRegistry.List`. |
 
-`Execute`: sem entrada; para cada registro de `GeoDataRegistry.List()`,
-preenche `Available` via `FileChecker.Exists`.
+Sem entrada; para cada registro de `GeoDataRegistry.List()`, preenche
+`Available` via `FileChecker.Exists`.
 
-### RemoveGeoDataService
+### `Remove(name string) error`
 
-| Tipo | Campo | Descrição |
-|---|---|---|
-| `RemoveGeoDataInput` | `Name string` | Nome do registro a remover. |
-
-`Execute`: recusa com `ErrDataSourceNotRegistered` se não existir; caso
+Recusa com `ErrDataSourceNotRegistered` se `name` não existir; caso
 contrário chama `GeoDataRegistry.Delete`. Não há tipo de saída além do
 erro — o arquivo original nunca é tocado (FR-011).
 
-### CheckCoverageService
+### `CheckCoverage(reader io.Reader) (CheckCoverageOutput, error)`
 
 | Tipo | Campo | Descrição |
 |---|---|---|
-| `CheckCoverageInput` | `Reader io.Reader` | Conteúdo do arquivo de trajeto a verificar (mesmo formato de entrada de `InspectTrackInput`). |
 | `CheckCoverageOutput` | `Status CoverageStatus` | Veredito geral: `CoverageStatusFull`, `CoverageStatusPartial` ou `CoverageStatusNone` (SC-003). |
 | | `UncoveredSegments []UncoveredSegment` | Subtrechos contínuos não cobertos (vazio quando `Status == CoverageStatusFull`). |
 | | `BaseMapSourcesUsed []domain.GeoDataSource` | Conjunto (sem repetição) de registros de mapa base que cobriram pelo menos um ponto do trajeto. |
@@ -194,16 +206,22 @@ erro — o arquivo original nunca é tocado (FR-011).
 | | `EndLatitude, EndLongitude float64` | Coordenadas do último ponto do subtrecho não coberto. |
 | | `Missing MissingDataType` | O que falta nesse subtrecho: `MissingBaseMap`, `MissingElevation` ou `MissingBoth`. |
 
-`Execute`: obtém a rota limpa (não simplificada/suavizada) via o helper
-compartilhado de `track_loading.go` (mesmo `TrackParser` e mesmas funções
-puras de limpeza da etapa 1); lista os registros via `GeoDataRegistry.List`,
-descartando os que `FileChecker.Exists` reporta como ausentes (FR-017);
-para cada ponto da rota, determina o `GeoDataSource` de mapa base e o de
-relevo que o cobrem (usando `BoundingBox.Contains`), escolhendo entre
-candidatos do mesmo tipo pelo critério de desempate de `BoundingBox.AreaDegrees`
-(menor área vence; empate por `RegisteredAt` mais antigo — FR-016); agrupa
-pontos consecutivos com o mesmo status de cobertura em `UncoveredSegment`
-(FR-015); e agrega os conjuntos de fontes usadas.
+`reader` tem o mesmo formato de entrada de `InspectTrackInput.Reader`.
+`CheckCoverage` obtém a rota limpa (não simplificada/suavizada) via o
+helper compartilhado de `track_loading.go` (mesmo `TrackParser` e mesmas
+funções puras de limpeza da etapa 1); lista os registros via
+`GeoDataRegistry.List`, descartando os que `FileChecker.Exists` reporta
+como ausentes (FR-017); para cada ponto da rota, determina o
+`GeoDataSource` de mapa base e o de relevo que o cobrem (usando
+`BoundingBox.Contains`), escolhendo entre candidatos do mesmo tipo pelo
+critério de desempate de `BoundingBox.AreaDegrees` (menor área vence;
+empate por `RegisteredAt` mais antigo — FR-016); agrupa pontos
+consecutivos com o mesmo status de cobertura em `UncoveredSegment`
+(FR-015); e agrega os conjuntos de fontes usadas. A lógica interna que
+precisa do estado do serviço (`fileChecker`) vira método não exportado de
+`geoDataService`; a que é puramente algébrica (escolher o vencedor entre
+candidatos, decidir o que falta, ordenar fontes) continua função livre no
+mesmo arquivo — mesmo padrão das funções puras do domínio.
 
 **Regra de decisão entre `CoverageStatusFull`, `CoverageStatusPartial` e
 `CoverageStatusNone`** (resolve a ambiguidade apontada pela análise de
@@ -225,8 +243,3 @@ frequência":
   nem todo ponto está totalmente coberto. Em particular, um trajeto com mapa
   base cobrindo 100% da extensão mas nenhum registro de relevo em lugar
   nenhum é `Partial` (há cobertura real, só que incompleta), não `None`.
-
-Assim como `InspectTrackOutput`, todos os DTOs acima são dado puro — nenhum
-campo é `io.Writer`, nenhuma formatação de texto acontece na camada de
-serviço; a apresentação é responsabilidade exclusiva do adapter de entrada
-(CLI).

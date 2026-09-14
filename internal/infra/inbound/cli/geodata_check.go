@@ -12,8 +12,8 @@ import (
 )
 
 // NewGeoDataCheckCommand creates the "geodata check" command, which
-// exposes CheckCoverageService (FR-013 through FR-018).
-func NewGeoDataCheckCommand(checkCoverageService application.CheckCoverageService) *cobra.Command {
+// exposes GeoDataService.CheckCoverage (FR-013 through FR-018).
+func NewGeoDataCheckCommand(geoDataService application.GeoDataService) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check <track-file>",
 		Short: "Check whether a GPS track is covered by the registered geo data",
@@ -28,26 +28,26 @@ func NewGeoDataCheckCommand(checkCoverageService application.CheckCoverageServic
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runGeoDataCheck(cmd, checkCoverageService, args[0])
+			return runGeoDataCheck(cmd, geoDataService, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func runGeoDataCheck(cmd *cobra.Command, checkCoverageService application.CheckCoverageService, path string) error {
-	// CheckCoverageInput needs an io.Reader (like InspectTrackInput), so —
-	// same as inspect.go — this adapter is the one that opens the track
-	// file; a plain I/O error here (file missing, unreadable) falls
-	// through to exit_code.go's generic fallback, exactly as it does for
-	// "inspect" (contracts/cli.md).
+func runGeoDataCheck(cmd *cobra.Command, geoDataService application.GeoDataService, path string) error {
+	// CheckCoverage needs an io.Reader (like InspectTrackInput), so — same
+	// as inspect.go — this adapter is the one that opens the track file; a
+	// plain I/O error here (file missing, unreadable) falls through to
+	// exit_code.go's generic fallback, exactly as it does for "inspect"
+	// (contracts/cli.md).
 	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	output, err := checkCoverageService.Execute(application.CheckCoverageInput{Reader: file})
+	output, err := geoDataService.CheckCoverage(file)
 	if err != nil {
 		return err
 	}

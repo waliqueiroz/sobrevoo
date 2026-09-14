@@ -20,9 +20,26 @@ materializam essa exigência.
 `spec.md`) para permitir implementação e teste independentes de cada
 história. Diferente da etapa 1 (um único comando `inspect` refinado
 incrementalmente por todas as histórias), esta etapa expõe quatro comandos
-distintos — um por história — então cada serviço de aplicação e seu
-subcomando Cobra pertencem inteiramente à fase da própria história, não a um
-esqueleto compartilhado estendido ao longo de todas elas.
+distintos — um por história — então cada subcomando Cobra pertence
+inteiramente à fase da própria história, não a um esqueleto compartilhado
+estendido ao longo de todas elas.
+
+> **Nota de amendment (pós-implementação)**: as tarefas abaixo (T009–T060)
+> descrevem a implementação original — quatro serviços de aplicação
+> separados, cada um com um único método `Execute`
+> (`RegisterGeoDataService`, `ListGeoDataService`, `RemoveGeoDataService`,
+> `CheckCoverageService`). Por pedido explícito do usuário, essa camada foi
+> consolidada em um único `GeoDataService` (`Register`/`List`/`Remove`/
+> `CheckCoverage`), seguindo o padrão de service layer de
+> `waliqueiroz/mystery-gifter-api` — ver `research.md` item 13 e
+> `data-model.md`, que são a descrição atual e autoritativa da camada de
+> aplicação. As tarefas abaixo permanecem marcadas `[X]` como registro
+> histórico do que foi construído; onde mencionam `RegisterGeoDataService`,
+> `ListGeoDataService`, `RemoveGeoDataService`, `CheckCoverageService` ou
+> `.Execute(...)`, leia como o método correspondente de `GeoDataService`.
+> `InspectTrackService.Execute` também foi renomeado para `Inspect` no
+> mesmo pedido, por consistência (métodos nomeados pela operação, nunca
+> `Execute`).
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 

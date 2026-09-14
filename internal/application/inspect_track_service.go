@@ -12,7 +12,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// InspectTrackInput is the input for InspectTrackService.Execute.
+// InspectTrackInput is the input for InspectTrackService.Inspect.
 type InspectTrackInput struct {
 	// Reader is the track file's content to process.
 	Reader io.Reader
@@ -28,7 +28,7 @@ type InspectTrackInput struct {
 	SmoothingLevel      domain.Level
 }
 
-// InspectTrackOutput is the summary produced by InspectTrackService.Execute
+// InspectTrackOutput is the summary produced by InspectTrackService.Inspect
 // (FR-025). It is plain data — no io.Writer field, no formatted text — so
 // presentation stays the exclusive responsibility of whichever inbound
 // adapter calls this service (Constitution Principle III).
@@ -51,7 +51,7 @@ type InspectTrackOutput struct {
 // instance — without duplicating any business rule (Constitution Principle
 // III).
 type InspectTrackService interface {
-	Execute(input InspectTrackInput) (InspectTrackOutput, error)
+	Inspect(input InspectTrackInput) (InspectTrackOutput, error)
 }
 
 type inspectTrackService struct {
@@ -85,7 +85,7 @@ func NewInspectTrackService(
 	}
 }
 
-func (s *inspectTrackService) Execute(input InspectTrackInput) (InspectTrackOutput, error) {
+func (s *inspectTrackService) Inspect(input InspectTrackInput) (InspectTrackOutput, error) {
 	track, points, discarded, err := cleanTrack(s.parser, s.minPoints, s.maxPlausibleSpeedKmh, input.Reader)
 	if err != nil {
 		return InspectTrackOutput{}, err

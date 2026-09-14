@@ -9,8 +9,8 @@ import (
 )
 
 // NewGeoDataRegisterCommand creates the "geodata register" command, which
-// exposes RegisterGeoDataService (FR-001 through FR-008).
-func NewGeoDataRegisterCommand(registerGeoDataService application.RegisterGeoDataService) *cobra.Command {
+// exposes GeoDataService.Register (FR-001 through FR-008).
+func NewGeoDataRegisterCommand(geoDataService application.GeoDataService) *cobra.Command {
 	var name string
 
 	cmd := &cobra.Command{
@@ -30,7 +30,7 @@ func NewGeoDataRegisterCommand(registerGeoDataService application.RegisterGeoDat
 			if name == "" {
 				return newUsageError(fmt.Errorf("--name is required"))
 			}
-			return runGeoDataRegister(cmd, registerGeoDataService, args[0], name)
+			return runGeoDataRegister(cmd, geoDataService, args[0], name)
 		},
 	}
 
@@ -39,17 +39,14 @@ func NewGeoDataRegisterCommand(registerGeoDataService application.RegisterGeoDat
 	return cmd
 }
 
-func runGeoDataRegister(cmd *cobra.Command, registerGeoDataService application.RegisterGeoDataService, path, name string) error {
-	output, err := registerGeoDataService.Execute(application.RegisterGeoDataInput{
-		Name: name,
-		Path: path,
-	})
+func runGeoDataRegister(cmd *cobra.Command, geoDataService application.GeoDataService, path, name string) error {
+	source, err := geoDataService.Register(name, path)
 	if err != nil {
 		return err
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "Registered %q as %s, covering %s\n",
-		output.Source.Name, output.Source.Type, formatBoundingBox(output.Source.BoundingBox))
+		source.Name, source.Type, formatBoundingBox(source.BoundingBox))
 
 	return nil
 }

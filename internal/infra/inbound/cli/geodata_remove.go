@@ -9,8 +9,8 @@ import (
 )
 
 // NewGeoDataRemoveCommand creates the "geodata remove" command, which
-// exposes RemoveGeoDataService (FR-011, FR-012).
-func NewGeoDataRemoveCommand(removeGeoDataService application.RemoveGeoDataService) *cobra.Command {
+// exposes GeoDataService.Remove (FR-011, FR-012).
+func NewGeoDataRemoveCommand(geoDataService application.GeoDataService) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a registered geo data source, without deleting its file",
@@ -25,15 +25,15 @@ func NewGeoDataRemoveCommand(removeGeoDataService application.RemoveGeoDataServi
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runGeoDataRemove(cmd, removeGeoDataService, args[0])
+			return runGeoDataRemove(cmd, geoDataService, args[0])
 		},
 	}
 
 	return cmd
 }
 
-func runGeoDataRemove(cmd *cobra.Command, removeGeoDataService application.RemoveGeoDataService, name string) error {
-	if err := removeGeoDataService.Execute(application.RemoveGeoDataInput{Name: name}); err != nil {
+func runGeoDataRemove(cmd *cobra.Command, geoDataService application.GeoDataService, name string) error {
+	if err := geoDataService.Remove(name); err != nil {
 		return err
 	}
 

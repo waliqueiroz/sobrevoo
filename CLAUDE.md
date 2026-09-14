@@ -83,9 +83,24 @@ adapter.
   já que produz `Track`). Uma porta sem entidade dona ganha seu próprio
   arquivo, nomeado pelo conceito que representa (`Simplifier` em
   `simplification.go`, `Smoother` em `smoothing.go`).
-- Casos de uso são `XService` (interface exportada) / `xService` (struct
-  não exportada) / `NewXService(...)` (construtor). Adapters de entrada
-  dependem só da interface, nunca da struct concreta.
+- `XService` (interface exportada) / `xService` (struct não exportada) /
+  `NewXService(...)` (construtor) é **um serviço por recurso/agregado, não
+  um serviço por caso de uso**: `X` nomeia o que o serviço gerencia (ex.:
+  `GeoDataService`), e cada caso de uso vira um método nomeado pela
+  operação (`Register`, `List`, `Remove`, `CheckCoverage` — nunca um
+  `Execute` genérico, nunca uma interface por método). Vários casos de uso
+  que operam sobre o mesmo recurso pertencem à mesma interface e à mesma
+  struct — padrão espelhado de `waliqueiroz/mystery-gifter-api`
+  (`internal/application/group_service.go`: `GroupService` reúne
+  `Create`/`GetByID`/`Search`/`AddUser`/`RemoveUser`/`GenerateMatches`/
+  `Reopen`/`Archive`/`GetUserMatch`). Um serviço pode depender de outro
+  serviço de aplicação (não só de portas do domínio) quando isso faz
+  sentido — ver `GroupInviteService` dependendo de `UserService` no mesmo
+  repositório de referência. Adapters de entrada dependem só da interface,
+  nunca da struct concreta. (`InspectTrackService`/`GeoDataService`, em
+  `internal/application`, seguem esse padrão; ver
+  `specs/002-geo-data-registry/research.md` item 13 para o histórico dessa
+  decisão.)
 - Mocks são gerados com `go.uber.org/mock/mockgen` via diretiva
   `//go:generate` posicionada diretamente acima da interface que ela
   mocka — nunca em um arquivo central. A saída vai para um subpacote

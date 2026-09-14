@@ -15,14 +15,14 @@ import (
 )
 
 // executeGeoDataListCommand runs the "geodata list" command with
-// listGeoDataService as its only dependency and returns stdout and the
+// geoDataService as its only dependency and returns stdout and the
 // resulting error. The service is a test double — this is a unit test of
 // the CLI adapter alone (Constitution Principle III), never a real
-// ListGeoDataService.
-func executeGeoDataListCommand(t *testing.T, listGeoDataService application.ListGeoDataService) (stdout string, err error) {
+// GeoDataService.
+func executeGeoDataListCommand(t *testing.T, geoDataService application.GeoDataService) (stdout string, err error) {
 	t.Helper()
 
-	cmd := cli.NewGeoDataListCommand(listGeoDataService)
+	cmd := cli.NewGeoDataListCommand(geoDataService)
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetArgs([]string{})
@@ -35,16 +35,14 @@ func executeGeoDataListCommand(t *testing.T, listGeoDataService application.List
 func Test_GeoDataListCommand_Execute(t *testing.T) {
 	t.Run("should print name, type and area for two or more registered sources", func(t *testing.T) {
 		// given
-		output := application.ListGeoDataOutput{
-			Sources: []application.GeoDataSummary{
-				{Source: domain.GeoDataSource{Name: "europa-mapa", Type: domain.DataTypeBaseMap, BoundingBox: domain.BoundingBox{MinLatitude: 40, MaxLatitude: 50, MinLongitude: 10, MaxLongitude: 20}}, Available: true},
-				{Source: domain.GeoDataSource{Name: "europa-relevo", Type: domain.DataTypeElevation, BoundingBox: domain.BoundingBox{MinLatitude: 50, MaxLatitude: 51, MinLongitude: 10, MaxLongitude: 11}}, Available: true},
-			},
+		summaries := []application.GeoDataSummary{
+			{Source: domain.GeoDataSource{Name: "europa-mapa", Type: domain.DataTypeBaseMap, BoundingBox: domain.BoundingBox{MinLatitude: 40, MaxLatitude: 50, MinLongitude: 10, MaxLongitude: 20}}, Available: true},
+			{Source: domain.GeoDataSource{Name: "europa-relevo", Type: domain.DataTypeElevation, BoundingBox: domain.BoundingBox{MinLatitude: 50, MaxLatitude: 51, MinLongitude: 10, MaxLongitude: 11}}, Available: true},
 		}
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockListGeoDataService(mockCtrl)
-		mockedService.EXPECT().Execute().Return(output, nil)
+		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().List().Return(summaries, nil)
 
 		// when
 		stdout, err := executeGeoDataListCommand(t, mockedService)
@@ -59,16 +57,14 @@ func Test_GeoDataListCommand_Execute(t *testing.T) {
 
 	t.Run("should flag a source whose file was moved or deleted without omitting the others", func(t *testing.T) {
 		// given
-		output := application.ListGeoDataOutput{
-			Sources: []application.GeoDataSummary{
-				{Source: domain.GeoDataSource{Name: "europa-mapa"}, Available: true},
-				{Source: domain.GeoDataSource{Name: "europa-relevo"}, Available: false},
-			},
+		summaries := []application.GeoDataSummary{
+			{Source: domain.GeoDataSource{Name: "europa-mapa"}, Available: true},
+			{Source: domain.GeoDataSource{Name: "europa-relevo"}, Available: false},
 		}
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockListGeoDataService(mockCtrl)
-		mockedService.EXPECT().Execute().Return(output, nil)
+		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().List().Return(summaries, nil)
 
 		// when
 		stdout, err := executeGeoDataListCommand(t, mockedService)
@@ -83,8 +79,8 @@ func Test_GeoDataListCommand_Execute(t *testing.T) {
 	t.Run("should print a clear message when no source is registered", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockListGeoDataService(mockCtrl)
-		mockedService.EXPECT().Execute().Return(application.ListGeoDataOutput{}, nil)
+		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().List().Return(nil, nil)
 
 		// when
 		stdout, err := executeGeoDataListCommand(t, mockedService)

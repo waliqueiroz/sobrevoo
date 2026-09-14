@@ -63,7 +63,7 @@ func runInspect(cmd *cobra.Command, inspectTrackService application.InspectTrack
 	}
 	defer file.Close()
 
-	output, err := inspectTrackService.Execute(application.InspectTrackInput{
+	output, err := inspectTrackService.Inspect(application.InspectTrackInput{
 		Reader:              file,
 		SimplificationLevel: simplificationLevel,
 		SmoothingLevel:      smoothingLevel,

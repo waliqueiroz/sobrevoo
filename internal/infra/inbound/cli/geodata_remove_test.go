@@ -15,14 +15,14 @@ import (
 )
 
 // executeGeoDataRemoveCommand runs the "geodata remove" command with
-// removeGeoDataService as its only dependency and returns stdout and the
+// geoDataService as its only dependency and returns stdout and the
 // resulting error. The service is a test double — this is a unit test of
 // the CLI adapter alone (Constitution Principle III), never a real
-// RemoveGeoDataService.
-func executeGeoDataRemoveCommand(t *testing.T, removeGeoDataService application.RemoveGeoDataService, args ...string) (stdout string, err error) {
+// GeoDataService.
+func executeGeoDataRemoveCommand(t *testing.T, geoDataService application.GeoDataService, args ...string) (stdout string, err error) {
 	t.Helper()
 
-	cmd := cli.NewGeoDataRemoveCommand(removeGeoDataService)
+	cmd := cli.NewGeoDataRemoveCommand(geoDataService)
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetArgs(args)
@@ -47,8 +47,8 @@ func Test_GeoDataRemoveCommand_Execute(t *testing.T) {
 	t.Run("should confirm removal when the service succeeds", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockRemoveGeoDataService(mockCtrl)
-		mockedService.EXPECT().Execute(application.RemoveGeoDataInput{Name: "europa-mapa"}).Return(nil)
+		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().Remove("europa-mapa").Return(nil)
 
 		// when
 		stdout, err := executeGeoDataRemoveCommand(t, mockedService, "europa-mapa")
@@ -62,8 +62,8 @@ func Test_GeoDataRemoveCommand_Execute(t *testing.T) {
 	t.Run("should map a name not registered to exit code 9", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockRemoveGeoDataService(mockCtrl)
-		mockedService.EXPECT().Execute(gomock.Any()).Return(domain.ErrDataSourceNotRegistered)
+		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().Remove(gomock.Any()).Return(domain.ErrDataSourceNotRegistered)
 
 		// when
 		_, err := executeGeoDataRemoveCommand(t, mockedService, "nao-existe")

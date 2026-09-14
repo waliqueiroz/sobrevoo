@@ -309,3 +309,50 @@ clarificada.
 - **Alternativas consideradas**: quatro comandos de nível raiz (`register`,
   `list`, `remove`, `check-coverage`) (rejeitada — nomes genéricos demais
   no nível raiz, com risco de colisão com comandos de etapas futuras).
+
+## 13. Um único `GeoDataService`, não um serviço por caso de uso
+
+- **Decisão**: os quatro casos de uso desta etapa (`register`, `list`,
+  `remove`, `check`) são expostos por uma única interface `GeoDataService`,
+  com um método nomeado por operação (`Register`, `List`, `Remove`,
+  `CheckCoverage`) — não quatro interfaces separadas de método único
+  (`RegisterGeoDataService.Execute`, `ListGeoDataService.Execute`, etc.,
+  como a primeira versão desta etapa implementou). Os helpers internos de
+  `CheckCoverage` que precisam de estado do serviço
+  (`partitionAvailableSources`, `buildCoverageOutput`) viraram métodos não
+  exportados de `geoDataService`; os que são puramente algébricos, sem
+  estado (`pickCoverageWinner`, `isMoreSpecific`, `missingDataType`,
+  `sortedSources`), continuam funções livres no mesmo arquivo — o mesmo
+  padrão já usado por funções puras do domínio (`Haversine`,
+  `ComputeBoundingBox`).
+- **Racional**: decisão revisada por pedido explícito do usuário, que
+  apontou `waliqueiroz/mystery-gifter-api`
+  (`internal/application/group_service.go`) como referência do padrão que
+  já usa em outros projetos: um serviço por *recurso/agregado* (`Group`,
+  `User`, `GroupInvite`), com métodos nomeados pela operação
+  (`Create`, `GetByID`, `AddUser`, `Reopen`, ...), não um objeto por caso
+  de uso com um único método `Execute`. Os quatro casos de uso desta etapa
+  operam sobre o mesmo recurso — o registro de dados geográficos — então
+  cabem naturalmente em um único `GeoDataService`, do mesmo jeito que
+  `GroupService` reúne `Create`/`GetByID`/`Search`/`AddUser`/`RemoveUser`/
+  `GenerateMatches`/`Reopen`/`Archive`/`GetUserMatch` numa só interface. Um
+  serviço também pode depender de outro serviço (no repositório de
+  referência, `GroupService` depende de `UserService`) — não só de portas
+  do domínio — mas não foi necessário aqui, já que `GeoDataService` não
+  precisa de nenhum outro serviço de aplicação.
+- **Alternativas consideradas**: manter quatro interfaces de método único
+  (decisão original desta etapa, superada — contraria o padrão de service
+  layer que o usuário já usa e o Princípio IX, lido à luz dessa correção:
+  "cada caso de uso" não significa "uma interface por método", significa
+  "cada recurso/agregado da aplicação").
+
+**Nota de amendment sugerida**: a redação atual do Princípio IX da
+constituição ("Cada caso de uso em `internal/application`... MUST ser
+modelado como uma interface exportada terminada em `Service`") é ambígua
+o bastante para levar a exatamente o erro que esta decisão corrige — foi
+seguida ao pé da letra na primeira versão desta etapa, produzindo quatro
+serviços de método único. Vale abrir um amendment dedicado (via
+`/speckit-constitution`) explicitando o padrão "um serviço por recurso,
+métodos nomeados pela operação — não um objeto por caso de uso", com
+`waliqueiroz/mystery-gifter-api` como referência, para que as próximas
+etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
