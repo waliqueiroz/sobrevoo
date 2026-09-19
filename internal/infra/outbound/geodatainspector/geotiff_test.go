@@ -14,7 +14,7 @@ func Test_Inspector_Inspect_GeoTIFF(t *testing.T) {
 	t.Run("should identify a valid geographic-CRS GeoTIFF as elevation with the area computed from its georeferencing tags", func(t *testing.T) {
 		// given
 		path := writeFixture(t, "valid.tif", helper.ValidGeoTIFF())
-		inspector := geodatainspector.New()
+		inspector := geodatainspector.NewGeoDataInspector()
 
 		// when
 		result, err := inspector.Inspect(path)
@@ -32,7 +32,7 @@ func Test_Inspector_Inspect_GeoTIFF(t *testing.T) {
 	t.Run("should compute a wrapped, antimeridian-crossing area for a raster placed near the 180th meridian", func(t *testing.T) {
 		// given
 		path := writeFixture(t, "antimeridian.tif", helper.GeoTIFFCrossingAntimeridian())
-		inspector := geodatainspector.New()
+		inspector := geodatainspector.NewGeoDataInspector()
 
 		// when
 		result, err := inspector.Inspect(path)
@@ -47,7 +47,7 @@ func Test_Inspector_Inspect_GeoTIFF(t *testing.T) {
 	t.Run("should reject a GeoTIFF in a projected CRS as an unsupported format", func(t *testing.T) {
 		// given
 		path := writeFixture(t, "projected.tif", helper.GeoTIFFWithProjectedCRS())
-		inspector := geodatainspector.New()
+		inspector := geodatainspector.NewGeoDataInspector()
 
 		// when
 		_, err := inspector.Inspect(path)

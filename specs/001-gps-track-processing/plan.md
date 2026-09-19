@@ -136,7 +136,7 @@ internal/
     │   ├── config/
     │   │   └── config.go                    # adapter que resolve os limiares internos (Princípio VIII)
     │   ├── trackparser/
-    │   │   └── gpx.go                       # adapter TrackParser: valida conteúdo GPX e delega a tkrajina/gpxgo
+    │   │   └── gpx_parser.go                # adapter TrackParser (NewGPXParser): valida conteúdo GPX e delega a tkrajina/gpxgo
     │   ├── simplifier/
     │   │   └── douglas_peucker_simplifier.go  # adapter Simplifier (NewDouglasPeuckerSimplifier)
     │   └── smoother/

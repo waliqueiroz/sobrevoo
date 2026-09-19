@@ -93,7 +93,9 @@ estendido ao longo de todas elas.
 > `smoother.NewCatmullRomSmoother()`, sem os subpacotes `douglaspeucker/`
 > e `catmullrom/` — ver `research.md` item 18 e a constituição 1.3.0
 > (Princípio IX). Chamadas como `jsonfile.New(...)` em T023 são o registro
-> histórico.
+> histórico. O mesmo vale para `geodatainspector.New()`/`filechecker.New()`
+> (hoje `NewGeoDataInspector()`/`NewOSFileChecker()`) e para os nomes de
+> arquivo `filechecker.go`/`geodatainspector.go`/`gpx.go`.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 

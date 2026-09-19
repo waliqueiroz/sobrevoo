@@ -35,9 +35,9 @@ func run() int {
 	catmullRom := smoother.NewCatmullRomSmoother()
 	inspectTrackService := application.NewInspectTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
-	geoDataInspector := geodatainspector.New()
+	geoDataInspector := geodatainspector.NewGeoDataInspector()
 	geoDataRepository := jsonfile.NewGeoDataRepository(cfg.RegistryPath)
-	geoDataFileChecker := filechecker.New()
+	geoDataFileChecker := filechecker.NewOSFileChecker()
 	geoDataService := application.NewGeoDataService(geoDataRepository, geoDataInspector, geoDataFileChecker, parser, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
 	geoDataCommand := cli.NewGeoDataCommand()

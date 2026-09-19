@@ -13,7 +13,7 @@ import (
 func Test_Inspector_Inspect(t *testing.T) {
 	t.Run("should reject a nonexistent path", func(t *testing.T) {
 		// given
-		inspector := geodatainspector.New()
+		inspector := geodatainspector.NewGeoDataInspector()
 		path := filepath.Join(t.TempDir(), "does-not-exist.mbtiles")
 
 		// when
@@ -25,7 +25,7 @@ func Test_Inspector_Inspect(t *testing.T) {
 
 	t.Run("should reject a path pointing at a directory", func(t *testing.T) {
 		// given
-		inspector := geodatainspector.New()
+		inspector := geodatainspector.NewGeoDataInspector()
 
 		// when
 		_, err := inspector.Inspect(t.TempDir())
@@ -36,7 +36,7 @@ func Test_Inspector_Inspect(t *testing.T) {
 
 	t.Run("should reject content that is neither MBTiles nor GeoTIFF", func(t *testing.T) {
 		// given
-		inspector := geodatainspector.New()
+		inspector := geodatainspector.NewGeoDataInspector()
 		path := writeFixture(t, "invalid.dat", helper.NotSQLiteContent())
 
 		// when

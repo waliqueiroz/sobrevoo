@@ -546,7 +546,14 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   análogo a `security.NewBcryptPasswordManager` e
   `identity.NewUUIDIdentityGenerator`. Os subpacotes `douglaspeucker/` e
   `catmullrom/` deixaram de existir; `trackparser.NewGPXParser()` já seguia
-  o caso (2). **Diferença deliberada** do repositório de referência: os
+  o caso (2). Os demais adapters foram alinhados na mesma rodada:
+  `filechecker.NewOSFileChecker()` (tipo `OSFileChecker`, arquivo
+  `os_file_checker.go`, antes `New()`/`FileChecker`),
+  `geodatainspector.NewGeoDataInspector()` (tipo `GeoDataInspector`, arquivo
+  `geo_data_inspector.go`, antes `New()`/`Inspector`) e `trackparser/gpx.go`
+  virou `gpx_parser.go`. O pacote `config` ficou de fora de propósito: é um
+  adapter de saída na prática (leitura de configuração/ambiente), por isso
+  permanece em `outbound/`. **Diferença deliberada** do repositório de referência: os
   construtores devolvem o struct concreto do adapter (exportado), não a
   interface do domínio — o `main.go` (composition root) e os serviços
   continuam recebendo-os pela interface do domínio, por atribuição.

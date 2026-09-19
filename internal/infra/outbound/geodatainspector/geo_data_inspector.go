@@ -17,12 +17,12 @@ import (
 // therefore every MBTiles file) starts with.
 const sqliteMagic = "SQLite format 3\x00"
 
-// Inspector implements domain.GeoDataInspector.
-type Inspector struct{}
+// GeoDataInspector implements domain.GeoDataInspector.
+type GeoDataInspector struct{}
 
-// New creates an Inspector.
-func New() Inspector {
-	return Inspector{}
+// NewGeoDataInspector creates a GeoDataInspector.
+func NewGeoDataInspector() GeoDataInspector {
+	return GeoDataInspector{}
 }
 
 // Inspect examines the file at path, determines whether it is a base map
@@ -31,7 +31,7 @@ func New() Inspector {
 // opening path are translated here into domain.ErrDataFileNotFound /
 // domain.ErrDataFileUnreadable; a path pointing at a directory is treated
 // as unreadable, matching the edge case documented in spec.md.
-func (Inspector) Inspect(path string) (domain.InspectedGeoData, error) {
+func (GeoDataInspector) Inspect(path string) (domain.InspectedGeoData, error) {
 	header, err := readHeader(path)
 	if err != nil {
 		return domain.InspectedGeoData{}, err
