@@ -23,7 +23,7 @@ type GeoDataInspector interface {
 
 // GeoDataRepository persists and retrieves the set of registered
 // GeoDataSource entries (FR-008). Implemented by
-// internal/infra/outbound/geodatastore/jsonfile.
+// internal/infra/outbound/jsonfile.
 type GeoDataRepository interface {
 	// Save adds or replaces the registered source with the same Name.
 	Save(source GeoDataSource) error

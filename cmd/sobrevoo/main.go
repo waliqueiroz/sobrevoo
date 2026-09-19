@@ -13,7 +13,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/config"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/filechecker"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/geodatainspector"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/geodatastore/jsonfile"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/jsonfile"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier/douglaspeucker"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother/catmullrom"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/trackparser"

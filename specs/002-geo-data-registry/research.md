@@ -110,7 +110,7 @@ clarificada.
   `os.UserHomeDir()`, o mesmo em qualquer sistema operacional), resolvido
   por `internal/infra/outbound/config` (estendendo o `Config` já existente
   com um campo `RegistryPath`) e lido/escrito por um adapter dedicado
-  (`internal/infra/outbound/geodatastore/jsonfile`). Toda escrita é atômica:
+  (`internal/infra/outbound/jsonfile`). Toda escrita é atômica:
   o novo conteúdo é escrito em um arquivo temporário no mesmo diretório e
   então promovido com `os.Rename`, evitando um registro corrompido caso o
   processo seja interrompido no meio da escrita.
@@ -507,3 +507,26 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   sobre o vocabulário do domínio, e "registro"/"registry" continuam nomes
   corretos para o dado persistido e para a feature, independente de como a
   porta que o acessa se chama.
+
+## 17. Pacote `jsonfile` sobe um nível: `geodatastore/` deixa de existir
+
+- **Decisão**: o adapter da porta `GeoDataRepository` passou de
+  `internal/infra/outbound/geodatastore/jsonfile` para
+  `internal/infra/outbound/jsonfile`. O pacote, o struct `Store` e o
+  comportamento não mudam; só o caminho de import e o diretório.
+- **Racional**: pergunta direta do usuário ("a pasta geodatastore precisa
+  mesmo existir?"). Não precisava: era um diretório com um único pacote
+  dentro, sem irmãos. No repositório de referência
+  (`waliqueiroz/mystery-gifter-api`), os adapters de saída ficam planos e
+  são nomeados pela tecnologia (`outgoing/postgres`, `outgoing/identity`,
+  `outgoing/security`), sem pasta de categoria por cima — `jsonfile` é o
+  equivalente direto de `postgres`. Já `geodatainspector`, `filechecker` e
+  `trackparser` estavam planos; `geodatastore` era a exceção.
+- **Alternativas consideradas**: manter `geodatastore/jsonfile` (decisão
+  original, superada — a pasta de categoria só se justificaria se já
+  houvesse uma segunda implementação da porta, ex.: `geodatastore/sqlite`,
+  o que não existe; se aparecer, `sqlite` entra como irmão de `jsonfile`
+  em `outbound/`, sem precisar de agrupador). Não foram tocados
+  `simplifier/douglaspeucker` e `smoother/catmullrom` (etapa 1), que têm o
+  mesmo formato de pasta de categoria — ficam para uma decisão separada.
+

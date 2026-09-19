@@ -77,6 +77,13 @@ estendido ao longo de todas elas.
 > (`RegistryPath`, `registry.json`, o texto de ajuda da CLI, o nome desta
 > feature) não muda — só o nome do tipo Go da porta e o que dele deriva —
 > ver `research.md` item 16.
+>
+> Uma quinta pergunta do usuário ("a pasta geodatastore precisa mesmo
+> existir?") moveu o adapter de T008 de
+> `internal/infra/outbound/geodatastore/jsonfile` para
+> `internal/infra/outbound/jsonfile` — ver `research.md` item 17. Os
+> caminhos antigos nas tarefas T002/T008/T062/T065 abaixo são o registro
+> histórico do que foi feito na época.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 

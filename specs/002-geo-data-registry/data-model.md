@@ -195,7 +195,7 @@ type GeoDataRepository interface {
 }
 ```
 
-Implementação em `internal/infra/outbound/geodatastore/jsonfile`: um único
+Implementação em `internal/infra/outbound/jsonfile`: um único
 arquivo JSON em local fixo do SO, com escrita atômica (FR-008, ver
 `research.md` item 5). `FindByName` devolve `(GeoDataSource{}, false, nil)`
 quando não há registro com aquele nome (não é um erro). Chamada

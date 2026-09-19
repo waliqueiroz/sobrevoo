@@ -77,7 +77,7 @@ adapter.
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso
   posicional a um arquivo — `geodatainspector` (lê SQLite/TIFF por
-  caminho), `geodatastore/jsonfile` (lê/escreve o registro) e `filechecker`
+  caminho), `jsonfile` (lê/escreve o registro) e `filechecker`
   (`os.Stat`) — abrem o arquivo eles mesmos, dado apenas o caminho; a CLI
   continua sendo quem abre o arquivo só quando o método do serviço exige um
   `io.Reader` (`register` não abre nada, pois passa um caminho;

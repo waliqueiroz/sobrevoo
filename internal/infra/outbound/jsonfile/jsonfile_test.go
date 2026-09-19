@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/geodatastore/jsonfile"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/jsonfile"
 )
 
 func registryPath(t *testing.T) string {
