@@ -40,7 +40,7 @@ func passthroughSmoother(ctrl *gomock.Controller) domain.Smoother {
 	return smoother
 }
 
-func Test_inspectTrackService_Execute(t *testing.T) {
+func Test_inspectTrackService_Inspect(t *testing.T) {
 	t.Run("should propagate the parser's error unchanged", func(t *testing.T) {
 		// given
 		wantErr := errors.New("boom")
@@ -52,65 +52,16 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		_, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("")})
+		_, err := service.Inspect(strings.NewReader(""), domain.LevelMedium, domain.LevelMedium)
 
 		// then
 		assert.ErrorIs(t, err, wantErr)
 	})
 
-	t.Run("should build a summary from the parsed track when it has complete data", func(t *testing.T) {
-		// given
-		start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithElevation(100).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(1).WithElevation(150).WithTime(start.Add(time.Hour)).Build(),
-		).Build()
-
-		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
-		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
-
-		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)
-
-		// when
-		output, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
-
-		// then
-		require.NoError(t, err)
-		assert.Equal(t, domain.FormatGPX, output.Format)
-		assert.Equal(t, 2, output.PointCountOriginal)
-		assert.Equal(t, 2, output.PointCountTreated, "neither point is problematic, so none is discarded")
-		assert.Greater(t, output.TotalDistanceMeters, 0.0)
-		require.NotNil(t, output.ElevationGainMeters)
-		assert.InDelta(t, 50.0, *output.ElevationGainMeters, 0.0001)
-		require.NotNil(t, output.Duration)
-		assert.Equal(t, time.Hour, *output.Duration)
-	})
-
-	t.Run("should report elevation and duration as unavailable when the track has no such data", func(t *testing.T) {
-		// given
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithoutElevation().WithoutTime().Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(1).WithoutElevation().WithoutTime().Build(),
-		).Build()
-
-		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
-		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
-
-		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)
-
-		// when
-		output, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
-
-		// then
-		require.NoError(t, err)
-		assert.Nil(t, output.ElevationGainMeters)
-		assert.Nil(t, output.Duration)
-	})
-
-	t.Run("should reject a track with fewer than the minimum points before cleaning", func(t *testing.T) {
-		// given
+	t.Run("should propagate domain.CleanTrack's error unchanged", func(t *testing.T) {
+		// given: domain/cleaning_test.go covers CleanTrack's own rules
+		// (including distinguishing this from ErrInsufficientPointsAfterCleaning)
+		// in detail — this only checks the service does not swallow it.
 		track := build_domain.NewTrackBuilder().WithPoints(
 			build_domain.NewTrackPointBuilder().Build(),
 		).Build()
@@ -122,59 +73,10 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		_, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
+		_, err := service.Inspect(strings.NewReader("irrelevant"), domain.LevelMedium, domain.LevelMedium)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrInsufficientPoints)
-	})
-
-	t.Run("should reject a track that has enough raw points but too few after cleaning", func(t *testing.T) {
-		// given: two of the three points have an impossible latitude
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(0).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(200).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(300).Build(),
-		).Build()
-
-		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
-		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
-
-		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
-
-		// when
-		_, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
-
-		// then
-		assert.ErrorIs(t, err, domain.ErrInsufficientPointsAfterCleaning)
-		assert.NotErrorIs(t, err, domain.ErrInsufficientPoints, "the two errors must be distinguishable (FR-006)")
-	})
-
-	t.Run("should exclude discarded points from the computed distance", func(t *testing.T) {
-		// given: the middle point is an implausible jump (~55km in 1s)
-		start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0.5).WithLongitude(0).WithTime(start.Add(time.Second)).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0.00002).WithLongitude(0).WithTime(start.Add(2*time.Second)).Build(),
-		).Build()
-
-		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
-		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
-
-		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)
-
-		// when
-		output, err := service.Execute(application.InspectTrackInput{Reader: strings.NewReader("irrelevant")})
-
-		// then
-		require.NoError(t, err)
-		assert.Equal(t, 2, output.PointCountTreated, "the middle point is discarded as an implausible jump")
-		// Without the implausible jump, the remaining two points are only a
-		// couple of meters apart; with it, the distance would be tens of
-		// kilometers.
-		assert.Less(t, output.TotalDistanceMeters, 100.0)
 	})
 
 	t.Run("should run simplification then smoothing, in that order, with the requested levels", func(t *testing.T) {
@@ -202,16 +104,42 @@ func Test_inspectTrackService_Execute(t *testing.T) {
 		service := application.NewInspectTrackService(mockedParser, mockedSimplifier, mockedSmoother, testMinPoints, testMaxPlausibleSpeedKmh)
 
 		// when
-		output, err := service.Execute(application.InspectTrackInput{
-			Reader:              strings.NewReader("irrelevant"),
-			SimplificationLevel: domain.LevelHigh,
-			SmoothingLevel:      domain.LevelLow,
-		})
+		summary, err := service.Inspect(strings.NewReader("irrelevant"), domain.LevelHigh, domain.LevelLow)
 
 		// then: the final route must be Smooth's output, confirming both
 		// ports were actually applied to build the summary
 		require.NoError(t, err)
-		assert.Equal(t, 1, output.PointCountTreated)
-		assert.Equal(t, domain.ComputeBoundingBox(smoothed), output.BoundingBox)
+		assert.Equal(t, 1, summary.PointCountTreated)
+		assert.Equal(t, domain.ComputeBoundingBox(smoothed), summary.BoundingBox)
+	})
+
+	t.Run("should return the summary built from the cleaned, simplified and smoothed route", func(t *testing.T) {
+		// given: SummarizeTrack's own rules (elevation gain, duration,
+		// discard stats) are covered in domain/track_summary_test.go — this
+		// only checks the service wires the cleaned/treated route into it.
+		start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
+		track := build_domain.NewTrackBuilder().WithPoints(
+			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithElevation(100).WithTime(start).Build(),
+			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(1).WithElevation(150).WithTime(start.Add(time.Hour)).Build(),
+		).Build()
+
+		mockCtrl := gomock.NewController(t)
+		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
+		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
+
+		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)
+
+		// when
+		summary, err := service.Inspect(strings.NewReader("irrelevant"), domain.LevelMedium, domain.LevelMedium)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, domain.FormatGPX, summary.Format)
+		assert.Equal(t, 2, summary.PointCountOriginal)
+		assert.Equal(t, 2, summary.PointCountTreated)
+		require.NotNil(t, summary.ElevationGainMeters)
+		assert.InDelta(t, 50.0, *summary.ElevationGainMeters, 0.0001)
+		require.NotNil(t, summary.Duration)
+		assert.Equal(t, time.Hour, *summary.Duration)
 	})
 }

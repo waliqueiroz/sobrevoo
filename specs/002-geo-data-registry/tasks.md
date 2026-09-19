@@ -20,9 +20,83 @@ materializam essa exigência.
 `spec.md`) para permitir implementação e teste independentes de cada
 história. Diferente da etapa 1 (um único comando `inspect` refinado
 incrementalmente por todas as histórias), esta etapa expõe quatro comandos
-distintos — um por história — então cada serviço de aplicação e seu
-subcomando Cobra pertencem inteiramente à fase da própria história, não a um
-esqueleto compartilhado estendido ao longo de todas elas.
+distintos — um por história — então cada subcomando Cobra pertence
+inteiramente à fase da própria história, não a um esqueleto compartilhado
+estendido ao longo de todas elas.
+
+> **Nota de amendment (pós-implementação)**: as tarefas abaixo (T009–T060)
+> descrevem a implementação original — quatro serviços de aplicação
+> separados, cada um com um único método `Execute`
+> (`RegisterGeoDataService`, `ListGeoDataService`, `RemoveGeoDataService`,
+> `CheckCoverageService`). Por pedido explícito do usuário, essa camada foi
+> consolidada em um único `GeoDataService` (`Register`/`List`/`Remove`/
+> `CheckCoverage`), seguindo o padrão de service layer de
+> `waliqueiroz/mystery-gifter-api` — ver `research.md` item 13 e
+> `data-model.md`, que são a descrição atual e autoritativa da camada de
+> aplicação. As tarefas abaixo permanecem marcadas `[X]` como registro
+> histórico do que foi construído; onde mencionam `RegisterGeoDataService`,
+> `ListGeoDataService`, `RemoveGeoDataService`, `CheckCoverageService` ou
+> `.Execute(...)`, leia como o método correspondente de `GeoDataService`.
+> `InspectTrackService.Execute` também foi renomeado para `Inspect` no
+> mesmo pedido, por consistência (métodos nomeados pela operação, nunca
+> `Execute`).
+>
+> Uma segunda rodada do mesmo pedido moveu os DTOs de saída
+> (`CheckCoverageOutput`→`domain.CoverageReport`, `UncoveredSegment`,
+> `CoverageStatus`, `MissingDataType`, `GeoDataSummary`) e o algoritmo de
+> cobertura (antes um conjunto de funções soltas em
+> `internal/application/check_coverage_service.go`) para
+> `internal/domain` (`geo_data_coverage.go` — função pura
+> `ComputeCoverage`; `GeoDataSummary` e o construtor `NewGeoDataSource` em
+> `geo_data_source.go`), seguindo o mesmo padrão de
+> `waliqueiroz/mystery-gifter-api` (DTOs e regra de negócio em
+> `internal/domain`; a service layer só orquestra) — ver `research.md`
+> item 14. `internal/application/geo_data_service.go` ficou só com
+> orquestração de portas.
+>
+> Uma terceira rodada do mesmo pedido estendeu isso para a etapa 1: T019
+> (`InspectTrackService`) passou a expor `Inspect(reader io.Reader,
+> simplificationLevel, smoothingLevel domain.Level) (domain.TrackSummary,
+> error)` — sem `InspectTrackInput`/`InspectTrackOutput` — e T033 (o
+> helper `track_loading.go`) foi eliminado: a composição
+> reorder+discard+discard+discard, que ele escondia atrás de uma porta
+> `TrackParser` recebida por parâmetro, virou a função pura
+> `domain.CleanTrack`, em `internal/domain/cleaning.go`; o que antes era o
+> método privado `buildOutput` virou `domain.SummarizeTrack`, em
+> `internal/domain/track_summary.go`. `InspectTrackOutputBuilder`
+> (`build_application`) virou `build_domain.TrackSummaryBuilder` — ver
+> `research.md` item 15.
+>
+> Uma quarta pergunta do usuário ("dá pra gente passar a chamar registry
+> de repository...?") renomeou a porta de persistência de T003/T005/T008
+> de `GeoDataRegistry` para `GeoDataRepository` (mock:
+> `mock_domain/geo_data_repository.go`; campo/parâmetro `registry`→
+> `repository` em `geoDataService`/`NewGeoDataService`) — mesmo
+> vocabulário de `GroupRepository`/`UserRepository` em
+> `waliqueiroz/mystery-gifter-api`. O conceito de "registro" em si
+> (`RegistryPath`, `registry.json`, o texto de ajuda da CLI, o nome desta
+> feature) não muda — só o nome do tipo Go da porta e o que dele deriva —
+> ver `research.md` item 16.
+>
+> Uma quinta pergunta do usuário ("a pasta geodatastore precisa mesmo
+> existir?") moveu o adapter de T008 de
+> `internal/infra/outbound/geodatastore/jsonfile` para
+> `internal/infra/outbound/jsonfile` — ver `research.md` item 17. Os
+> caminhos antigos nas tarefas T002/T008/T062/T065 abaixo são o registro
+> histórico do que foi feito na época.
+>
+> Uma sexta rodada aplicou o padrão de nomes de adapters do
+> `mystery-gifter-api`, depois refinado para o estilo Go (`research.md`
+> itens 18 e 19; constituição 1.3.1, Princípio IX): T008 virou
+> `jsonfile.NewGeoDataRepository(path)` (arquivo `geo_data_repository.go`,
+> struct `GeoDataRepository`, antes `jsonfile.New` e `Store`); os adapters da
+> etapa 1 viraram `simplifier.NewDouglasPeucker()` e
+> `smoother.NewCatmullRom()`, sem os subpacotes `douglaspeucker/` e
+> `catmullrom/`; `trackparser.NewGPX()`; `filechecker.NewOS()`; e
+> `geodatainspector.New()` devolve `Inspector`. Chamadas como
+> `jsonfile.New(...)`, `filechecker.New()` e os nomes de arquivo
+> `filechecker.go`/`geodatainspector.go`/`gpx.go` nas tarefas T008, T016,
+> T023, T032 e T017 (etapa 1) são o registro histórico.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 
@@ -48,8 +122,8 @@ hexagonal definida em `plan.md`: `cmd/sobrevoo/`, `internal/domain/`,
 desta etapa (o módulo Go, o `Makefile` e a estrutura raiz já existem desde a
 etapa 1).
 
-- [ ] T001 [P] Adicionar a dependência `modernc.org/sqlite` via `go get`, atualizando `go.mod`/`go.sum` (research.md item 2)
-- [ ] T002 [P] Criar o esqueleto de diretórios para os novos pacotes: `internal/infra/outbound/geodatainspector/`, `internal/infra/outbound/geodatastore/jsonfile/`, `internal/infra/outbound/filechecker/`, `internal/infra/outbound/clock/`, conforme a árvore em `plan.md`
+- [X] T001 [P] Adicionar a dependência `modernc.org/sqlite` via `go get`, atualizando `go.mod`/`go.sum` (research.md item 2)
+- [X] T002 [P] Criar o esqueleto de diretórios para os novos pacotes: `internal/infra/outbound/geodatainspector/`, `internal/infra/outbound/geodatastore/jsonfile/`, `internal/infra/outbound/filechecker/`, conforme a árvore em `plan.md`
 
 **Checkpoint**: dependência e diretórios prontos.
 
@@ -65,12 +139,12 @@ todas leem e/ou escrevem o mesmo registro.
 **⚠️ CRÍTICO**: nenhuma tarefa de história de usuário pode começar até que
 esta fase esteja completa.
 
-- [ ] T003 [P] Criar a entidade `GeoDataSource` (`Name`, `Path`, `Type`, `Format`, `BoundingBox`, `RegisteredAt`), os enums `DataType` (`DataTypeBaseMap`, `DataTypeElevation`) e `DataFormat` (`DataFormatMBTiles`, `DataFormatGeoTIFF`), e a porta `GeoDataRegistry` (`Save(source GeoDataSource) error`, `FindByName(name string) (GeoDataSource, bool, error)`, `List() ([]GeoDataSource, error)`, `Delete(name string) error`) em `internal/domain/geo_data_source.go`, com a diretiva `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_registry.go . GeoDataRegistry` posicionada diretamente acima da interface, conforme `data-model.md`
-- [ ] T004 [P] Declarar os 5 novos erros sentinela em `internal/domain/errors.go` (estender o arquivo já existente): `ErrDataFileNotFound` (FR-004), `ErrDataFileUnreadable` (FR-005), `ErrUnsupportedDataFormat` (FR-006), `ErrDataSourceNameAlreadyUsed` (FR-007), `ErrDataSourceNotRegistered` (FR-012) — Princípio VII da constituição
-- [ ] T005 [P] Gerar o mock de `GeoDataRegistry` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/geo_data_registry.go` (depende de T003)
-- [ ] T006 [P] Criar `GeoDataSourceBuilder` em `internal/domain/build_domain/geo_data_source_builder.go`: `NewGeoDataSourceBuilder()` com defaults sensatos, métodos fluentes `WithName`/`WithPath`/`WithType`/`WithFormat`/`WithBoundingBox`/`WithRegisteredAt`, e `Build()` terminal (depende de T003)
-- [ ] T007 [P] Estender `internal/infra/outbound/config/config.go`: adicionar `RegistryPath string`, resolvido a partir de `os.UserHomeDir()` como `~/.sobrevoo/registry.json`, com teste em `config_test.go` (research.md item 5)
-- [ ] T008 Implementar o adapter `GeoDataRegistry` em `internal/infra/outbound/geodatastore/jsonfile/jsonfile.go`: `Save`, `FindByName` (devolve `(GeoDataSource{}, false, nil)` quando não encontrado — não é erro), `List`, `Delete`, lendo/escrevendo o arquivo JSON em `RegistryPath` com escrita atômica (arquivo temporário no mesmo diretório + `os.Rename` — research.md item 5); testes em `jsonfile_test.go` cobrindo save/find/list/delete e a ausência do arquivo de registro na primeira execução (depende de T003, T007)
+- [X] T003 [P] Criar a entidade `GeoDataSource` (`Name`, `Path`, `Type`, `Format`, `BoundingBox`, `RegisteredAt`), os enums `DataType` (`DataTypeBaseMap`, `DataTypeElevation`) e `DataFormat` (`DataFormatMBTiles`, `DataFormatGeoTIFF`), e a porta `GeoDataRegistry` (`Save(source GeoDataSource) error`, `FindByName(name string) (GeoDataSource, bool, error)`, `List() ([]GeoDataSource, error)`, `Delete(name string) error`) em `internal/domain/geo_data_source.go`, com a diretiva `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_registry.go . GeoDataRegistry` posicionada diretamente acima da interface, conforme `data-model.md`
+- [X] T004 [P] Declarar os 5 novos erros sentinela em `internal/domain/errors.go` (estender o arquivo já existente): `ErrDataFileNotFound` (FR-004), `ErrDataFileUnreadable` (FR-005), `ErrUnsupportedDataFormat` (FR-006), `ErrDataSourceNameAlreadyUsed` (FR-007), `ErrDataSourceNotRegistered` (FR-012) — Princípio VII da constituição
+- [X] T005 [P] Gerar o mock de `GeoDataRegistry` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/geo_data_registry.go` (depende de T003)
+- [X] T006 [P] Criar `GeoDataSourceBuilder` em `internal/domain/build_domain/geo_data_source_builder.go`: `NewGeoDataSourceBuilder()` com defaults sensatos, métodos fluentes `WithName`/`WithPath`/`WithType`/`WithFormat`/`WithBoundingBox`/`WithRegisteredAt`, e `Build()` terminal (depende de T003)
+- [X] T007 [P] Estender `internal/infra/outbound/config/config.go`: adicionar `RegistryPath string`, resolvido a partir de `os.UserHomeDir()` como `~/.sobrevoo/registry.json`, com teste em `config_test.go` (research.md item 5)
+- [X] T008 Implementar o adapter `GeoDataRegistry` em `internal/infra/outbound/geodatastore/jsonfile/jsonfile.go`: `Save`, `FindByName` (devolve `(GeoDataSource{}, false, nil)` quando não encontrado — não é erro), `List`, `Delete`, lendo/escrevendo o arquivo JSON em `RegistryPath` com escrita atômica (arquivo temporário no mesmo diretório + `os.Rename` — research.md item 5); testes em `jsonfile_test.go` cobrindo save/find/list/delete e a ausência do arquivo de registro na primeira execução (depende de T003, T007)
 
 **Checkpoint**: núcleo do registro completo e testável, mas ainda sem
 nenhum comando `geodata` executável.
@@ -91,26 +165,26 @@ inexistente, um conteúdo não reconhecido, e um nome já usado.
 
 ### Implementação da História de Usuário 1
 
-- [ ] T009 [P] [US1] Estender `internal/domain/geo_data_source.go`: adicionar a struct `InspectedGeoData` (`Format`, `Type`, `BoundingBox`) e a porta `GeoDataInspector` (`Inspect(path string) (InspectedGeoData, error)`), com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_inspector.go . GeoDataInspector` (depende de T003)
-- [ ] T010 [P] [US1] Criar a porta `Clock` (`Now() time.Time`) em `internal/domain/clock.go`, com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/clock.go . Clock`
-- [ ] T011 [P] [US1] Gerar os mocks de `GeoDataInspector` e `Clock` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/geo_data_inspector.go` e `internal/domain/mock_domain/clock.go` (depende de T009, T010)
-- [ ] T012 [P] [US1] Criar fixtures de MBTiles de teste em `test/helper/mbtiles_fixture.go`: um MBTiles válido com a chave `bounds` na tabela `metadata`, um MBTiles sem `bounds`, e um conteúdo que não é um banco SQLite
-- [ ] T013 [P] [US1] Criar fixtures de GeoTIFF de teste em `test/helper/geotiff_fixture.go`: um GeoTIFF válido em CRS geográfico (WGS84), um GeoTIFF em CRS projetado, e um conteúdo que não é TIFF
-- [ ] T014 [P] [US1] Implementar a leitura de MBTiles em `internal/infra/outbound/geodatainspector/mbtiles.go`: abrir o arquivo via `modernc.org/sqlite`, consultar a chave `bounds` da tabela `metadata`, converter `"minLon,minLat,maxLon,maxLat"` para `domain.BoundingBox`; devolver `domain.ErrUnsupportedDataFormat` quando a chave `bounds` estiver ausente; testes em `mbtiles_test.go` usando as fixtures de T012 (research.md itens 1-2) (depende de T012)
-- [ ] T015 [P] [US1] Implementar a leitura de tags GeoTIFF em `internal/infra/outbound/geodatainspector/geotiff.go`: parser próprio de cabeçalho TIFF + IFD via `encoding/binary`/`io.ReaderAt` (sem biblioteca externa), extraindo `ImageWidth`, `ImageLength`, `ModelPixelScaleTag`, `ModelTiepointTag` (ou `ModelTransformationTag`) e `GeoKeyDirectoryTag`; confirmar CRS geográfico (`GTModelTypeGeoKey = 2`) e computar a `BoundingBox`; devolver `domain.ErrUnsupportedDataFormat` para CRS projetado ou tags de georreferenciamento ausentes; testes em `geotiff_test.go` usando as fixtures de T013 (research.md itens 3-4) (depende de T013)
-- [ ] T016 [US1] Implementar o adapter dispatcher em `internal/infra/outbound/geodatainspector/geodatainspector.go`: identificar o formato pela assinatura do conteúdo (cabeçalho SQLite → `mbtiles.go`/mapa base; cabeçalho TIFF → `geotiff.go`/relevo), traduzir erros de abertura de arquivo do SO para `domain.ErrDataFileNotFound`/`domain.ErrDataFileUnreadable`, assinatura não reconhecida → `domain.ErrUnsupportedDataFormat`, implementando `domain.GeoDataInspector` (research.md item 8); testes em `geodatainspector_test.go` (depende de T009, T014, T015)
-- [ ] T017 [P] [US1] Implementar o adapter `Clock` em `internal/infra/outbound/clock/clock.go` usando `time.Now()` (depende de T010)
-- [ ] T018 [US1] Implementar `RegisterGeoDataService` em `internal/application/register_geo_data_service.go`: `RegisterGeoDataInput{Name, Path}` / `RegisterGeoDataOutput{Source}`; recusa com `domain.ErrDataSourceNameAlreadyUsed` quando `GeoDataRegistry.FindByName` já encontra o nome; chama `GeoDataInspector.Inspect`; monta o `GeoDataSource` com `RegisteredAt` vindo de `Clock.Now()`; chama `GeoDataRegistry.Save`; testes usando os mocks de `GeoDataRegistry`, `GeoDataInspector` e `Clock` (depende de T005, T011, T016, T017)
-- [ ] T019 [P] [US1] Gerar o mock de `RegisterGeoDataService` em `internal/application/mock_application/register_geo_data_service.go` (depende de T018)
-- [ ] T020 [P] [US1] Implementar o comando pai Cobra `geodata` em `internal/infra/inbound/cli/geodata.go` (mesmo padrão de `root.go`, agrupa os subcomandos desta feature)
-- [ ] T021 [US1] Implementar o subcomando `register` em `internal/infra/inbound/cli/geodata_register.go`: argumento posicional `<arquivo>` + flag `--name` (obrigatória), chama `RegisterGeoDataService.Execute`, formata a confirmação em inglês descrita em `contracts/cli.md` (nome, tipo, área geográfica), anexa ao comando `geodata` (depende de T018, T020)
-- [ ] T022 [P] [US1] Estender `internal/infra/inbound/cli/exit_code.go`: mapear `domain.ErrDataFileNotFound`→`5`, `domain.ErrDataFileUnreadable`→`6`, `domain.ErrUnsupportedDataFormat`→`7`, `domain.ErrDataSourceNameAlreadyUsed`→`8` (contracts/cli.md) (depende de T004)
-- [ ] T023 [US1] Conectar em `cmd/sobrevoo/main.go`: `geodatainspector.New()`, `clock.New()`, `jsonfile.New(cfg.RegistryPath)`, `application.NewRegisterGeoDataService(...)`, e anexar o comando `geodata` (com o subcomando `register`) ao comando raiz (depende de T008, T014, T015, T016, T017, T018, T020, T021, T022)
-- [ ] T024 [US1] Teste de contrato em `internal/infra/inbound/cli/geodata_register_test.go`: MBTiles válido → confirmação com tipo "base map" e área corretos, código de saída `0` (depende de T021)
-- [ ] T025 [US1] Teste de contrato em `geodata_register_test.go`: caminho inexistente → código de saída `5` (depende de T022)
-- [ ] T026 [US1] Teste de contrato em `geodata_register_test.go`: arquivo existente mas sem permissão de leitura → código de saída `6` (depende de T022)
-- [ ] T027 [US1] Teste de contrato em `geodata_register_test.go`: conteúdo de formato não reconhecido → código de saída `7` (depende de T022)
-- [ ] T028 [US1] Teste de contrato em `geodata_register_test.go`: nome já em uso por outro registro → código de saída `8` (depende de T022)
+- [X] T009 [P] [US1] Estender `internal/domain/geo_data_source.go`: adicionar a struct `InspectedGeoData` (`Format`, `Type`, `BoundingBox`) e a porta `GeoDataInspector` (`Inspect(path string) (InspectedGeoData, error)`), com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_inspector.go . GeoDataInspector` (depende de T003)
+- [X] ~~T010 [P] [US1] Criar a porta `Clock` (`Now() time.Time`) em `internal/domain/clock.go`, com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/clock.go . Clock`~~ Feita e depois revertida: `time` é biblioteca padrão, não uma dependência externa no sentido do Princípio II, e `RegisteredAt` nunca é exibido ao usuário — a porta não compensava o custo da abstração. `RegisterGeoDataService` chama `time.Now()` diretamente (research.md item 10.1).
+- [X] T011 [P] [US1] Gerar o mock de `GeoDataInspector` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/geo_data_inspector.go` (depende de T009)
+- [X] T012 [P] [US1] Criar fixtures de MBTiles de teste em `test/helper/mbtiles_fixture.go`: um MBTiles válido com a chave `bounds` na tabela `metadata`, um MBTiles sem `bounds`, e um conteúdo que não é um banco SQLite
+- [X] T013 [P] [US1] Criar fixtures de GeoTIFF de teste em `test/helper/geotiff_fixture.go`: um GeoTIFF válido em CRS geográfico (WGS84), um GeoTIFF em CRS projetado, e um conteúdo que não é TIFF
+- [X] T014 [P] [US1] Implementar a leitura de MBTiles em `internal/infra/outbound/geodatainspector/mbtiles.go`: abrir o arquivo via `modernc.org/sqlite`, consultar a chave `bounds` da tabela `metadata`, converter `"minLon,minLat,maxLon,maxLat"` para `domain.BoundingBox`; devolver `domain.ErrUnsupportedDataFormat` quando a chave `bounds` estiver ausente; testes em `mbtiles_test.go` usando as fixtures de T012 (research.md itens 1-2) (depende de T012)
+- [X] T015 [P] [US1] Implementar a leitura de tags GeoTIFF em `internal/infra/outbound/geodatainspector/geotiff.go`: parser próprio de cabeçalho TIFF + IFD via `encoding/binary`/`io.ReaderAt` (sem biblioteca externa), extraindo `ImageWidth`, `ImageLength`, `ModelPixelScaleTag`, `ModelTiepointTag` (ou `ModelTransformationTag`) e `GeoKeyDirectoryTag`; confirmar CRS geográfico (`GTModelTypeGeoKey = 2`) e computar a `BoundingBox`; devolver `domain.ErrUnsupportedDataFormat` para CRS projetado ou tags de georreferenciamento ausentes; testes em `geotiff_test.go` usando as fixtures de T013 (research.md itens 3-4) (depende de T013)
+- [X] T016 [US1] Implementar o adapter dispatcher em `internal/infra/outbound/geodatainspector/geodatainspector.go`: identificar o formato pela assinatura do conteúdo (cabeçalho SQLite → `mbtiles.go`/mapa base; cabeçalho TIFF → `geotiff.go`/relevo), traduzir erros de abertura de arquivo do SO para `domain.ErrDataFileNotFound`/`domain.ErrDataFileUnreadable`, assinatura não reconhecida → `domain.ErrUnsupportedDataFormat`, implementando `domain.GeoDataInspector` (research.md item 8); testes em `geodatainspector_test.go` (depende de T009, T014, T015)
+- [X] ~~T017 [P] [US1] Implementar o adapter `Clock` em `internal/infra/outbound/clock/clock.go` usando `time.Now()` (depende de T010)~~ Feita e depois revertida junto com T010 — ver nota acima.
+- [X] T018 [US1] Implementar `RegisterGeoDataService` em `internal/application/register_geo_data_service.go`: `RegisterGeoDataInput{Name, Path}` / `RegisterGeoDataOutput{Source}`; recusa com `domain.ErrDataSourceNameAlreadyUsed` quando `GeoDataRegistry.FindByName` já encontra o nome; chama `GeoDataInspector.Inspect`; monta o `GeoDataSource` com `RegisteredAt` vindo de `time.Now()`; chama `GeoDataRegistry.Save`; testes usando os mocks de `GeoDataRegistry` e `GeoDataInspector`, com `RegisteredAt` verificado por uma janela `[antes, depois]` em torno da chamada (depende de T005, T011, T016)
+- [X] T019 [P] [US1] Gerar o mock de `RegisterGeoDataService` em `internal/application/mock_application/register_geo_data_service.go` (depende de T018)
+- [X] T020 [P] [US1] Implementar o comando pai Cobra `geodata` em `internal/infra/inbound/cli/geodata.go` (mesmo padrão de `root.go`, agrupa os subcomandos desta feature)
+- [X] T021 [US1] Implementar o subcomando `register` em `internal/infra/inbound/cli/geodata_register.go`: argumento posicional `<arquivo>` + flag `--name` (obrigatória), chama `RegisterGeoDataService.Execute`, formata a confirmação em inglês descrita em `contracts/cli.md` (nome, tipo, área geográfica), anexa ao comando `geodata` (depende de T018, T020)
+- [X] T022 [P] [US1] Estender `internal/infra/inbound/cli/exit_code.go`: mapear `domain.ErrDataFileNotFound`→`5`, `domain.ErrDataFileUnreadable`→`6`, `domain.ErrUnsupportedDataFormat`→`7`, `domain.ErrDataSourceNameAlreadyUsed`→`8` (contracts/cli.md) (depende de T004)
+- [X] T023 [US1] Conectar em `cmd/sobrevoo/main.go`: `geodatainspector.New()`, `jsonfile.New(cfg.RegistryPath)`, `application.NewRegisterGeoDataService(...)`, e anexar o comando `geodata` (com o subcomando `register`) ao comando raiz (depende de T008, T014, T015, T016, T018, T020, T021, T022)
+- [X] T024 [US1] Teste de contrato em `internal/infra/inbound/cli/geodata_register_test.go`: MBTiles válido → confirmação com tipo "base map" e área corretos, código de saída `0` (depende de T021)
+- [X] T025 [US1] Teste de contrato em `geodata_register_test.go`: caminho inexistente → código de saída `5` (depende de T022)
+- [X] T026 [US1] Teste de contrato em `geodata_register_test.go`: arquivo existente mas sem permissão de leitura → código de saída `6` (depende de T022)
+- [X] T027 [US1] Teste de contrato em `geodata_register_test.go`: conteúdo de formato não reconhecido → código de saída `7` (depende de T022)
+- [X] T028 [US1] Teste de contrato em `geodata_register_test.go`: nome já em uso por outro registro → código de saída `8` (depende de T022)
 
 **Checkpoint**: História de Usuário 1 completa, demonstrável de ponta a
 ponta (MVP).
@@ -131,24 +205,24 @@ e os subtrechos não cobertos aparecem corretamente.
 
 ### Implementação da História de Usuário 2
 
-- [ ] T029 [P] [US2] Estender `internal/domain/bounding_box.go`: adicionar `Contains(lat, lon float64) bool` (tratando `CrossesAntimeridian` corretamente) e `AreaDegrees() float64` (largura × altura em graus, com o mesmo "unwrap" de longitude), com testes em `bounding_box_test.go` cobrindo uma bounding box que cruza o antimeridiano e uma que não cruza (data-model.md)
-- [ ] T030 [P] [US2] Declarar a porta `FileChecker` (`Exists(path string) bool`) em `internal/domain/file_checker.go`, com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/file_checker.go . FileChecker`
-- [ ] T031 [P] [US2] Gerar o mock de `FileChecker` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/file_checker.go` (depende de T030)
-- [ ] T032 [P] [US2] Implementar o adapter `FileChecker` em `internal/infra/outbound/filechecker/filechecker.go` usando `os.Stat` (depende de T030)
-- [ ] T033 [US2] Extrair a lógica compartilhada de leitura/limpeza de trajeto (parse via `TrackParser` + `ReorderByTime` + os três `Discard*`) de `internal/application/inspect_track_service.go` para um helper não exportado em `internal/application/track_loading.go`; ajustar `inspect_track_service.go` para chamar esse helper, preservando seu comportamento observável e os testes já existentes (research.md item 9); rodar `go test ./internal/application/...` imediatamente em seguida, antes de prosseguir para T034, para confirmar que nenhum teste existente da etapa 1 quebrou com a extração
-- [ ] T034 [US2] Implementar `CheckCoverageService` em `internal/application/check_coverage_service.go`: `CheckCoverageInput{Reader}`; enums `CoverageStatus` (`Full`/`Partial`/`None`) e `MissingDataType` (`BaseMap`/`Elevation`/`Both`); `UncoveredSegment{StartLatitude, StartLongitude, EndLatitude, EndLongitude, Missing}`; `CheckCoverageOutput{Status, UncoveredSegments, BaseMapSourcesUsed, ElevationSourcesUsed}`; usa o helper de T033 para obter a rota limpa (sem simplificação/suavização — research.md item 9); lista os registros via `GeoDataRegistry.List`, descartando os que `FileChecker.Exists` reporta como ausentes (FR-017); para cada ponto, escolhe o `GeoDataSource` de mapa base e o de relevo que o cobrem via `BoundingBox.Contains`, desempatando por `BoundingBox.AreaDegrees` (menor área vence) e depois por `RegisteredAt` mais antigo (FR-016, Clarification do spec.md); agrupa pontos consecutivos com o mesmo status de cobertura em `UncoveredSegment` (FR-015, Clarification do spec.md); agrega os conjuntos de fontes usadas; testes usando `TrackParser`, `GeoDataRegistry` e `FileChecker` mockados (depende de T005, T029, T031, T033)
-- [ ] T035 [P] [US2] Gerar o mock de `CheckCoverageService` em `internal/application/mock_application/check_coverage_service.go` (depende de T034)
-- [ ] T036 [US2] Implementar o subcomando `check` em `internal/infra/inbound/cli/geodata_check.go`: argumento posicional `<arquivo-de-trajeto>`, abre o arquivo com `os.Open` (mesmo padrão de `inspect.go` na etapa 1 — `CheckCoverageInput.Reader` exige um `io.Reader`, não um caminho), chama `CheckCoverageService.Execute`, formata o relatório em inglês descrito em `contracts/cli.md` (veredito, subtrechos não cobertos, fontes usadas), reaproveita o mapeamento de erro de trajeto já existente em `exit_code.go` (`ErrEmptyFile`→`1`, `ErrUnsupportedFormat`→`2`, `ErrInsufficientPoints`/`ErrInsufficientPointsAfterCleaning`→`3`, erro de I/O do `os.Open`→`4`), anexa ao comando `geodata` (depende de T020, T034)
-- [ ] T037 [US2] Conectar `CheckCoverageService` e seu subcomando em `cmd/sobrevoo/main.go` (depende de T023, T032, T034, T036)
-- [ ] T038 [US2] Teste de contrato em `internal/infra/inbound/cli/geodata_check_test.go`: trajeto totalmente coberto por mapa base e relevo registrados → status "full", fontes usadas listadas, código de saída `0` (depende de T036)
-- [ ] T039 [US2] Teste de contrato em `geodata_check_test.go`: só mapa base registrado (cobrindo toda a extensão), sem relevo cobrindo o trajeto → status "partial" (há cobertura real, só que incompleta — não "none", ver regra em `data-model.md`), relatório indica falta de relevo (depende de T036)
-- [ ] T040 [US2] Teste de contrato em `geodata_check_test.go`: só relevo registrado (cobrindo toda a extensão), sem mapa base cobrindo o trajeto → status "partial", relatório indica falta de mapa base — caso simétrico a T039 (depende de T036)
-- [ ] T041 [US2] Teste de contrato em `geodata_check_test.go`: trajeto parcialmente coberto → status "partial", subtrecho não coberto reportado com coordenadas geográficas de início e fim (FR-015) (depende de T036)
-- [ ] T042 [US2] Teste de contrato em `geodata_check_test.go`: nenhum registro cadastrado → status "none", trajeto inteiro reportado como um único subtrecho não coberto (depende de T036)
-- [ ] T043 [US2] Teste de contrato em `geodata_check_test.go`: duas fontes de mapa base sobrepostas, uma de área menor contida na maior → a mais específica (menor área) aparece em `BaseMapSourcesUsed` (FR-016, Clarification do spec.md) (depende de T036)
-- [ ] T044 [US2] Teste de contrato em `geodata_check_test.go`: trajeto cruzando o antimeridiano com registros cobrindo os dois lados → cobertura corretamente reportada, sem tratamento especial (FR-018) (depende de T036)
-- [ ] T045 [US2] Teste de contrato em `geodata_check_test.go`: registro cujo arquivo não existe mais no caminho registrado → excluído da verificação de cobertura (FR-017) (depende de T036)
-- [ ] T046 [US2] Teste de contrato em `geodata_check_test.go`: arquivo de trajeto vazio → reaproveita `domain.ErrEmptyFile`, código de saída `1`, igual ao comando `inspect` (Casos Extremos do spec.md) (depende de T036)
+- [X] T029 [P] [US2] Estender `internal/domain/bounding_box.go`: adicionar `Contains(lat, lon float64) bool` (tratando `CrossesAntimeridian` corretamente) e `AreaDegrees() float64` (largura × altura em graus, com o mesmo "unwrap" de longitude), com testes em `bounding_box_test.go` cobrindo uma bounding box que cruza o antimeridiano e uma que não cruza (data-model.md)
+- [X] T030 [P] [US2] Declarar a porta `FileChecker` (`Exists(path string) bool`) em `internal/domain/file_checker.go`, com `//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/file_checker.go . FileChecker`
+- [X] T031 [P] [US2] Gerar o mock de `FileChecker` executando `go generate ./internal/domain/...`, produzindo `internal/domain/mock_domain/file_checker.go` (depende de T030)
+- [X] T032 [P] [US2] Implementar o adapter `FileChecker` em `internal/infra/outbound/filechecker/filechecker.go` usando `os.Stat` (depende de T030)
+- [X] T033 [US2] Extrair a lógica compartilhada de leitura/limpeza de trajeto (parse via `TrackParser` + `ReorderByTime` + os três `Discard*`) de `internal/application/inspect_track_service.go` para um helper não exportado em `internal/application/track_loading.go`; ajustar `inspect_track_service.go` para chamar esse helper, preservando seu comportamento observável e os testes já existentes (research.md item 9); rodar `go test ./internal/application/...` imediatamente em seguida, antes de prosseguir para T034, para confirmar que nenhum teste existente da etapa 1 quebrou com a extração
+- [X] T034 [US2] Implementar `CheckCoverageService` em `internal/application/check_coverage_service.go`: `CheckCoverageInput{Reader}`; enums `CoverageStatus` (`Full`/`Partial`/`None`) e `MissingDataType` (`BaseMap`/`Elevation`/`Both`); `UncoveredSegment{StartLatitude, StartLongitude, EndLatitude, EndLongitude, Missing}`; `CheckCoverageOutput{Status, UncoveredSegments, BaseMapSourcesUsed, ElevationSourcesUsed}`; usa o helper de T033 para obter a rota limpa (sem simplificação/suavização — research.md item 9); lista os registros via `GeoDataRegistry.List`, descartando os que `FileChecker.Exists` reporta como ausentes (FR-017); para cada ponto, escolhe o `GeoDataSource` de mapa base e o de relevo que o cobrem via `BoundingBox.Contains`, desempatando por `BoundingBox.AreaDegrees` (menor área vence) e depois por `RegisteredAt` mais antigo (FR-016, Clarification do spec.md); agrupa pontos consecutivos com o mesmo status de cobertura em `UncoveredSegment` (FR-015, Clarification do spec.md); agrega os conjuntos de fontes usadas; testes usando `TrackParser`, `GeoDataRegistry` e `FileChecker` mockados (depende de T005, T029, T031, T033)
+- [X] T035 [P] [US2] Gerar o mock de `CheckCoverageService` em `internal/application/mock_application/check_coverage_service.go` (depende de T034)
+- [X] T036 [US2] Implementar o subcomando `check` em `internal/infra/inbound/cli/geodata_check.go`: argumento posicional `<arquivo-de-trajeto>`, abre o arquivo com `os.Open` (mesmo padrão de `inspect.go` na etapa 1 — `CheckCoverageInput.Reader` exige um `io.Reader`, não um caminho), chama `CheckCoverageService.Execute`, formata o relatório em inglês descrito em `contracts/cli.md` (veredito, subtrechos não cobertos, fontes usadas), reaproveita o mapeamento de erro de trajeto já existente em `exit_code.go` (`ErrEmptyFile`→`1`, `ErrUnsupportedFormat`→`2`, `ErrInsufficientPoints`/`ErrInsufficientPointsAfterCleaning`→`3`, erro de I/O do `os.Open`→`4`), anexa ao comando `geodata` (depende de T020, T034)
+- [X] T037 [US2] Conectar `CheckCoverageService` e seu subcomando em `cmd/sobrevoo/main.go` (depende de T023, T032, T034, T036)
+- [X] T038 [US2] Teste de contrato em `internal/infra/inbound/cli/geodata_check_test.go`: trajeto totalmente coberto por mapa base e relevo registrados → status "full", fontes usadas listadas, código de saída `0` (depende de T036)
+- [X] T039 [US2] Teste de contrato em `geodata_check_test.go`: só mapa base registrado (cobrindo toda a extensão), sem relevo cobrindo o trajeto → status "partial" (há cobertura real, só que incompleta — não "none", ver regra em `data-model.md`), relatório indica falta de relevo (depende de T036)
+- [X] T040 [US2] Teste de contrato em `geodata_check_test.go`: só relevo registrado (cobrindo toda a extensão), sem mapa base cobrindo o trajeto → status "partial", relatório indica falta de mapa base — caso simétrico a T039 (depende de T036)
+- [X] T041 [US2] Teste de contrato em `geodata_check_test.go`: trajeto parcialmente coberto → status "partial", subtrecho não coberto reportado com coordenadas geográficas de início e fim (FR-015) (depende de T036)
+- [X] T042 [US2] Teste de contrato em `geodata_check_test.go`: nenhum registro cadastrado → status "none", trajeto inteiro reportado como um único subtrecho não coberto (depende de T036)
+- [X] T043 [US2] Teste de contrato em `geodata_check_test.go`: duas fontes de mapa base sobrepostas, uma de área menor contida na maior → a mais específica (menor área) aparece em `BaseMapSourcesUsed` (FR-016, Clarification do spec.md) (depende de T036)
+- [X] T044 [US2] Teste de contrato em `geodata_check_test.go`: trajeto cruzando o antimeridiano com registros cobrindo os dois lados → cobertura corretamente reportada, sem tratamento especial (FR-018) (depende de T036)
+- [X] T045 [US2] Teste de contrato em `geodata_check_test.go`: registro cujo arquivo não existe mais no caminho registrado → excluído da verificação de cobertura (FR-017) (depende de T036)
+- [X] T046 [US2] Teste de contrato em `geodata_check_test.go`: arquivo de trajeto vazio → reaproveita `domain.ErrEmptyFile`, código de saída `1`, igual ao comando `inspect` (Casos Extremos do spec.md) (depende de T036)
 
 **Checkpoint**: Histórias de Usuário 1 e 2 funcionam de forma independente.
 
@@ -166,13 +240,13 @@ nome, tipo, área e disponibilidade aparecem corretamente para cada um.
 
 ### Implementação da História de Usuário 3
 
-- [ ] T047 [US3] Implementar `ListGeoDataService` em `internal/application/list_geo_data_service.go`: `GeoDataSummary{Source, Available}`; `ListGeoDataOutput{Sources}`; `Execute` chama `GeoDataRegistry.List` e preenche `Available` via `FileChecker.Exists` para cada registro; testes usando os mocks de `GeoDataRegistry`/`FileChecker` já existentes (depende de T005, T031)
-- [ ] T048 [P] [US3] Gerar o mock de `ListGeoDataService` em `internal/application/mock_application/list_geo_data_service.go` (depende de T047)
-- [ ] T049 [US3] Implementar o subcomando `list` em `internal/infra/inbound/cli/geodata_list.go`: sem argumentos, chama `ListGeoDataService.Execute`, formata uma linha por registro (nome, tipo, área, disponibilidade — sinalizando algo como `(file not found)` quando ausente, FR-009/FR-010) ou uma mensagem clara quando não há nenhum registro, anexa ao comando `geodata` (depende de T020, T047)
-- [ ] T050 [US3] Conectar `ListGeoDataService` e seu subcomando em `cmd/sobrevoo/main.go` (depende de T037, T047, T049)
-- [ ] T051 [US3] Teste de contrato em `internal/infra/inbound/cli/geodata_list_test.go`: dois ou mais registros → cada linha mostra nome, tipo, área (depende de T049)
-- [ ] T052 [US3] Teste de contrato em `geodata_list_test.go`: um registro cujo arquivo foi movido/apagado → sinalizado como indisponível, os demais registros continuam listados normalmente (FR-010) (depende de T049)
-- [ ] T053 [US3] Teste de contrato em `geodata_list_test.go`: nenhum registro existente → mensagem explícita de que não há dados registrados, código de saída `0` (depende de T049)
+- [X] T047 [US3] Implementar `ListGeoDataService` em `internal/application/list_geo_data_service.go`: `GeoDataSummary{Source, Available}`; `ListGeoDataOutput{Sources}`; `Execute` chama `GeoDataRegistry.List` e preenche `Available` via `FileChecker.Exists` para cada registro; testes usando os mocks de `GeoDataRegistry`/`FileChecker` já existentes (depende de T005, T031)
+- [X] T048 [P] [US3] Gerar o mock de `ListGeoDataService` em `internal/application/mock_application/list_geo_data_service.go` (depende de T047)
+- [X] T049 [US3] Implementar o subcomando `list` em `internal/infra/inbound/cli/geodata_list.go`: sem argumentos, chama `ListGeoDataService.Execute`, formata uma linha por registro (nome, tipo, área, disponibilidade — sinalizando algo como `(file not found)` quando ausente, FR-009/FR-010) ou uma mensagem clara quando não há nenhum registro, anexa ao comando `geodata` (depende de T020, T047)
+- [X] T050 [US3] Conectar `ListGeoDataService` e seu subcomando em `cmd/sobrevoo/main.go` (depende de T037, T047, T049)
+- [X] T051 [US3] Teste de contrato em `internal/infra/inbound/cli/geodata_list_test.go`: dois ou mais registros → cada linha mostra nome, tipo, área (depende de T049)
+- [X] T052 [US3] Teste de contrato em `geodata_list_test.go`: um registro cujo arquivo foi movido/apagado → sinalizado como indisponível, os demais registros continuam listados normalmente (FR-010) (depende de T049)
+- [X] T053 [US3] Teste de contrato em `geodata_list_test.go`: nenhum registro existente → mensagem explícita de que não há dados registrados, código de saída `0` (depende de T049)
 
 **Checkpoint**: Histórias de Usuário 1, 2 e 3 funcionam de forma
 independente.
@@ -190,13 +264,13 @@ continua existindo no disco.
 
 ### Implementação da História de Usuário 4
 
-- [ ] T054 [US4] Implementar `RemoveGeoDataService` em `internal/application/remove_geo_data_service.go`: `RemoveGeoDataInput{Name}`; `Execute` recusa com `domain.ErrDataSourceNotRegistered` quando `GeoDataRegistry.FindByName` não encontra o nome, senão chama `GeoDataRegistry.Delete`; testes usando `GeoDataRegistry` mockado (depende de T005)
-- [ ] T055 [P] [US4] Gerar o mock de `RemoveGeoDataService` em `internal/application/mock_application/remove_geo_data_service.go` (depende de T054)
-- [ ] T056 [US4] Implementar o subcomando `remove` em `internal/infra/inbound/cli/geodata_remove.go`: argumento posicional `<nome>`, chama `RemoveGeoDataService.Execute`, imprime confirmação ou mapeia `domain.ErrDataSourceNotRegistered`, anexa ao comando `geodata` (depende de T020, T054)
-- [ ] T057 [US4] Estender `internal/infra/inbound/cli/exit_code.go`: mapear `domain.ErrDataSourceNotRegistered`→`9` (contracts/cli.md) (depende de T022, T056)
-- [ ] T058 [US4] Conectar `RemoveGeoDataService` e seu subcomando em `cmd/sobrevoo/main.go` (depende de T050, T054, T056)
-- [ ] T059 [US4] Teste de contrato em `internal/infra/inbound/cli/geodata_remove_test.go`: registro existente → removido, some da listagem, arquivo de dado original permanece intacto no disco (FR-011) (depende de T056, T057)
-- [ ] T060 [US4] Teste de contrato em `geodata_remove_test.go`: nome não corresponde a nenhum registro → código de saída `9` (depende de T057)
+- [X] T054 [US4] Implementar `RemoveGeoDataService` em `internal/application/remove_geo_data_service.go`: `RemoveGeoDataInput{Name}`; `Execute` recusa com `domain.ErrDataSourceNotRegistered` quando `GeoDataRegistry.FindByName` não encontra o nome, senão chama `GeoDataRegistry.Delete`; testes usando `GeoDataRegistry` mockado (depende de T005)
+- [X] T055 [P] [US4] Gerar o mock de `RemoveGeoDataService` em `internal/application/mock_application/remove_geo_data_service.go` (depende de T054)
+- [X] T056 [US4] Implementar o subcomando `remove` em `internal/infra/inbound/cli/geodata_remove.go`: argumento posicional `<nome>`, chama `RemoveGeoDataService.Execute`, imprime confirmação ou mapeia `domain.ErrDataSourceNotRegistered`, anexa ao comando `geodata` (depende de T020, T054)
+- [X] T057 [US4] Estender `internal/infra/inbound/cli/exit_code.go`: mapear `domain.ErrDataSourceNotRegistered`→`9` (contracts/cli.md) (depende de T022, T056)
+- [X] T058 [US4] Conectar `RemoveGeoDataService` e seu subcomando em `cmd/sobrevoo/main.go` (depende de T050, T054, T056)
+- [X] T059 [US4] Teste de contrato em `internal/infra/inbound/cli/geodata_remove_test.go`: registro existente → removido, some da listagem, arquivo de dado original permanece intacto no disco (FR-011) (depende de T056, T057)
+- [X] T060 [US4] Teste de contrato em `geodata_remove_test.go`: nome não corresponde a nenhum registro → código de saída `9` (depende de T057)
 
 **Checkpoint**: todas as quatro histórias de usuário funcionam de forma
 independente.
@@ -207,11 +281,11 @@ independente.
 
 **Propósito**: qualidade final que atravessa todas as histórias.
 
-- [ ] T061 [P] Rodar `go vet ./...` e corrigir qualquer problema encontrado no repositório
-- [ ] T062 [P] Adicionar comentários de documentação de pacote (`// Package ...`) em `internal/infra/outbound/geodatainspector`, `internal/infra/outbound/geodatastore/jsonfile`, `internal/infra/outbound/filechecker` e `internal/infra/outbound/clock`
-- [ ] T063 Executar manualmente todos os cenários de `quickstart.md` contra o binário compilado (`make build`) e registrar qualquer divergência encontrada
-- [ ] T064 [P] Rodar `go test ./... -cover` e confirmar cobertura alta em `internal/domain` e `internal/application` (Princípio VI da constituição), adicionando casos que faltarem
-- [ ] T065 [P] Atualizar o parágrafo de arquitetura do `CLAUDE.md` (item `internal/infra/inbound/cli`) para refletir que, a partir desta etapa, os adapters de saída `geodatainspector`, `geodatastore/jsonfile` e `filechecker` também tocam o sistema de arquivos — não só a CLI —, conforme justificado em `research.md` item 8
+- [X] T061 [P] Rodar `go vet ./...` e corrigir qualquer problema encontrado no repositório
+- [X] T062 [P] Adicionar comentários de documentação de pacote (`// Package ...`) em `internal/infra/outbound/geodatainspector`, `internal/infra/outbound/geodatastore/jsonfile` e `internal/infra/outbound/filechecker`
+- [X] T063 Executar manualmente todos os cenários de `quickstart.md` contra o binário compilado (`make build`) e registrar qualquer divergência encontrada
+- [X] T064 [P] Rodar `go test ./... -cover` e confirmar cobertura alta em `internal/domain` e `internal/application` (Princípio VI da constituição), adicionando casos que faltarem
+- [X] T065 [P] Atualizar o parágrafo de arquitetura do `CLAUDE.md` (item `internal/infra/inbound/cli`) para refletir que, a partir desta etapa, os adapters de saída `geodatainspector`, `geodatastore/jsonfile` e `filechecker` também tocam o sistema de arquivos — não só a CLI —, conforme justificado em `research.md` item 8
 
 ---
 
@@ -222,7 +296,8 @@ independente.
 - **Setup (Phase 1)**: sem dependências — pode começar imediatamente.
 - **Foundational (Phase 2)**: depende da conclusão do Setup — BLOQUEIA todas
   as histórias de usuário, já que todas leem e/ou escrevem o mesmo
-  `GeoDataRegistry`.
+  `GeoDataRepository` (`GeoDataRegistry` ao tempo desta tarefa — ver
+  `research.md` item 16).
 - **User Stories (Phase 3–6)**: todas dependem da conclusão da fase
   Foundational.
   - Diferente da etapa 1, as quatro histórias implementam quatro comandos
@@ -273,7 +348,6 @@ independente.
 ```bash
 # Disparar as portas/fixtures independentes juntas:
 Task: "Estender geo_data_source.go com InspectedGeoData e GeoDataInspector"
-Task: "Criar a porta Clock em internal/domain/clock.go"
 Task: "Criar fixtures de MBTiles em test/helper/mbtiles_fixture.go"
 Task: "Criar fixtures de GeoTIFF em test/helper/geotiff_fixture.go"
 

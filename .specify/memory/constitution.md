@@ -1,34 +1,92 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.1.0 → 1.1.1
-Rationale: PATCH — clarified that the pt-BR language policy also covers
-repository guidance documents aimed at people or coding agents (e.g.
-CLAUDE.md), not only Spec Kit flow artifacts. Triggered by CLAUDE.md having
-been generated in English in this session, which the user flagged as a
-violation of the language policy's intent. No principle added, removed, or
-redefined; no new governance introduced.
+Version change: 1.3.0 → 1.3.1
+Rationale: PATCH — refines the adapter naming rule added in 1.3.0 so it
+follows Go style (Effective Go / Code Review Comments): exported names MUST
+NOT repeat the package name. Strategy adapters therefore name the type and
+constructor after the strategy only (simplifier.NewDouglasPeucker,
+smoother.NewCatmullRom, trackparser.NewGPX, filechecker.NewOS); a package
+with a single implementation and no distinguishing strategy uses
+New()/Inspector (geodatainspector.New). File names keep the full
+strategy+port name. Also records, in the Stack section, that Go conventions
+apply and lists the one known deviation (underscores in the mock_<pkg> and
+build_<pkg> package names, to be reviewed after the PR merge).
 
-Modified sections:
-  - Stack Tecnológica e Idioma dos Artefatos — extended the pt-BR requirement
-    to repository guidance docs (CLAUDE.md or equivalent), with code blocks,
-    commands, paths and identifiers still in English.
+Previous amendment (1.2.1 → 1.3.0, MINOR): adds to Principle IX the naming/organization rule for
+outbound adapters (internal/infra/outbound), learned from
+waliqueiroz/mystery-gifter-api (outgoing/postgres, security, identity):
+a technology package (postgres, jsonfile) can serve several ports, so the
+constructor is named by the port (NewGroupRepository, NewGeoDataRepository);
+a package that groups alternative strategies of one port is named by the
+port/category (security, simplifier, smoother) and the file, type and
+constructor name the strategy (NewBcryptPasswordManager,
+NewDouglasPeuckerSimplifier). A sub-package per algorithm, created only to
+call algorithm.New(), is banned; adapter constructors MAY return the
+concrete struct (an intentional difference from the reference repo, which
+returns the domain interface). Applied to jsonfile, simplifier and smoother.
+
+Previous amendment (1.2.0 → 1.2.1, PATCH): clarifies file layout within a domain file that declares
+a port: the //go:generate directive goes right after the package clause, and
+the interface is declared at the top of the file (right after imports),
+before the entity, enums and constructors — the layout used by
+waliqueiroz/mystery-gifter-api (user.go, group.go). No rule is added or
+removed; it makes an existing organization convention (Principle IX)
+precise. Applied to track.go and geo_data_source.go, the only domain files
+that still declared their interfaces at the bottom.
+
+Previous amendment (1.1.1 → 1.2.0), kept for context:
+Rationale: MINOR — materially expands Principles II and IX to codify, as
+standing governance rather than one-off feature history, patterns the user
+had the agent learn from an external reference repository
+(waliqueiroz/mystery-gifter-api) and apply piecemeal across four rounds of
+feedback on feature 002. The ambiguity being closed here already caused one
+real rework in this project (a first draft of feature 002 implemented one
+single-method interface per use case, read literally from the previous
+wording of Principle IX) — this amendment exists so future features don't
+repeat it without needing another explicit correction from the user. No
+principle is removed or contradicted; both affected principles keep their
+prior rules intact and add scope that was previously undocumented at the
+constitution level (it lived only in a feature's research.md and in
+CLAUDE.md).
+
+Modified principles:
+  - II. Portas para Toda Dependência Externa — added an explicit carve-out:
+    a direct call to a pure Go standard-library function (e.g. time.Now())
+    is not an "external dependency" under this principle and needs no port
+    or wrapper abstraction. Only genuine I/O or out-of-process state needs
+    one.
+  - IX. Organização de Portas, Service Layer e Mocks -> IX. Organização de
+    Portas, Service Layer, Localização da Regra de Negócio e Mocks —
+    (a) replaced the ambiguous "cada caso de uso... MUST ser modelado como
+    uma interface exportada terminada em Service" with an explicit
+    service-per-resource rule (one exported XService interface per
+    resource/aggregate, one named method per operation, Execute banned, one
+    interface-per-use-case banned, services may depend on other services);
+    (b) added a port-naming-by-architectural-role rule (persistence ports
+    are XRepository, not XRegistry/XStore/...); (c) added a new paragraph
+    stating where business logic lives: non-trivial DTOs and any logic
+    beyond "call a port in order" belong in internal/domain (as an entity
+    method or a free pure function), never as a DTO or loose helper in
+    internal/application.
 
 Added principles: N/A
 Removed sections: N/A
 
 Templates requiring alignment review:
-  - .specify/templates/plan-template.md — ⚠ still pending manual check that the
-    "Constitution Check" gate references all ten principles explicitly (was eight,
-    from the previous 1.0.0 → 1.1.0 amendment).
-  - .specify/templates/tasks-template.md — ⚠ still pending manual check that generated
-    task descriptions follow the given/when/then + no-table-tests convention
-    (Principle X) and the ports/service-layer file-naming convention (Principle IX).
-  - CLAUDE.md — MUST be rewritten in Portuguese prose (code/commands/paths/identifiers
-    stay in English) to comply with this amendment.
+  - .specify/templates/plan-template.md — still pending manual check that the
+    "Constitution Check" gate's Principle IX row reflects the expanded rule
+    (service-per-resource, business-logic placement, port naming), not just
+    the file-organization rule it originally covered.
+  - CLAUDE.md — MUST be updated so its "Onde vive a regra de negócio" and
+    service-layer guidance read as standing project convention (already
+    true in practice for features 001/002), not as feature-002-specific
+    history, and so its Princípio II mention doesn't imply time.Now() ever
+    needed a port. Tracked as a same-session follow-up, not deferred.
 
 Follow-up TODOs:
-  - None. All placeholders were resolved from user-supplied input.
+  - None. All placeholders were resolved from user-supplied input and from
+    specs/002-geo-data-registry/research.md (items 10.1, 13, 14, 16).
 -->
 
 # Sobrevoo Constitution
@@ -52,10 +110,20 @@ arquivos, processo externo como ffmpeg, browser headless — é acessada
 exclusivamente através de uma porta (interface) declarada no núcleo. A
 implementação concreta de cada porta vive em `internal/infra/outbound`. Nenhum
 adapter concreto pode ser referenciado diretamente pelo domain ou pela
-application.
+application. Uma chamada direta a uma função pura da biblioteca padrão do Go
+(por exemplo, `time.Now()`) NÃO é considerada dependência externa para efeito
+deste princípio, e NÃO exige porta nem abstração dedicada: só exige porta o
+que de fato realiza I/O real ou depende de estado fora do processo em
+execução — arquivo, rede, processo externo.
 **Rationale**: portas explícitas tornam as dependências do núcleo visíveis,
 substituíveis e mockáveis, e impedem o vazamento de detalhes de infraestrutura
-para dentro das regras de negócio.
+para dentro das regras de negócio. Embrulhar uma função pura e determinística
+da biblioteca padrão atrás de uma porta só para poder mockar algo que já é
+trivial de verificar em teste (por exemplo, `time.Now()` checado por uma
+janela de tempo, não por um valor exato) traz o custo de uma abstração sem
+nenhum ganho real de testabilidade ou de substituibilidade — este princípio
+existe para dependências que de fato variam por ambiente ou infraestrutura,
+não para a linguagem em si.
 
 ### III. Entrypoints Descartáveis
 CLI, uma futura API REST, uma GUI, ou qualquer outro ponto de entrada são adapters
@@ -116,20 +184,70 @@ de um entrypoint específico, e permite que adapters futuros configurem os mesmo
 casos de uso por vias diferentes (flags vs. corpo de requisição HTTP, etc.) sem
 tocar na application layer.
 
-### IX. Organização de Portas, Service Layer e Mocks
+### IX. Organização de Portas, Service Layer, Localização da Regra de Negócio e Mocks
 Nenhum arquivo de porta genérico (`ports.go`, `interfaces.go`) é permitido em
 nenhuma camada. Uma interface que manipula ou produz uma entidade específica
 MUST ser declarada no mesmo arquivo dessa entidade (por exemplo, `TrackParser`
-em `track.go`, pois produz `Track`). Uma interface sem entidade dona MUST
+em `track.go`, pois produz `Track`), no início do arquivo — logo após os
+imports e antes da entidade, dos enums e dos construtores, com a diretiva
+`//go:generate` imediatamente após a cláusula `package`. Uma interface sem entidade dona MUST
 ganhar um arquivo próprio, nomeado pelo conceito que representa (por exemplo,
-`Simplifier` em `simplification.go`, `Smoother` em `smoothing.go`).
+`Simplifier` em `simplification.go`, `Smoother` em `smoothing.go`). Toda porta
+MUST ser nomeada pelo papel arquitetural que exerce, não pelo dado que
+manipula — por exemplo, uma porta de persistência chama-se `XRepository`
+(nunca `XRegistry`, `XStore`, ou similar), com o campo correspondente na
+struct do serviço que a usa seguindo o mesmo nome (`xRepository
+domain.XRepository`).
 
-Cada caso de uso em `internal/application` — a service layer do projeto —
-MUST ser modelado como uma interface exportada terminada em `Service` (por
-exemplo, `InspectTrackService`), implementada por uma struct não exportada
-com o mesmo nome em minúsculas (`inspectTrackService`), construída por uma
-função `NewXService(...)`. Um adapter de entrada MUST depender exclusivamente
-da interface, nunca da struct concreta.
+A service layer de `internal/application` é organizada por **recurso ou
+agregado**, não por caso de uso. Cada recurso MUST ser modelado como uma
+única interface exportada terminada em `Service` (`XService`), onde `X`
+nomeia o recurso que o serviço gerencia (por exemplo, `GeoDataService`) —
+implementada por uma struct não exportada com o mesmo nome em minúsculas
+(`xService`), construída por uma função `NewXService(...)`. Cada caso de uso
+relacionado a esse recurso MUST virar um método nomeado pela operação que
+realiza (`Register`, `List`, `Remove`, `CheckCoverage`) na mesma interface —
+é PROIBIDO criar uma interface nova por caso de uso, e é PROIBIDO modelar
+qualquer operação como um método genérico `Execute`. Um serviço de aplicação
+PODE depender de outro serviço de aplicação (não só de portas do domínio)
+quando uma operação precisa de lógica que já vive em outro serviço. Um
+adapter de entrada MUST depender exclusivamente da interface do serviço,
+nunca da struct concreta.
+
+Dentro do núcleo, um serviço de aplicação só orquestra: chama uma ou mais
+portas, delega a regra de negócio para um construtor ou função de domínio, e
+devolve o resultado — ele NUNCA decide uma regra de negócio por conta
+própria. Qualquer DTO de saída não trivial (isto é, que não seja um valor
+escalar simples) usado por um serviço de aplicação MUST ser um tipo
+declarado em `internal/domain`, nunca um DTO próprio de
+`internal/application`. Qualquer lógica que vá além de "chamar uma porta na
+ordem certa" — construir uma entidade, calcular algo a partir de uma
+coleção, aplicar uma regra de negócio — MUST ser um construtor ou função
+pura de domínio: um método da entidade quando a lógica pertence a uma única
+entidade, ou uma função livre quando opera sobre coleções ou múltiplas
+entradas sem uma entidade dona. É PROIBIDO qualquer função solta ou helper
+que contenha regra de negócio em `internal/application`.
+
+Os adapters de saída em `internal/infra/outbound` seguem a mesma lógica de
+nomes. Quando o pacote representa uma **tecnologia** ou sistema externo que
+pode servir várias portas (por exemplo `jsonfile`, como `postgres` no
+`mystery-gifter-api`), o pacote leva o nome da tecnologia, e o arquivo e o
+construtor levam o nome da **porta** que implementam (`geo_data_repository.go`,
+`NewGeoDataRepository(...)`). Quando as implementações são **estratégias
+alternativas de uma única porta** (algoritmos, como Douglas-Peucker e
+Catmull-Rom), o pacote leva o nome da porta ou categoria (`simplifier`,
+`smoother`, como `security` e `identity` lá), e o tipo e o construtor nomeiam
+apenas a **estratégia** (`simplifier.DouglasPeucker`,
+`simplifier.NewDouglasPeucker()`, `trackparser.NewGPX()`,
+`filechecker.NewOS()`), enquanto o arquivo leva o nome completo, estratégia
+mais porta (`douglas_peucker_simplifier.go`). Um pacote com uma única
+implementação e sem estratégia distinguível usa `New()` e um tipo curto
+(`geodatainspector.New()` devolvendo `Inspector`). Nomes exportados NÃO
+repetem o nome do pacote (`geodatainspector.GeoDataInspector` e
+`simplifier.DouglasPeuckerSimplifier` são proibidos), e é PROIBIDO criar um
+subpacote por algoritmo só para poder chamar `algoritmo.New()`. Um
+construtor de adapter PODE devolver o struct concreto do adapter; não
+precisa devolver a interface do domínio.
 
 Mocks de qualquer interface — porta de domínio ou serviço de aplicação —
 MUST ser gerados com `go.uber.org/mock/mockgen`, via diretiva `//go:generate`
@@ -138,14 +256,28 @@ um arquivo à parte. A saída MUST viver em um subpacote `mock_<nome do
 pacote>` dentro do pacote onde a interface é declarada (por exemplo,
 `internal/domain/mock_domain`, `internal/application/mock_application`), um
 arquivo gerado por interface.
-**Rationale**: nomes de arquivo genéricos escondem o que o código realmente
-faz e viram um "catch-all" para qualquer interface nova, independentemente de
-ela pertencer ali. Nomear a service layer de forma consistente
-(`XService`/`xService`/`NewXService`) e mantê-la sempre atrás de uma
-interface é o que permite a um adapter de entrada (CLI hoje, REST amanhã) ser
-testado sem nunca instanciar a implementação real — pré-requisito para o
-Princípio X. Gerar os mocks junto da interface que representam, em vez de
-centralizados, evita que a geração de mocks de um pacote dependa de outro.
+**Rationale**: nomes de arquivo e de porta genéricos escondem o que o código
+realmente faz e viram um "catch-all" para qualquer interface nova,
+independentemente de ela pertencer ali — nomear uma porta pelo papel
+arquitetural que exerce (por exemplo, `XRepository` para persistência) é tão
+importante quanto nomear o arquivo que a declara pelo conceito certo.
+Modelar a service layer por recurso, com um método por operação, e proibir
+tanto uma interface por caso de uso quanto um método genérico `Execute`,
+evita que a application layer vire uma coleção de objetos soltos em vez de
+uma service layer coesa — o padrão de referência deste projeto é
+`waliqueiroz/mystery-gifter-api` (`GroupService`, `UserService`,
+`GroupInviteService`, cada um reunindo todas as operações do recurso que
+gerencia, podendo depender de outro serviço). Exigir que toda regra de
+negócio não trivial — DTO ou lógica — viva em `internal/domain`, nunca em
+`internal/application`, é o que garante que um serviço de aplicação
+permaneça pura orquestração, legível método a método, sem regra de negócio
+real escondida atrás de uma porta ou de um helper solto. Nomear a service
+layer de forma consistente (`XService`/`xService`/`NewXService`) e
+mantê-la sempre atrás de uma interface é o que permite a um adapter de
+entrada (CLI hoje, REST amanhã) ser testado sem nunca instanciar a
+implementação real — pré-requisito para o Princípio X. Gerar os mocks junto
+da interface que representam, em vez de centralizados, evita que a geração
+de mocks de um pacote dependa de outro.
 
 ### X. Testes: Given/When/Then, Builders e Isolamento por Camada
 Todo teste unitário MUST ser escrito como um ou mais
@@ -157,8 +289,9 @@ configuração entre cenários.
 
 Quando a construção de uma entidade ou DTO em teste é repetitiva ou tem
 muitos campos, um builder fluente MUST ser criado em um subpacote
-`build_<nome do pacote>` (por exemplo, `internal/domain/build_domain`,
-`internal/application/build_application`), no formato `NewXBuilder()` com
+`build_<nome do pacote>` (por exemplo, `internal/domain/build_domain`; um
+`internal/application/build_application` só passa a existir quando um
+serviço de aplicação precisar de builder próprio), no formato `NewXBuilder()` com
 defaults sensatos, métodos `WithCampo(...)`/`WithoutCampo()` retornando o
 próprio builder, e um método terminal `Build()`.
 
@@ -180,7 +313,13 @@ que o Princípio VI já exige do núcleo, estendida para os adapters.
 
 ## Stack Tecnológica e Idioma dos Artefatos
 
-Sobrevoo é implementado em Go, como projeto pessoal e open source.
+Sobrevoo é implementado em Go, como projeto pessoal e open source. O código
+segue as convenções da comunidade Go (Effective Go e Code Review Comments),
+em especial nomes exportados que não repetem o nome do pacote. Desvio
+conhecido e temporário: os subpacotes `mock_<pacote>` e `build_<pacote>`
+(Princípios IX e X) usam underscore no nome do pacote, o que o estilo Go
+desaconselha; a revisão desses nomes está adiada para depois do merge da
+feature 002.
 
 Todos os artefatos de especificação do fluxo Spec Kit — `spec.md`, `plan.md`,
 `tasks.md`, `research.md`, checklists, e qualquer documento gerado por esse fluxo
@@ -235,4 +374,4 @@ antes do início da implementação. Qualquer desvio MUST ser justificado
 explicitamente na seção de Complexity Tracking do plano, ou o desvio MUST ser
 eliminado.
 
-**Version**: 1.1.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-13
+**Version**: 1.3.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19

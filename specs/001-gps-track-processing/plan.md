@@ -136,11 +136,11 @@ internal/
     │   ├── config/
     │   │   └── config.go                    # adapter que resolve os limiares internos (Princípio VIII)
     │   ├── trackparser/
-    │   │   └── gpx.go                       # adapter TrackParser: valida conteúdo GPX e delega a tkrajina/gpxgo
+    │   │   └── gpx_parser.go                # adapter TrackParser (NewGPX): valida conteúdo GPX e delega a tkrajina/gpxgo
     │   ├── simplifier/
-    │   │   └── douglaspeucker/douglaspeucker.go  # adapter Simplifier
+    │   │   └── douglas_peucker_simplifier.go  # adapter Simplifier (NewDouglasPeucker)
     │   └── smoother/
-    │       └── catmullrom/catmullrom.go     # adapter Smoother
+    │       └── catmull_rom_smoother.go      # adapter Smoother (NewCatmullRom)
     │
     └── inbound/
         └── cli/

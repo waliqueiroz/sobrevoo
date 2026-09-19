@@ -11,8 +11,11 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/application"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/inbound/cli"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/config"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier/douglaspeucker"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother/catmullrom"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/filechecker"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/geodatainspector"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/jsonfile"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/trackparser"
 )
 
@@ -21,15 +24,31 @@ func main() {
 }
 
 func run() int {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 4
+	}
 
-	parser := trackparser.NewGPXParser()
-	simplifier := douglaspeucker.New()
-	smoother := catmullrom.New()
-	inspectTrackService := application.NewInspectTrackService(parser, simplifier, smoother, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+	parser := trackparser.NewGPX()
+	douglasPeucker := simplifier.NewDouglasPeucker()
+	catmullRom := smoother.NewCatmullRom()
+	inspectTrackService := application.NewInspectTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+
+	geoDataInspector := geodatainspector.New()
+	geoDataRepository := jsonfile.NewGeoDataRepository(cfg.RegistryPath)
+	geoDataFileChecker := filechecker.NewOS()
+	geoDataService := application.NewGeoDataService(geoDataRepository, geoDataInspector, geoDataFileChecker, parser, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+
+	geoDataCommand := cli.NewGeoDataCommand()
+	geoDataCommand.AddCommand(cli.NewGeoDataRegisterCommand(geoDataService))
+	geoDataCommand.AddCommand(cli.NewGeoDataCheckCommand(geoDataService))
+	geoDataCommand.AddCommand(cli.NewGeoDataListCommand(geoDataService))
+	geoDataCommand.AddCommand(cli.NewGeoDataRemoveCommand(geoDataService))
 
 	root := cli.NewRootCommand()
 	root.AddCommand(cli.NewInspectCommand(inspectTrackService, cfg.DefaultLevel))
+	root.AddCommand(geoDataCommand)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

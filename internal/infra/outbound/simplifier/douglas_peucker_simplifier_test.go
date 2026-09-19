@@ -1,4 +1,4 @@
-package douglaspeucker_test
+package simplifier_test
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier/douglaspeucker"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier"
 )
 
 // jitteryLine builds points along a straight line from (0,0) to (0,0.01)
@@ -36,14 +36,14 @@ func jitteryLine() []domain.TrackPoint {
 func Test_Simplifier_Simplify(t *testing.T) {
 	t.Run("should return fewer than three points unchanged", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := []domain.TrackPoint{
 			build_domain.NewTrackPointBuilder().WithLatitude(1).Build(),
 			build_domain.NewTrackPointBuilder().WithLatitude(2).Build(),
 		}
 
 		// when
-		result := simplifier.Simplify(points, domain.LevelHigh)
+		result := douglasPeucker.Simplify(points, domain.LevelHigh)
 
 		// then
 		assert.Equal(t, points, result)
@@ -51,11 +51,11 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should keep the first and last point at the low level", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := jitteryLine()
 
 		// when
-		result := simplifier.Simplify(points, domain.LevelLow)
+		result := douglasPeucker.Simplify(points, domain.LevelLow)
 
 		// then
 		require.NotEmpty(t, result)
@@ -65,11 +65,11 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should keep the first and last point at the medium level", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := jitteryLine()
 
 		// when
-		result := simplifier.Simplify(points, domain.LevelMedium)
+		result := douglasPeucker.Simplify(points, domain.LevelMedium)
 
 		// then
 		require.NotEmpty(t, result)
@@ -79,11 +79,11 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should keep the first and last point at the high level", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := jitteryLine()
 
 		// when
-		result := simplifier.Simplify(points, domain.LevelHigh)
+		result := douglasPeucker.Simplify(points, domain.LevelHigh)
 
 		// then
 		require.NotEmpty(t, result)
@@ -93,11 +93,11 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should preserve a point with a large, real deviation even at the highest level", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := jitteryLine()
 
 		// when
-		result := simplifier.Simplify(points, domain.LevelHigh)
+		result := douglasPeucker.Simplify(points, domain.LevelHigh)
 
 		// then
 		foundRealTurn := false
@@ -111,7 +111,7 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should handle a degenerate segment whose endpoints coincide", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := []domain.TrackPoint{
 			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
 			build_domain.NewTrackPointBuilder().WithLatitude(0.001).WithLongitude(0).Build(), // off to the side of a zero-length segment
@@ -119,7 +119,7 @@ func Test_Simplifier_Simplify(t *testing.T) {
 		}
 
 		// when
-		result := simplifier.Simplify(points, domain.LevelLow)
+		result := douglasPeucker.Simplify(points, domain.LevelLow)
 
 		// then
 		assert.Equal(t, points[0], result[0])
@@ -128,12 +128,12 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should keep fewer points at the high level than at the low level (SC-006)", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := jitteryLine()
 
 		// when
-		low := simplifier.Simplify(points, domain.LevelLow)
-		high := simplifier.Simplify(points, domain.LevelHigh)
+		low := douglasPeucker.Simplify(points, domain.LevelLow)
+		high := douglasPeucker.Simplify(points, domain.LevelHigh)
 
 		// then
 		assert.Less(t, len(high), len(low))
@@ -142,12 +142,12 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should keep fewer or as many points at the medium level as at the low level (SC-006)", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := jitteryLine()
 
 		// when
-		low := simplifier.Simplify(points, domain.LevelLow)
-		medium := simplifier.Simplify(points, domain.LevelMedium)
+		low := douglasPeucker.Simplify(points, domain.LevelLow)
+		medium := douglasPeucker.Simplify(points, domain.LevelMedium)
 
 		// then
 		assert.LessOrEqual(t, len(medium), len(low))
@@ -155,12 +155,12 @@ func Test_Simplifier_Simplify(t *testing.T) {
 
 	t.Run("should keep fewer or as many points at the high level as at the medium level (SC-006)", func(t *testing.T) {
 		// given
-		simplifier := douglaspeucker.New()
+		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := jitteryLine()
 
 		// when
-		medium := simplifier.Simplify(points, domain.LevelMedium)
-		high := simplifier.Simplify(points, domain.LevelHigh)
+		medium := douglasPeucker.Simplify(points, domain.LevelMedium)
+		high := douglasPeucker.Simplify(points, domain.LevelHigh)
 
 		// then
 		assert.LessOrEqual(t, len(high), len(medium))
