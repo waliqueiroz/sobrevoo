@@ -108,6 +108,11 @@ uso) que a redação anterior da constituição permitia.
   de persistência é `XRepository` (nunca `XRegistry`, `XStore`, ou
   similar), com o campo correspondente na struct do serviço seguindo o
   mesmo nome (`xRepository domain.XRepository`) — ex.: `GeoDataRepository`.
+- Num arquivo de domínio que declara uma porta, a ordem é: `package`,
+  diretiva `//go:generate` (logo após o `package`), imports, **a interface
+  logo no início**, e só depois a entidade, os enums e os construtores —
+  nunca a interface no meio ou no fim do arquivo (como em `user.go`/
+  `group.go` do `mystery-gifter-api`; ver `track.go` e `geo_data_source.go`).
 - `XService` (interface exportada) / `xService` (struct não exportada) /
   `NewXService(...)` (construtor) é **um serviço por recurso/agregado, não
   um serviço por caso de uso**: `X` nomeia o que o serviço gerencia (ex.:

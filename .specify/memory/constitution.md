@@ -1,7 +1,17 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.1.1 → 1.2.0
+Version change: 1.2.0 → 1.2.1
+Rationale: PATCH — clarifies file layout within a domain file that declares
+a port: the //go:generate directive goes right after the package clause, and
+the interface is declared at the top of the file (right after imports),
+before the entity, enums and constructors — the layout used by
+waliqueiroz/mystery-gifter-api (user.go, group.go). No rule is added or
+removed; it makes an existing organization convention (Principle IX)
+precise. Applied to track.go and geo_data_source.go, the only domain files
+that still declared their interfaces at the bottom.
+
+Previous amendment (1.1.1 → 1.2.0), kept for context:
 Rationale: MINOR — materially expands Principles II and IX to codify, as
 standing governance rather than one-off feature history, patterns the user
 had the agent learn from an external reference repository
@@ -154,7 +164,9 @@ tocar na application layer.
 Nenhum arquivo de porta genérico (`ports.go`, `interfaces.go`) é permitido em
 nenhuma camada. Uma interface que manipula ou produz uma entidade específica
 MUST ser declarada no mesmo arquivo dessa entidade (por exemplo, `TrackParser`
-em `track.go`, pois produz `Track`). Uma interface sem entidade dona MUST
+em `track.go`, pois produz `Track`), no início do arquivo — logo após os
+imports e antes da entidade, dos enums e dos construtores, com a diretiva
+`//go:generate` imediatamente após a cláusula `package`. Uma interface sem entidade dona MUST
 ganhar um arquivo próprio, nomeado pelo conceito que representa (por exemplo,
 `Simplifier` em `simplification.go`, `Smoother` em `smoothing.go`). Toda porta
 MUST ser nomeada pelo papel arquitetural que exerce, não pelo dado que
@@ -310,4 +322,4 @@ antes do início da implementação. Qualquer desvio MUST ser justificado
 explicitamente na seção de Complexity Tracking do plano, ou o desvio MUST ser
 eliminado.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-14
+**Version**: 1.2.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19
