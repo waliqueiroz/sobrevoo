@@ -1,6 +1,6 @@
 package domain
 
-//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/track_parser.go . TrackParser
+//go:generate go run go.uber.org/mock/mockgen -destination mockdomain/track_parser.go -package mockdomain . TrackParser
 
 import "io"
 

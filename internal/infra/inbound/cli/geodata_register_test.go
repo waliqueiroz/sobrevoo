@@ -9,7 +9,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/waliqueiroz/sobrevoo/internal/application"
-	"github.com/waliqueiroz/sobrevoo/internal/application/mock_application"
+	"github.com/waliqueiroz/sobrevoo/internal/application/mockapplication"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/inbound/cli"
 )
@@ -63,7 +63,7 @@ func Test_GeoDataRegisterCommand_Execute(t *testing.T) {
 		}
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().Register("europa-central-mapa", "/data/mapa.mbtiles").Return(source, nil)
 
 		// when
@@ -79,7 +79,7 @@ func Test_GeoDataRegisterCommand_Execute(t *testing.T) {
 	t.Run("should map a nonexistent file to exit code 5", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.GeoDataSource{}, domain.ErrDataFileNotFound)
 
 		// when
@@ -93,7 +93,7 @@ func Test_GeoDataRegisterCommand_Execute(t *testing.T) {
 	t.Run("should map an unreadable file to exit code 6", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.GeoDataSource{}, domain.ErrDataFileUnreadable)
 
 		// when
@@ -107,7 +107,7 @@ func Test_GeoDataRegisterCommand_Execute(t *testing.T) {
 	t.Run("should map an unsupported format to exit code 7", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.GeoDataSource{}, domain.ErrUnsupportedDataFormat)
 
 		// when
@@ -121,7 +121,7 @@ func Test_GeoDataRegisterCommand_Execute(t *testing.T) {
 	t.Run("should map a name already in use to exit code 8", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().Register(gomock.Any(), gomock.Any()).Return(domain.GeoDataSource{}, domain.ErrDataSourceNameAlreadyUsed)
 
 		// when

@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
 func Test_Duration(t *testing.T) {
@@ -27,8 +27,8 @@ func Test_Duration(t *testing.T) {
 	t.Run("should return not ok when no point has time", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithoutTime().Build(),
-			build_domain.NewTrackPointBuilder().WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithoutTime().Build(),
 		}
 
 		// when
@@ -42,8 +42,8 @@ func Test_Duration(t *testing.T) {
 	t.Run("should return not ok when some points are missing time", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithoutTime().Build(),
 		}
 
 		// when
@@ -57,9 +57,9 @@ func Test_Duration(t *testing.T) {
 	t.Run("should return the elapsed time between the first and the last point when every point has time", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithTime(start.Add(30 * time.Minute)).Build(),
-			build_domain.NewTrackPointBuilder().WithTime(start.Add(45 * time.Minute)).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(30 * time.Minute)).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(45 * time.Minute)).Build(),
 		}
 
 		// when

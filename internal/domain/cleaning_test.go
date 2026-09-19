@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
 func Test_ReorderByTime(t *testing.T) {
@@ -16,9 +16,9 @@ func Test_ReorderByTime(t *testing.T) {
 	t.Run("should sort the points chronologically when every point has time", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(3).WithTime(start.Add(2 * time.Minute)).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(2).WithTime(start.Add(time.Minute)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(3).WithTime(start.Add(2 * time.Minute)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(2).WithTime(start.Add(time.Minute)).Build(),
 		}
 
 		// when
@@ -31,9 +31,9 @@ func Test_ReorderByTime(t *testing.T) {
 	t.Run("should leave the points unchanged when some are missing time", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(3).WithTime(start.Add(2 * time.Minute)).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithoutTime().Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(2).WithTime(start.Add(time.Minute)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(3).WithTime(start.Add(2 * time.Minute)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(2).WithTime(start.Add(time.Minute)).Build(),
 		}
 
 		// when
@@ -46,9 +46,9 @@ func Test_ReorderByTime(t *testing.T) {
 	t.Run("should leave the points unchanged when none has time", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(3).WithoutTime().Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithoutTime().Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(2).WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(3).WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(2).WithoutTime().Build(),
 		}
 
 		// when
@@ -63,10 +63,10 @@ func Test_DiscardImpossibleCoordinates(t *testing.T) {
 	t.Run("should discard a couple of impossible points scattered in the track", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(20).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(200).WithLongitude(20).Build(),  // impossible latitude
-			build_domain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(-300).Build(), // impossible longitude
-			build_domain.NewTrackPointBuilder().WithLatitude(-90).WithLongitude(180).Build(), // boundary values are possible
+			builddomain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(20).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(200).WithLongitude(20).Build(),  // impossible latitude
+			builddomain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(-300).Build(), // impossible longitude
+			builddomain.NewTrackPointBuilder().WithLatitude(-90).WithLongitude(180).Build(), // boundary values are possible
 		}
 
 		// when
@@ -80,14 +80,14 @@ func Test_DiscardImpossibleCoordinates(t *testing.T) {
 	t.Run("should discard many impossible points throughout a longer track", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(1).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(91).Build(), // impossible
-			build_domain.NewTrackPointBuilder().WithLatitude(2).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(-91).Build(), // impossible
-			build_domain.NewTrackPointBuilder().WithLatitude(3).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(3).WithLongitude(181).Build(),  // impossible
-			build_domain.NewTrackPointBuilder().WithLatitude(3).WithLongitude(-181).Build(), // impossible
-			build_domain.NewTrackPointBuilder().WithLatitude(4).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(91).Build(), // impossible
+			builddomain.NewTrackPointBuilder().WithLatitude(2).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(-91).Build(), // impossible
+			builddomain.NewTrackPointBuilder().WithLatitude(3).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(3).WithLongitude(181).Build(),  // impossible
+			builddomain.NewTrackPointBuilder().WithLatitude(3).WithLongitude(-181).Build(), // impossible
+			builddomain.NewTrackPointBuilder().WithLatitude(4).Build(),
 		}
 
 		// when
@@ -103,10 +103,10 @@ func Test_DiscardConsecutiveDuplicates(t *testing.T) {
 	t.Run("should discard a single duplicate", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(), // duplicate of the previous kept point
-			build_domain.NewTrackPointBuilder().WithLatitude(2).WithLongitude(2).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(), // not consecutive with the first occurrence, so it is kept
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(), // duplicate of the previous kept point
+			builddomain.NewTrackPointBuilder().WithLatitude(2).WithLongitude(2).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(), // not consecutive with the first occurrence, so it is kept
 		}
 
 		// when
@@ -119,14 +119,14 @@ func Test_DiscardConsecutiveDuplicates(t *testing.T) {
 
 	t.Run("should collapse a long run of consecutive duplicates to a single point", func(t *testing.T) {
 		// given
-		samePoint := build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build()
+		samePoint := builddomain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build()
 		points := []domain.TrackPoint{
 			samePoint,
 			samePoint,
 			samePoint,
 			samePoint,
 			samePoint,
-			build_domain.NewTrackPointBuilder().WithLatitude(2).WithLongitude(2).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(2).WithLongitude(2).Build(),
 		}
 
 		// when
@@ -144,8 +144,8 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 	t.Run("should keep a plausible walking/running/cycling pace", func(t *testing.T) {
 		// given: ~11m in 10s, ~4 km/h
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0.0001).WithTime(start.Add(10 * time.Second)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0.0001).WithTime(start.Add(10 * time.Second)).Build(),
 		}
 
 		// when
@@ -159,8 +159,8 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 	t.Run("should discard a jump implying a speed far beyond any human-powered activity", func(t *testing.T) {
 		// given: ~55km in 1s
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0.5).WithLongitude(0).WithTime(start.Add(time.Second)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0.5).WithLongitude(0).WithTime(start.Add(time.Second)).Build(),
 		}
 
 		// when
@@ -174,8 +174,8 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 	t.Run("should never evaluate a jump when either point is missing time", func(t *testing.T) {
 		// given: would be an enormous jump, but time is unknown
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithoutTime().Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(50).WithLongitude(50).WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithoutTime().Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(50).WithLongitude(50).WithoutTime().Build(),
 		}
 
 		// when
@@ -191,8 +191,8 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		// it in exactly one hour is a ~111.19 km/h pace, safely below a
 		// 130 km/h threshold.
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(0).WithTime(start.Add(time.Hour)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(0).WithTime(start.Add(time.Hour)).Build(),
 		}
 
 		// when
@@ -206,8 +206,8 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 	t.Run("should treat zero or negative elapsed time with real distance as always implausible", func(t *testing.T) {
 		// given: same timestamp, but the point moved
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0.001).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0.001).WithTime(start).Build(),
 		}
 
 		// when
@@ -220,7 +220,7 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 
 	t.Run("should not consider zero elapsed time with zero distance implausible", func(t *testing.T) {
 		// given: identical point and timestamp
-		point := build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build()
+		point := builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build()
 		points := []domain.TrackPoint{point, point}
 
 		// when
@@ -236,9 +236,9 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		// point; the third point is plausible relative to the first (kept)
 		// point, not the discarded middle one
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0.5).WithLongitude(0).WithTime(start.Add(time.Second)).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0.00002).WithLongitude(0).WithTime(start.Add(2 * time.Second)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0.5).WithLongitude(0).WithTime(start.Add(time.Second)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0.00002).WithLongitude(0).WithTime(start.Add(2 * time.Second)).Build(),
 		}
 
 		// when
@@ -257,7 +257,7 @@ func Test_CleanTrack(t *testing.T) {
 	t.Run("should reject fewer than the minimum points before any cleaning", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().Build(),
+			builddomain.NewTrackPointBuilder().Build(),
 		}
 
 		// when
@@ -270,9 +270,9 @@ func Test_CleanTrack(t *testing.T) {
 	t.Run("should reject a track with enough raw points but too few after cleaning, with a distinguishable error", func(t *testing.T) {
 		// given: two of the three points have an impossible latitude
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(200).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(300).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(200).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(300).Build(),
 		}
 
 		// when
@@ -289,9 +289,9 @@ func Test_CleanTrack(t *testing.T) {
 		// of latitude between the two kept points stays a plausible pace
 		// (~111 km/h), not an implausible jump.
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(3).WithLongitude(0).WithTime(start.Add(2 * time.Hour)).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(-300).WithTime(start).Build(), // impossible longitude
-			build_domain.NewTrackPointBuilder().WithLatitude(2).WithLongitude(0).WithTime(start.Add(time.Hour)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(3).WithLongitude(0).WithTime(start.Add(2 * time.Hour)).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(-300).WithTime(start).Build(), // impossible longitude
+			builddomain.NewTrackPointBuilder().WithLatitude(2).WithLongitude(0).WithTime(start.Add(time.Hour)).Build(),
 		}
 
 		// when

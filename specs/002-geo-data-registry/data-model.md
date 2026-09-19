@@ -221,7 +221,7 @@ uma dependência externa no sentido do Princípio II.
 
 Gerados com `go.uber.org/mock/mockgen` via `//go:generate` posicionado
 diretamente acima de cada interface, com saída em
-`internal/domain/mock_domain/` — um arquivo por porta: `geo_data_inspector.go`,
+`internal/domain/mockdomain/` — um arquivo por porta: `geo_data_inspector.go`,
 `geo_data_repository.go`, `file_checker.go`.
 
 ## Camada de serviço: `GeoDataService`

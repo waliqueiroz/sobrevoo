@@ -124,9 +124,7 @@ uso) que a redação anterior da constituição permitia.
   (nada de `geodatainspector.GeoDataInspector`). Nada de subpacote por
   algoritmo só para chamar `algoritmo.New()`. Diferente do
   `mystery-gifter-api`, o construtor pode devolver o struct concreto do
-  adapter (não precisa devolver a interface do domínio). Desvio conhecido:
-  os pacotes `mock_<pacote>`/`build_<pacote>` têm underscore, a rever depois
-  do merge da feature 002.
+  adapter (não precisa devolver a interface do domínio).
 - Num arquivo de domínio que declara uma porta, a ordem é: `package`,
   diretiva `//go:generate` (logo após o `package`), imports, **a interface
   logo no início**, e só depois a entidade, os enums e os construtores —
@@ -169,9 +167,11 @@ uso) que a redação anterior da constituição permitia.
 - Mocks são gerados com `go.uber.org/mock/mockgen` via diretiva
   `//go:generate` posicionada diretamente acima da interface que ela
   mocka — nunca em um arquivo central. A saída vai para um subpacote
-  irmão `mock_<pacote>` (`internal/domain/mock_domain`,
-  `internal/application/mock_application`), um arquivo gerado por
-  interface. Rode `make generate` depois de adicionar ou alterar uma
+  irmão `mock<pacote>`, sem underscore
+  (`internal/domain/mockdomain`, `internal/application/mockapplication`), um
+  arquivo gerado por interface, com `-package mockdomain` (etc.) explícito na
+  diretiva. O nome carrega a camada (nada de `mocks`/`builders` genérico)
+  para um teste poder importar mocks de duas camadas sem alias. Rode `make generate` depois de adicionar ou alterar uma
   porta/interface.
 
 ### Testes (Princípio X da constituição)
@@ -180,17 +180,17 @@ uso) que a redação anterior da constituição permitia.
   `t.Run("should ...", func(t *testing.T) { // given ... // when ... // then ... })`.
 - Nada de testes tabulares (`[]struct{...}` + `for`) — um cenário, um
   `t.Run`, mesmo que isso repita configuração.
-- Test data builders vivem em subpacotes `build_<pacote>`
-  (hoje só `internal/domain/build_domain` existe; `build_application` só
+- Test data builders vivem em subpacotes `build<pacote>`
+  (hoje só `internal/domain/builddomain` existe; `buildapplication` só
   seria criado se um serviço passasse a precisar de builder próprio):
   `NewXBuilder()` com defaults sensatos, `WithCampo(...)`/`WithoutCampo()`
   fluentes, `Build()` terminal. Use um sempre que um literal de struct
   repetido ou grande demais deixaria o teste poluído.
 - Cada camada é testada isolada, com o que ela depende mockado: os testes
-  de domain/application mockam as portas do domínio (`mock_domain`); os
+  de domain/application mockam as portas do domínio (`mockdomain`); os
   testes de `internal/infra/inbound/cli` mockam
   `application.InspectTrackService` e `application.GeoDataService`
-  (`mock_application`) e nunca conectam
+  (`mockapplication`) e nunca conectam
   um serviço ou adapter de saída real. Não existe teste automatizado de
   ponta a ponta — `specs/<feature>/quickstart.md` é o checklist manual, com
   o binário real, pra isso.

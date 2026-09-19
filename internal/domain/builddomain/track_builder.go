@@ -1,4 +1,4 @@
-package build_domain
+package builddomain
 
 import "github.com/waliqueiroz/sobrevoo/internal/domain"
 

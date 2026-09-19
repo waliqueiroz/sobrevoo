@@ -49,8 +49,8 @@ da constituição)
 
 **Testes**: mesmo padrão já estabelecido — `go test` com `testify`, formato
 given/when/then (`// given`/`// when`/`// then`, sem tabelas de casos),
-builders em `build_domain` para as novas entidades/DTOs (todas de domínio —
-`internal/application/build_application` deixou de existir, research.md
+builders em `builddomain` para as novas entidades/DTOs (todas de domínio —
+`internal/application/buildapplication` deixou de existir, research.md
 item 15),
 mocks gerados com `go.uber.org/mock` para as três novas portas do domínio
 (`GeoDataInspector`, `GeoDataRepository`, `FileChecker`) e para o novo
@@ -110,8 +110,8 @@ superior definido); verificação de cobertura sobre um trajeto de até
 | VI. Testes Automatizados no Núcleo | PASSA | `internal/domain` (novas funções puras de `BoundingBox`) testado sem I/O; `internal/application` testado com `GeoDataInspector`, `GeoDataRepository`, `FileChecker` e `TrackParser` mockados via `go.uber.org/mock`; nenhum teste do núcleo abre um arquivo MBTiles/GeoTIFF real nem toca o arquivo de registro. `GeoDataSource.RegisteredAt` (via `time.Now()` real, em `Register`) é verificado com uma janela `[antes, depois]`, não um mock — suficiente já que o campo nunca é exibido ao usuário (research.md item 10.1). |
 | VII. Erros Sentinela no Domínio | PASSA | `ErrDataFileNotFound`, `ErrDataFileUnreadable`, `ErrUnsupportedDataFormat`, `ErrDataSourceNameAlreadyUsed`, `ErrDataSourceNotRegistered` declarados em `internal/domain/errors.go`, traduzidos pela CLI em novos códigos de saída de processo (ver `contracts/cli.md`); a verificação de cobertura reaproveita os sentinelas de trajeto já existentes (`ErrEmptyFile`, `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`) para os mesmos erros de trajeto inválido. |
 | VIII. Configuração Injetada | PASSA | O caminho do arquivo de registro é resolvido por `internal/infra/outbound/config` (estendido) e injetado na construção do adapter `jsonfile` em `cmd/sobrevoo`; o núcleo nunca lê `os.UserHomeDir()`, variável de ambiente, ou flag diretamente. |
-| IX. Organização de Portas, Service Layer e Mocks | PASSA | Nenhum `ports.go`/`interfaces.go` novo: `GeoDataInspector` e `GeoDataRepository` — que produzem/manipulam `GeoDataSource` — ficam em `geo_data_source.go`, junto da entidade; `FileChecker`, sem entidade dona, ganha arquivo próprio (`file_checker.go`). Os quatro casos de uso desta etapa seguem `XService`/`xService`/`NewXService(...)` como uma única interface (`GeoDataService`/`geoDataService`/`NewGeoDataService(...)`) com um método por operação (`Register`/`List`/`Remove`/`CheckCoverage`) — um serviço por recurso, não um serviço por caso de uso (research.md item 13) — em `internal/application/geo_data_service.go`, que contém só orquestração: a regra de negócio (construção de `GeoDataSource`, cálculo de cobertura) vive em `internal/domain` como construtor/função pura (`NewGeoDataSource`, `ComputeCoverage` em `geo_data_coverage.go` — research.md item 14). Mocks gerados com `go.uber.org/mock/mockgen` via `//go:generate` acima de cada interface, em `mock_domain`/`mock_application`. |
-| X. Testes: Given/When/Then, Builders e Isolamento por Camada | PASSA | Todo teste novo usa `t.Run("should ...")` com comentários `// given`/`// when`/`// then`, sem tabelas de casos, agrupados por método (`Test_geoDataService_Register`, `Test_geoDataService_List`, `Test_ComputeCoverage`, ...) no mesmo arquivo de teste — mesmo padrão de `GroupService`/`group_service_test.go` em `waliqueiroz/mystery-gifter-api`. Um novo builder `GeoDataSourceBuilder` em `build_domain` evita literais de struct repetidos. Os cenários do algoritmo de cobertura (sobreposição, desempate, antimeridiano, segmentos) são testados como função pura em `internal/domain/geo_data_coverage_test.go`, sem nenhum mock; `internal/application/geo_data_service_test.go` testa só orquestração (propagação de erro de cada porta). Cada camada continua isolada: domínio/serviço com portas mockadas, CLI com `GeoDataService` mockado (`mock_application`) — nunca com a implementação real nem com os adapters de saída reais. |
+| IX. Organização de Portas, Service Layer e Mocks | PASSA | Nenhum `ports.go`/`interfaces.go` novo: `GeoDataInspector` e `GeoDataRepository` — que produzem/manipulam `GeoDataSource` — ficam em `geo_data_source.go`, junto da entidade; `FileChecker`, sem entidade dona, ganha arquivo próprio (`file_checker.go`). Os quatro casos de uso desta etapa seguem `XService`/`xService`/`NewXService(...)` como uma única interface (`GeoDataService`/`geoDataService`/`NewGeoDataService(...)`) com um método por operação (`Register`/`List`/`Remove`/`CheckCoverage`) — um serviço por recurso, não um serviço por caso de uso (research.md item 13) — em `internal/application/geo_data_service.go`, que contém só orquestração: a regra de negócio (construção de `GeoDataSource`, cálculo de cobertura) vive em `internal/domain` como construtor/função pura (`NewGeoDataSource`, `ComputeCoverage` em `geo_data_coverage.go` — research.md item 14). Mocks gerados com `go.uber.org/mock/mockgen` via `//go:generate` acima de cada interface, em `mockdomain`/`mockapplication`. |
+| X. Testes: Given/When/Then, Builders e Isolamento por Camada | PASSA | Todo teste novo usa `t.Run("should ...")` com comentários `// given`/`// when`/`// then`, sem tabelas de casos, agrupados por método (`Test_geoDataService_Register`, `Test_geoDataService_List`, `Test_ComputeCoverage`, ...) no mesmo arquivo de teste — mesmo padrão de `GroupService`/`group_service_test.go` em `waliqueiroz/mystery-gifter-api`. Um novo builder `GeoDataSourceBuilder` em `builddomain` evita literais de struct repetidos. Os cenários do algoritmo de cobertura (sobreposição, desempate, antimeridiano, segmentos) são testados como função pura em `internal/domain/geo_data_coverage_test.go`, sem nenhum mock; `internal/application/geo_data_service_test.go` testa só orquestração (propagação de erro de cada porta). Cada camada continua isolada: domínio/serviço com portas mockadas, CLI com `GeoDataService` mockado (`mockapplication`) — nunca com a implementação real nem com os adapters de saída reais. |
 | Idioma dos Artefatos | PASSA | Este plano, `research.md`, `data-model.md`, `contracts/cli.md` e `quickstart.md` estão em português do Brasil; identificadores, nomes de pacote/arquivo e comentários de código permanecem em inglês. Seguindo a mesma decisão já registrada na etapa 1 (`research.md` item 11), todo o I/O em tempo de execução dos novos comandos (nomes de flag, texto de saída, mensagens de erro) também é em inglês. |
 
 Nenhuma violação identificada. A seção de Rastreamento de Complexidade não se
@@ -148,15 +148,15 @@ internal/
 │   ├── file_checker.go                           # (novo) porta FileChecker (sem entidade dona)
 │   ├── bounding_box.go                           # (estendido) + Contains(lat, lon float64) bool, + AreaDegrees() float64
 │   ├── errors.go                                 # (estendido) + 5 novos erros sentinela
-│   ├── build_domain/
+│   ├── builddomain/
 │   │   ├── geo_data_source_builder.go            # (novo) test data builder
-│   │   └── track_summary_builder.go               # (novo, movido de build_application) test data builder
-│   └── mock_domain/                              # (estendido) + geo_data_inspector.go, geo_data_registry.go, file_checker.go
+│   │   └── track_summary_builder.go               # (novo, movido de buildapplication) test data builder
+│   └── mockdomain/                              # (estendido) + geo_data_inspector.go, geo_data_registry.go, file_checker.go
 │
 ├── application/
 │   ├── geo_data_service.go                       # (novo) GeoDataService: Register + List + Remove + CheckCoverage num único serviço, só orquestração (research.md itens 13-14)
 │   ├── inspect_track_service.go                  # (ajustado) só orquestração: parser.Parse → domain.CleanTrack → Simplifier/Smoother → domain.SummarizeTrack; método renomeado de Execute para Inspect, InspectTrackInput/Output removidos (research.md item 15)
-│   └── mock_application/                         # (estendido) + geo_data_service.go
+│   └── mockapplication/                         # (estendido) + geo_data_service.go
 │
 └── infra/
     ├── outbound/
@@ -240,9 +240,9 @@ recebe argumentos simples e devolve `domain.TrackSummary`, construído pela
 nova função pura `domain.SummarizeTrack`).
 
 Testes de unidade continuam no formato given/when/then, sem tabelas de
-casos, com builders em `build_domain` (o pacote `build_application` não
+casos, com builders em `builddomain` (o pacote `buildapplication` não
 tem mais nenhum builder — `InspectTrackOutputBuilder` virou
-`build_domain.TrackSummaryBuilder`, já que `TrackSummary` é um tipo de
+`builddomain.TrackSummaryBuilder`, já que `TrackSummary` é um tipo de
 domínio) sempre que um literal de struct repetido prejudicaria a
 legibilidade — mesma convenção já em vigor.
 

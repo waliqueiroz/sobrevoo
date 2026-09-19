@@ -1,6 +1,6 @@
 package domain
 
-//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/file_checker.go . FileChecker
+//go:generate go run go.uber.org/mock/mockgen -destination mockdomain/file_checker.go -package mockdomain . FileChecker
 
 // FileChecker reports whether a file still exists at a given path.
 // Implemented by internal/infra/outbound/filechecker. Used to detect a

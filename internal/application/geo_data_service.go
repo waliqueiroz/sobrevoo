@@ -6,7 +6,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-//go:generate go run go.uber.org/mock/mockgen -destination mock_application/geo_data_service.go . GeoDataService
+//go:generate go run go.uber.org/mock/mockgen -destination mockapplication/geo_data_service.go -package mockapplication . GeoDataService
 
 // GeoDataService manages the local repository of geo data sources — base
 // maps and elevation files the user has already downloaded — and checks

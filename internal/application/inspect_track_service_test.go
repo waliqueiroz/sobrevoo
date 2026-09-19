@@ -12,8 +12,8 @@ import (
 
 	"github.com/waliqueiroz/sobrevoo/internal/application"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/mock_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/mockdomain"
 )
 
 const (
@@ -25,7 +25,7 @@ const (
 // points they receive unchanged, for tests where the treatment stages
 // themselves are not what is being verified.
 func passthroughSimplifier(ctrl *gomock.Controller) domain.Simplifier {
-	simplifier := mock_domain.NewMockSimplifier(ctrl)
+	simplifier := mockdomain.NewMockSimplifier(ctrl)
 	simplifier.EXPECT().Simplify(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(points []domain.TrackPoint, _ domain.Level) []domain.TrackPoint { return points }).
 		AnyTimes()
@@ -33,7 +33,7 @@ func passthroughSimplifier(ctrl *gomock.Controller) domain.Simplifier {
 }
 
 func passthroughSmoother(ctrl *gomock.Controller) domain.Smoother {
-	smoother := mock_domain.NewMockSmoother(ctrl)
+	smoother := mockdomain.NewMockSmoother(ctrl)
 	smoother.EXPECT().Smooth(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(points []domain.TrackPoint, _ domain.Level) []domain.TrackPoint { return points }).
 		AnyTimes()
@@ -46,7 +46,7 @@ func Test_inspectTrackService_Inspect(t *testing.T) {
 		wantErr := errors.New("boom")
 
 		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
+		mockedParser := mockdomain.NewMockTrackParser(mockCtrl)
 		mockedParser.EXPECT().Parse(gomock.Any()).Return(domain.Track{}, wantErr)
 
 		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -62,12 +62,12 @@ func Test_inspectTrackService_Inspect(t *testing.T) {
 		// given: domain/cleaning_test.go covers CleanTrack's own rules
 		// (including distinguishing this from ErrInsufficientPointsAfterCleaning)
 		// in detail — this only checks the service does not swallow it.
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().Build(),
+		track := builddomain.NewTrackBuilder().WithPoints(
+			builddomain.NewTrackPointBuilder().Build(),
 		).Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
+		mockedParser := mockdomain.NewMockTrackParser(mockCtrl)
 		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
 
 		service := application.NewInspectTrackService(mockedParser, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -81,22 +81,22 @@ func Test_inspectTrackService_Inspect(t *testing.T) {
 
 	t.Run("should run simplification then smoothing, in that order, with the requested levels", func(t *testing.T) {
 		// given
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(1).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(2).Build(),
+		track := builddomain.NewTrackBuilder().WithPoints(
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(2).Build(),
 		).Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
+		mockedParser := mockdomain.NewMockTrackParser(mockCtrl)
 		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
 
-		simplified := []domain.TrackPoint{build_domain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(10).Build()}
-		mockedSimplifier := mock_domain.NewMockSimplifier(mockCtrl)
+		simplified := []domain.TrackPoint{builddomain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(10).Build()}
+		mockedSimplifier := mockdomain.NewMockSimplifier(mockCtrl)
 		mockedSimplifier.EXPECT().Simplify(track.Points, domain.LevelHigh).Return(simplified)
 
-		smoothed := []domain.TrackPoint{build_domain.NewTrackPointBuilder().WithLatitude(20).WithLongitude(20).Build()}
-		mockedSmoother := mock_domain.NewMockSmoother(mockCtrl)
+		smoothed := []domain.TrackPoint{builddomain.NewTrackPointBuilder().WithLatitude(20).WithLongitude(20).Build()}
+		mockedSmoother := mockdomain.NewMockSmoother(mockCtrl)
 		// Smooth must receive Simplify's output, not the original points —
 		// simplification runs first.
 		mockedSmoother.EXPECT().Smooth(simplified, domain.LevelLow).Return(smoothed)
@@ -118,13 +118,13 @@ func Test_inspectTrackService_Inspect(t *testing.T) {
 		// discard stats) are covered in domain/track_summary_test.go — this
 		// only checks the service wires the cleaned/treated route into it.
 		start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithElevation(100).WithTime(start).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(1).WithElevation(150).WithTime(start.Add(time.Hour)).Build(),
+		track := builddomain.NewTrackBuilder().WithPoints(
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).WithElevation(100).WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(1).WithElevation(150).WithTime(start.Add(time.Hour)).Build(),
 		).Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedParser := mock_domain.NewMockTrackParser(mockCtrl)
+		mockedParser := mockdomain.NewMockTrackParser(mockCtrl)
 		mockedParser.EXPECT().Parse(gomock.Any()).Return(track, nil)
 
 		service := application.NewInspectTrackService(mockedParser, passthroughSimplifier(mockCtrl), passthroughSmoother(mockCtrl), testMinPoints, testMaxPlausibleSpeedKmh)

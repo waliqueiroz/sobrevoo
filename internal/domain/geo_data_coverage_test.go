@@ -7,18 +7,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
 func Test_ComputeCoverage(t *testing.T) {
 	t.Run("should report full coverage when a base map and an elevation source cover every point", func(t *testing.T) {
 		// given
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 		}
-		baseMap := build_domain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).Build()
-		elevation := build_domain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
+		baseMap := builddomain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).Build()
+		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
 
 		// when
 		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
@@ -35,10 +35,10 @@ func Test_ComputeCoverage(t *testing.T) {
 	t.Run("should report partial coverage when only a base map covers the whole track and no elevation is registered", func(t *testing.T) {
 		// given
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 		}
-		baseMap := build_domain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).Build()
+		baseMap := builddomain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).Build()
 
 		// when
 		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, nil)
@@ -54,10 +54,10 @@ func Test_ComputeCoverage(t *testing.T) {
 	t.Run("should report partial coverage when only an elevation source covers the whole track and no base map is registered", func(t *testing.T) {
 		// given
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 		}
-		elevation := build_domain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
+		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
 
 		// when
 		report := domain.ComputeCoverage(route, nil, []domain.GeoDataSource{elevation})
@@ -72,11 +72,11 @@ func Test_ComputeCoverage(t *testing.T) {
 		// given
 		covered := domain.BoundingBox{MinLatitude: 44, MaxLatitude: 47, MinLongitude: 14, MaxLongitude: 17}
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(60).WithLongitude(30).Build(), // outside "covered"
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(60).WithLongitude(30).Build(), // outside "covered"
 		}
-		baseMap := build_domain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).WithBoundingBox(covered).Build()
-		elevation := build_domain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).WithBoundingBox(covered).Build()
+		baseMap := builddomain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).WithBoundingBox(covered).Build()
+		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).WithBoundingBox(covered).Build()
 
 		// when
 		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
@@ -94,8 +94,8 @@ func Test_ComputeCoverage(t *testing.T) {
 	t.Run("should report no coverage at all when no source is registered", func(t *testing.T) {
 		// given
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 		}
 
 		// when
@@ -111,12 +111,12 @@ func Test_ComputeCoverage(t *testing.T) {
 	t.Run("should pick the more specific of two overlapping base map sources", func(t *testing.T) {
 		// given
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(45.1).WithLongitude(15.1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45.1).WithLongitude(15.1).Build(),
 		}
-		wide := build_domain.NewGeoDataSourceBuilder().WithName("regiao-ampla").WithType(domain.DataTypeBaseMap).
+		wide := builddomain.NewGeoDataSourceBuilder().WithName("regiao-ampla").WithType(domain.DataTypeBaseMap).
 			WithBoundingBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 90, MinLongitude: 0, MaxLongitude: 90}).Build()
-		narrow := build_domain.NewGeoDataSourceBuilder().WithName("regiao-especifica").WithType(domain.DataTypeBaseMap).
+		narrow := builddomain.NewGeoDataSourceBuilder().WithName("regiao-especifica").WithType(domain.DataTypeBaseMap).
 			WithBoundingBox(domain.BoundingBox{MinLatitude: 44, MaxLatitude: 47, MinLongitude: 14, MaxLongitude: 17}).Build()
 
 		// when
@@ -131,12 +131,12 @@ func Test_ComputeCoverage(t *testing.T) {
 		// given
 		box := domain.BoundingBox{MinLatitude: 44, MaxLatitude: 47, MinLongitude: 14, MaxLongitude: 17}
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(45.1).WithLongitude(15.1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45.1).WithLongitude(15.1).Build(),
 		}
-		older := build_domain.NewGeoDataSourceBuilder().WithName("mais-antigo").WithType(domain.DataTypeBaseMap).
+		older := builddomain.NewGeoDataSourceBuilder().WithName("mais-antigo").WithType(domain.DataTypeBaseMap).
 			WithBoundingBox(box).WithRegisteredAt(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)).Build()
-		newer := build_domain.NewGeoDataSourceBuilder().WithName("mais-novo").WithType(domain.DataTypeBaseMap).
+		newer := builddomain.NewGeoDataSourceBuilder().WithName("mais-novo").WithType(domain.DataTypeBaseMap).
 			WithBoundingBox(box).WithRegisteredAt(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)).Build()
 
 		// when
@@ -150,12 +150,12 @@ func Test_ComputeCoverage(t *testing.T) {
 	t.Run("should report coverage correctly for a track crossing the antimeridian", func(t *testing.T) {
 		// given
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.9).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.9).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build(),
 		}
 		box := domain.BoundingBox{MinLatitude: -1, MaxLatitude: 1, MinLongitude: 170, MaxLongitude: -170, CrossesAntimeridian: true}
-		baseMap := build_domain.NewGeoDataSourceBuilder().WithName("antimeridiano-mapa").WithType(domain.DataTypeBaseMap).WithBoundingBox(box).Build()
-		elevation := build_domain.NewGeoDataSourceBuilder().WithName("antimeridiano-relevo").WithType(domain.DataTypeElevation).WithBoundingBox(box).Build()
+		baseMap := builddomain.NewGeoDataSourceBuilder().WithName("antimeridiano-mapa").WithType(domain.DataTypeBaseMap).WithBoundingBox(box).Build()
+		elevation := builddomain.NewGeoDataSourceBuilder().WithName("antimeridiano-relevo").WithType(domain.DataTypeElevation).WithBoundingBox(box).Build()
 
 		// when
 		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
@@ -167,12 +167,12 @@ func Test_ComputeCoverage(t *testing.T) {
 	t.Run("should list every base map source that covered at least one point, sorted by name", func(t *testing.T) {
 		// given: two non-overlapping base map sources, each covering one of the two points
 		route := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).WithLongitude(1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
 		}
-		sourceB := build_domain.NewGeoDataSourceBuilder().WithName("b-mapa").WithType(domain.DataTypeBaseMap).
+		sourceB := builddomain.NewGeoDataSourceBuilder().WithName("b-mapa").WithType(domain.DataTypeBaseMap).
 			WithBoundingBox(domain.BoundingBox{MinLatitude: 44, MaxLatitude: 47, MinLongitude: 14, MaxLongitude: 17}).Build()
-		sourceA := build_domain.NewGeoDataSourceBuilder().WithName("a-mapa").WithType(domain.DataTypeBaseMap).
+		sourceA := builddomain.NewGeoDataSourceBuilder().WithName("a-mapa").WithType(domain.DataTypeBaseMap).
 			WithBoundingBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 2, MinLongitude: 0, MaxLongitude: 2}).Build()
 
 		// when

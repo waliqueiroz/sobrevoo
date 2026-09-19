@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/jsonfile"
 )
 
@@ -35,7 +35,7 @@ func Test_Store_Save(t *testing.T) {
 	t.Run("should persist a new source so it can be listed afterward", func(t *testing.T) {
 		// given
 		store := jsonfile.NewGeoDataRepository(registryPath(t))
-		source := build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()
+		source := builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()
 
 		// when
 		err := store.Save(source)
@@ -51,10 +51,10 @@ func Test_Store_Save(t *testing.T) {
 	t.Run("should replace the existing source when saving the same name again", func(t *testing.T) {
 		// given
 		store := jsonfile.NewGeoDataRepository(registryPath(t))
-		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").WithPath("/data/old.mbtiles").Build()))
+		require.NoError(t, store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").WithPath("/data/old.mbtiles").Build()))
 
 		// when
-		err := store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").WithPath("/data/new.mbtiles").Build())
+		err := store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").WithPath("/data/new.mbtiles").Build())
 
 		// then
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func Test_Store_Save(t *testing.T) {
 	t.Run("should persist across separate Store instances pointed at the same path", func(t *testing.T) {
 		// given
 		path := registryPath(t)
-		require.NoError(t, jsonfile.NewGeoDataRepository(path).Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
+		require.NoError(t, jsonfile.NewGeoDataRepository(path).Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
 
 		// when
 		sources, err := jsonfile.NewGeoDataRepository(path).List()
@@ -83,7 +83,7 @@ func Test_Store_FindByName(t *testing.T) {
 	t.Run("should return the registered source with the given name", func(t *testing.T) {
 		// given
 		store := jsonfile.NewGeoDataRepository(registryPath(t))
-		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
+		require.NoError(t, store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
 
 		// when
 		source, found, err := store.FindByName("europa-central-mapa")
@@ -112,7 +112,7 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("should remove the registered source with the given name", func(t *testing.T) {
 		// given
 		store := jsonfile.NewGeoDataRepository(registryPath(t))
-		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
+		require.NoError(t, store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
 
 		// when
 		err := store.Delete("europa-central-mapa")
@@ -127,8 +127,8 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("should leave other registered sources untouched", func(t *testing.T) {
 		// given
 		store := jsonfile.NewGeoDataRepository(registryPath(t))
-		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
-		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-relevo").WithType(domain.DataTypeElevation).Build()))
+		require.NoError(t, store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
+		require.NoError(t, store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-relevo").WithType(domain.DataTypeElevation).Build()))
 
 		// when
 		err := store.Delete("europa-central-mapa")
@@ -147,7 +147,7 @@ func Test_Store_RoundTrip(t *testing.T) {
 		// given
 		store := jsonfile.NewGeoDataRepository(registryPath(t))
 		registeredAt := time.Date(2026, time.March, 4, 10, 30, 0, 0, time.UTC)
-		source := build_domain.NewGeoDataSourceBuilder().
+		source := builddomain.NewGeoDataSourceBuilder().
 			WithName("europa-central-relevo").
 			WithPath("/data/europa-central.tif").
 			WithType(domain.DataTypeElevation).

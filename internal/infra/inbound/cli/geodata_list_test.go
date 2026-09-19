@@ -9,7 +9,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/waliqueiroz/sobrevoo/internal/application"
-	"github.com/waliqueiroz/sobrevoo/internal/application/mock_application"
+	"github.com/waliqueiroz/sobrevoo/internal/application/mockapplication"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/inbound/cli"
 )
@@ -41,7 +41,7 @@ func Test_GeoDataListCommand_Execute(t *testing.T) {
 		}
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().List().Return(summaries, nil)
 
 		// when
@@ -63,7 +63,7 @@ func Test_GeoDataListCommand_Execute(t *testing.T) {
 		}
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().List().Return(summaries, nil)
 
 		// when
@@ -79,7 +79,7 @@ func Test_GeoDataListCommand_Execute(t *testing.T) {
 	t.Run("should print a clear message when no source is registered", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mock_application.NewMockGeoDataService(mockCtrl)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
 		mockedService.EXPECT().List().Return(nil, nil)
 
 		// when

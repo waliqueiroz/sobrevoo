@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
 func Test_ElevationGain(t *testing.T) {
@@ -24,8 +24,8 @@ func Test_ElevationGain(t *testing.T) {
 	t.Run("should return not ok when no point has elevation", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithoutElevation().Build(),
-			build_domain.NewTrackPointBuilder().WithoutElevation().Build(),
+			builddomain.NewTrackPointBuilder().WithoutElevation().Build(),
+			builddomain.NewTrackPointBuilder().WithoutElevation().Build(),
 		}
 
 		// when
@@ -39,9 +39,9 @@ func Test_ElevationGain(t *testing.T) {
 	t.Run("should return not ok when some points are missing elevation", func(t *testing.T) {
 		// given: a partial gain would misrepresent the real ascent (FR-019)
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithElevation(100).Build(),
-			build_domain.NewTrackPointBuilder().WithoutElevation().Build(),
-			build_domain.NewTrackPointBuilder().WithElevation(150).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(100).Build(),
+			builddomain.NewTrackPointBuilder().WithoutElevation().Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(150).Build(),
 		}
 
 		// when
@@ -55,9 +55,9 @@ func Test_ElevationGain(t *testing.T) {
 	t.Run("should sum every positive elevation delta when the route monotonically climbs", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithElevation(100).Build(),
-			build_domain.NewTrackPointBuilder().WithElevation(150).Build(),
-			build_domain.NewTrackPointBuilder().WithElevation(200).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(100).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(150).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(200).Build(),
 		}
 
 		// when
@@ -71,10 +71,10 @@ func Test_ElevationGain(t *testing.T) {
 	t.Run("should ignore descents and only sum positive deltas", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithElevation(100).Build(),
-			build_domain.NewTrackPointBuilder().WithElevation(80).Build(),
-			build_domain.NewTrackPointBuilder().WithElevation(120).Build(),
-			build_domain.NewTrackPointBuilder().WithElevation(90).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(100).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(80).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(120).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(90).Build(),
 		}
 
 		// when
@@ -88,8 +88,8 @@ func Test_ElevationGain(t *testing.T) {
 	t.Run("should return zero gain but still ok for a flat route", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithElevation(50).Build(),
-			build_domain.NewTrackPointBuilder().WithElevation(50).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(50).Build(),
+			builddomain.NewTrackPointBuilder().WithElevation(50).Build(),
 		}
 
 		// when

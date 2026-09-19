@@ -1,8 +1,20 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.3.0 → 1.3.1
-Rationale: PATCH — refines the adapter naming rule added in 1.3.0 so it
+Version change: 1.3.1 → 1.3.2
+Rationale: PATCH — resolves the known deviation recorded in 1.3.1: the
+generated-mock and test-builder packages drop the underscore from their
+names, as Go style requires (mock_domain -> mockdomain, mock_application ->
+mockapplication, build_domain -> builddomain). The layer stays in the
+package name (instead of a generic "mocks"/"builders") so that a test file
+can import the mocks or builders of two layers at once without an import
+alias. The mockgen directive now passes -package explicitly. The rule's
+intent (one generated mock per interface, next to the interface, plus
+fluent builders) is unchanged; only the package-name pattern changes, and
+the code was renamed in the same commit. The "known deviation" paragraph in
+the Stack section is removed.
+
+Previous amendment (1.3.0 → 1.3.1, PATCH): refines the adapter naming rule added in 1.3.0 so it
 follows Go style (Effective Go / Code Review Comments): exported names MUST
 NOT repeat the package name. Strategy adapters therefore name the type and
 constructor after the strategy only (simplifier.NewDouglasPeucker,
@@ -252,10 +264,13 @@ precisa devolver a interface do domínio.
 Mocks de qualquer interface — porta de domínio ou serviço de aplicação —
 MUST ser gerados com `go.uber.org/mock/mockgen`, via diretiva `//go:generate`
 posicionada imediatamente acima da própria interface, nunca centralizada em
-um arquivo à parte. A saída MUST viver em um subpacote `mock_<nome do
-pacote>` dentro do pacote onde a interface é declarada (por exemplo,
-`internal/domain/mock_domain`, `internal/application/mock_application`), um
-arquivo gerado por interface.
+um arquivo à parte. A saída MUST viver em um subpacote `mock<nome do
+pacote>`, sem underscore, dentro do pacote onde a interface é declarada (por
+exemplo, `internal/domain/mockdomain`, `internal/application/mockapplication`),
+um arquivo gerado por interface, com o nome do pacote passado explicitamente
+ao `mockgen` (`-package mockdomain`). O nome carrega a camada, em vez de um
+genérico `mocks`, para que um mesmo arquivo de teste possa importar mocks de
+duas camadas sem precisar de alias.
 **Rationale**: nomes de arquivo e de porta genéricos escondem o que o código
 realmente faz e viram um "catch-all" para qualquer interface nova,
 independentemente de ela pertencer ali — nomear uma porta pelo papel
@@ -289,8 +304,9 @@ configuração entre cenários.
 
 Quando a construção de uma entidade ou DTO em teste é repetitiva ou tem
 muitos campos, um builder fluente MUST ser criado em um subpacote
-`build_<nome do pacote>` (por exemplo, `internal/domain/build_domain`; um
-`internal/application/build_application` só passa a existir quando um
+`build<nome do pacote>`, sem underscore (por exemplo,
+`internal/domain/builddomain`; um
+`internal/application/buildapplication` só passa a existir quando um
 serviço de aplicação precisar de builder próprio), no formato `NewXBuilder()` com
 defaults sensatos, métodos `WithCampo(...)`/`WithoutCampo()` retornando o
 próprio builder, e um método terminal `Build()`.
@@ -315,11 +331,8 @@ que o Princípio VI já exige do núcleo, estendida para os adapters.
 
 Sobrevoo é implementado em Go, como projeto pessoal e open source. O código
 segue as convenções da comunidade Go (Effective Go e Code Review Comments),
-em especial nomes exportados que não repetem o nome do pacote. Desvio
-conhecido e temporário: os subpacotes `mock_<pacote>` e `build_<pacote>`
-(Princípios IX e X) usam underscore no nome do pacote, o que o estilo Go
-desaconselha; a revisão desses nomes está adiada para depois do merge da
-feature 002.
+em especial nomes exportados que não repetem o nome do pacote e nomes de
+pacote sem underscore.
 
 Todos os artefatos de especificação do fluxo Spec Kit — `spec.md`, `plan.md`,
 `tasks.md`, `research.md`, checklists, e qualquer documento gerado por esse fluxo
@@ -374,4 +387,4 @@ antes do início da implementação. Qualquer desvio MUST ser justificado
 explicitamente na seção de Complexity Tracking do plano, ou o desvio MUST ser
 eliminado.
 
-**Version**: 1.3.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19
+**Version**: 1.3.2 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19

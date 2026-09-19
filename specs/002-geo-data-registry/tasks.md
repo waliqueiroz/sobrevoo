@@ -97,6 +97,12 @@ estendido ao longo de todas elas.
 > `jsonfile.New(...)`, `filechecker.New()` e os nomes de arquivo
 > `filechecker.go`/`geodatainspector.go`/`gpx.go` nas tarefas T008, T016,
 > T023, T032 e T017 (etapa 1) são o registro histórico.
+>
+> Depois do merge da PR, uma sétima rodada removeu os underscores dos
+> pacotes de apoio a testes: `mock_domain`/`mock_application`/`build_domain`
+> viraram `mockdomain`/`mockapplication`/`builddomain` — ver `research.md`
+> item 20 e a constituição 1.3.2. Os nomes antigos nas tarefas abaixo são o
+> registro histórico.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 

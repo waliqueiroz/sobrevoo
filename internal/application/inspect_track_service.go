@@ -11,7 +11,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-//go:generate go run go.uber.org/mock/mockgen -destination mock_application/inspect_track_service.go . InspectTrackService
+//go:generate go run go.uber.org/mock/mockgen -destination mockapplication/inspect_track_service.go -package mockapplication . InspectTrackService
 
 // InspectTrackService reads, treats and summarizes a GPS track (FR-001
 // through FR-027). It depends only on ports declared in the domain, so it

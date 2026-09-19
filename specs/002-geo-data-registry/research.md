@@ -595,3 +595,22 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   (também fora do estilo Go) ficam para depois do merge da PR, para ela não
   crescer demais; a constituição registra isso como desvio conhecido.
 
+## 20. Pacotes de mock e de builder sem underscore
+
+- **Decisão**: `mock_domain`, `mock_application` e `build_domain` viraram
+  `mockdomain`, `mockapplication` e `builddomain` (diretórios e nomes de
+  pacote). A diretiva `//go:generate` passou a ter `-package mockdomain`
+  (respectivamente `mockapplication`) explícito, já que o `mockgen` usaria
+  `mock_<pacote>` por padrão. Constituição 1.3.2 (Princípios IX e X) e
+  `CLAUDE.md` atualizados; nos itens anteriores deste documento e no
+  `tasks.md`, os nomes antigos são o registro histórico.
+- **Racional**: era o desvio do estilo Go que o item 19 deixou registrado
+  para depois do merge (nome de pacote sem underscore). O nome mantém a
+  camada, em vez de um `mocks`/`builders` genérico em cada camada, porque
+  dois pacotes com o mesmo nome no mesmo arquivo de teste (ex.: os mocks do
+  domínio e da aplicação) exigiriam alias de import em todo uso.
+- **Alternativas consideradas**: `mocks` e `builders` por camada
+  (rejeitada — colisão de import entre camadas); `domaintest`/`applicationtest`
+  no estilo `httptest`, juntando mocks e builders num pacote só (rejeitada —
+  muda a organização, não só o nome).
+

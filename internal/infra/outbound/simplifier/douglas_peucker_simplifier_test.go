@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier"
 )
 
@@ -28,7 +28,7 @@ func jitteryLine() []domain.TrackPoint {
 		default:
 			lat = -0.00005
 		}
-		points = append(points, build_domain.NewTrackPointBuilder().WithLatitude(lat).WithLongitude(lon).Build())
+		points = append(points, builddomain.NewTrackPointBuilder().WithLatitude(lat).WithLongitude(lon).Build())
 	}
 	return points
 }
@@ -38,8 +38,8 @@ func Test_Simplifier_Simplify(t *testing.T) {
 		// given
 		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(1).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(2).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(2).Build(),
 		}
 
 		// when
@@ -113,9 +113,9 @@ func Test_Simplifier_Simplify(t *testing.T) {
 		// given
 		douglasPeucker := simplifier.NewDouglasPeucker()
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0.001).WithLongitude(0).Build(), // off to the side of a zero-length segment
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0.001).WithLongitude(0).Build(), // off to the side of a zero-length segment
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
 		}
 
 		// when

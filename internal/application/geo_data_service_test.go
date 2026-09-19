@@ -11,15 +11,15 @@ import (
 
 	"github.com/waliqueiroz/sobrevoo/internal/application"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/mock_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/mockdomain"
 )
 
 func Test_geoDataService_Register(t *testing.T) {
 	t.Run("should reject a name already used by another registered source", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName("europa-central-mapa").Return(domain.GeoDataSource{Name: "europa-central-mapa"}, true, nil)
 
 		service := application.NewGeoDataService(repository, nil, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -36,7 +36,7 @@ func Test_geoDataService_Register(t *testing.T) {
 		wantErr := errors.New("boom")
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName(gomock.Any()).Return(domain.GeoDataSource{}, false, wantErr)
 
 		service := application.NewGeoDataService(repository, nil, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -53,10 +53,10 @@ func Test_geoDataService_Register(t *testing.T) {
 		wantErr := domain.ErrUnsupportedDataFormat
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName("europa-central-mapa").Return(domain.GeoDataSource{}, false, nil)
 
-		inspector := mock_domain.NewMockGeoDataInspector(mockCtrl)
+		inspector := mockdomain.NewMockGeoDataInspector(mockCtrl)
 		inspector.EXPECT().Inspect("/data/mapa.mbtiles").Return(domain.InspectedGeoData{}, wantErr)
 
 		service := application.NewGeoDataService(repository, inspector, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -79,10 +79,10 @@ func Test_geoDataService_Register(t *testing.T) {
 		}
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName("europa-central-mapa").Return(domain.GeoDataSource{}, false, nil)
 
-		inspector := mock_domain.NewMockGeoDataInspector(mockCtrl)
+		inspector := mockdomain.NewMockGeoDataInspector(mockCtrl)
 		inspector.EXPECT().Inspect("/data/mapa.mbtiles").Return(inspected, nil)
 
 		var saved domain.GeoDataSource
@@ -111,11 +111,11 @@ func Test_geoDataService_Register(t *testing.T) {
 		wantErr := errors.New("boom")
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName(gomock.Any()).Return(domain.GeoDataSource{}, false, nil)
 		repository.EXPECT().Save(gomock.Any()).Return(wantErr)
 
-		inspector := mock_domain.NewMockGeoDataInspector(mockCtrl)
+		inspector := mockdomain.NewMockGeoDataInspector(mockCtrl)
 		inspector.EXPECT().Inspect(gomock.Any()).Return(domain.InspectedGeoData{}, nil)
 
 		service := application.NewGeoDataService(repository, inspector, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -134,7 +134,7 @@ func Test_geoDataService_List(t *testing.T) {
 		wantErr := errors.New("boom")
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().List().Return(nil, wantErr)
 
 		service := application.NewGeoDataService(repository, nil, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -149,7 +149,7 @@ func Test_geoDataService_List(t *testing.T) {
 	t.Run("should return an empty list when no source is registered", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().List().Return(nil, nil)
 
 		service := application.NewGeoDataService(repository, nil, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -168,10 +168,10 @@ func Test_geoDataService_List(t *testing.T) {
 		missing := domain.GeoDataSource{Name: "europa-relevo", Path: "/data/relevo.tif"}
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().List().Return([]domain.GeoDataSource{present, missing}, nil)
 
-		fileChecker := mock_domain.NewMockFileChecker(mockCtrl)
+		fileChecker := mockdomain.NewMockFileChecker(mockCtrl)
 		fileChecker.EXPECT().Exists("/data/mapa.mbtiles").Return(true)
 		fileChecker.EXPECT().Exists("/data/relevo.tif").Return(false)
 
@@ -194,7 +194,7 @@ func Test_geoDataService_Remove(t *testing.T) {
 	t.Run("should reject a name that does not match any registered source", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName("nao-existe").Return(domain.GeoDataSource{}, false, nil)
 
 		service := application.NewGeoDataService(repository, nil, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -211,7 +211,7 @@ func Test_geoDataService_Remove(t *testing.T) {
 		wantErr := errors.New("boom")
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName(gomock.Any()).Return(domain.GeoDataSource{}, false, wantErr)
 
 		service := application.NewGeoDataService(repository, nil, nil, nil, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -226,7 +226,7 @@ func Test_geoDataService_Remove(t *testing.T) {
 	t.Run("should delete the registered source with the given name", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName("europa-mapa").Return(domain.GeoDataSource{Name: "europa-mapa"}, true, nil)
 		repository.EXPECT().Delete("europa-mapa").Return(nil)
 
@@ -244,7 +244,7 @@ func Test_geoDataService_Remove(t *testing.T) {
 		wantErr := errors.New("boom")
 
 		mockCtrl := gomock.NewController(t)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().FindByName("europa-mapa").Return(domain.GeoDataSource{Name: "europa-mapa"}, true, nil)
 		repository.EXPECT().Delete("europa-mapa").Return(wantErr)
 
@@ -264,7 +264,7 @@ func Test_geoDataService_CheckCoverage(t *testing.T) {
 		wantErr := domain.ErrEmptyFile
 
 		mockCtrl := gomock.NewController(t)
-		parser := mock_domain.NewMockTrackParser(mockCtrl)
+		parser := mockdomain.NewMockTrackParser(mockCtrl)
 		parser.EXPECT().Parse(gomock.Any()).Return(domain.Track{}, wantErr)
 
 		service := application.NewGeoDataService(nil, nil, nil, parser, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -279,12 +279,12 @@ func Test_geoDataService_CheckCoverage(t *testing.T) {
 	t.Run("should propagate domain.CleanTrack's error unchanged", func(t *testing.T) {
 		// given: domain/cleaning_test.go covers CleanTrack's own rules in
 		// detail — this only checks the service does not swallow it.
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().Build(),
+		track := builddomain.NewTrackBuilder().WithPoints(
+			builddomain.NewTrackPointBuilder().Build(),
 		).Build()
 
 		mockCtrl := gomock.NewController(t)
-		parser := mock_domain.NewMockTrackParser(mockCtrl)
+		parser := mockdomain.NewMockTrackParser(mockCtrl)
 		parser.EXPECT().Parse(gomock.Any()).Return(track, nil)
 
 		service := application.NewGeoDataService(nil, nil, nil, parser, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -299,15 +299,15 @@ func Test_geoDataService_CheckCoverage(t *testing.T) {
 	t.Run("should propagate the repository's List error unchanged", func(t *testing.T) {
 		// given
 		wantErr := errors.New("boom")
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
+		track := builddomain.NewTrackBuilder().WithPoints(
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 		).Build()
 
 		mockCtrl := gomock.NewController(t)
-		parser := mock_domain.NewMockTrackParser(mockCtrl)
+		parser := mockdomain.NewMockTrackParser(mockCtrl)
 		parser.EXPECT().Parse(gomock.Any()).Return(track, nil)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().List().Return(nil, wantErr)
 
 		service := application.NewGeoDataService(repository, nil, nil, parser, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -326,20 +326,20 @@ func Test_geoDataService_CheckCoverage(t *testing.T) {
 		// service cleans the track (same pipeline as InspectTrackService —
 		// research.md item 9) and calls through with what the repository
 		// reports.
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
+		track := builddomain.NewTrackBuilder().WithPoints(
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 		).Build()
 
-		baseMap := build_domain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).Build()
-		elevation := build_domain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
+		baseMap := builddomain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).Build()
+		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
 
 		mockCtrl := gomock.NewController(t)
-		parser := mock_domain.NewMockTrackParser(mockCtrl)
+		parser := mockdomain.NewMockTrackParser(mockCtrl)
 		parser.EXPECT().Parse(gomock.Any()).Return(track, nil)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().List().Return([]domain.GeoDataSource{baseMap, elevation}, nil)
-		fileChecker := mock_domain.NewMockFileChecker(mockCtrl)
+		fileChecker := mockdomain.NewMockFileChecker(mockCtrl)
 		fileChecker.EXPECT().Exists(gomock.Any()).Return(true).AnyTimes()
 
 		service := application.NewGeoDataService(repository, nil, fileChecker, parser, testMinPoints, testMaxPlausibleSpeedKmh)
@@ -354,20 +354,20 @@ func Test_geoDataService_CheckCoverage(t *testing.T) {
 
 	t.Run("should exclude a registered source whose file no longer exists before checking coverage", func(t *testing.T) {
 		// given
-		track := build_domain.NewTrackBuilder().WithPoints(
-			build_domain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
+		track := builddomain.NewTrackBuilder().WithPoints(
+			builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 		).Build()
 
-		baseMap := build_domain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).WithPath("/data/mapa.mbtiles").Build()
-		elevation := build_domain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).WithPath("/data/relevo.tif").Build()
+		baseMap := builddomain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).WithPath("/data/mapa.mbtiles").Build()
+		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).WithPath("/data/relevo.tif").Build()
 
 		mockCtrl := gomock.NewController(t)
-		parser := mock_domain.NewMockTrackParser(mockCtrl)
+		parser := mockdomain.NewMockTrackParser(mockCtrl)
 		parser.EXPECT().Parse(gomock.Any()).Return(track, nil)
-		repository := mock_domain.NewMockGeoDataRepository(mockCtrl)
+		repository := mockdomain.NewMockGeoDataRepository(mockCtrl)
 		repository.EXPECT().List().Return([]domain.GeoDataSource{baseMap, elevation}, nil)
-		fileChecker := mock_domain.NewMockFileChecker(mockCtrl)
+		fileChecker := mockdomain.NewMockFileChecker(mockCtrl)
 		fileChecker.EXPECT().Exists("/data/mapa.mbtiles").Return(false)
 		fileChecker.EXPECT().Exists("/data/relevo.tif").Return(true)
 

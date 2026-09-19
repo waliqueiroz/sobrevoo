@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
 // sphericalLawOfCosinesMeters computes the great-circle distance between two
@@ -30,7 +30,7 @@ func sphericalLawOfCosinesMeters(a, b domain.TrackPoint) float64 {
 func Test_Haversine(t *testing.T) {
 	t.Run("should return zero for the same point", func(t *testing.T) {
 		// given
-		point := build_domain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(20).Build()
+		point := builddomain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(20).Build()
 
 		// when
 		distance := domain.Haversine(point, point)
@@ -41,8 +41,8 @@ func Test_Haversine(t *testing.T) {
 
 	t.Run("should match an independent great-circle formula for two nearby points", func(t *testing.T) {
 		// given
-		a := build_domain.NewTrackPointBuilder().WithLatitude(40.0).WithLongitude(-3.0).Build()
-		b := build_domain.NewTrackPointBuilder().WithLatitude(40.5).WithLongitude(-3.5).Build()
+		a := builddomain.NewTrackPointBuilder().WithLatitude(40.0).WithLongitude(-3.0).Build()
+		b := builddomain.NewTrackPointBuilder().WithLatitude(40.5).WithLongitude(-3.5).Build()
 
 		// when
 		distance := domain.Haversine(a, b)
@@ -53,8 +53,8 @@ func Test_Haversine(t *testing.T) {
 
 	t.Run("should match an independent great-circle formula across the equator", func(t *testing.T) {
 		// given
-		a := build_domain.NewTrackPointBuilder().WithLatitude(1.0).WithLongitude(10.0).Build()
-		b := build_domain.NewTrackPointBuilder().WithLatitude(-1.0).WithLongitude(10.0).Build()
+		a := builddomain.NewTrackPointBuilder().WithLatitude(1.0).WithLongitude(10.0).Build()
+		b := builddomain.NewTrackPointBuilder().WithLatitude(-1.0).WithLongitude(10.0).Build()
 
 		// when
 		distance := domain.Haversine(a, b)
@@ -65,8 +65,8 @@ func Test_Haversine(t *testing.T) {
 
 	t.Run("should match an independent great-circle formula across the antimeridian", func(t *testing.T) {
 		// given
-		a := build_domain.NewTrackPointBuilder().WithLatitude(0.0).WithLongitude(179.9).Build()
-		b := build_domain.NewTrackPointBuilder().WithLatitude(0.0).WithLongitude(-179.9).Build()
+		a := builddomain.NewTrackPointBuilder().WithLatitude(0.0).WithLongitude(179.9).Build()
+		b := builddomain.NewTrackPointBuilder().WithLatitude(0.0).WithLongitude(-179.9).Build()
 
 		// when
 		distance := domain.Haversine(a, b)
@@ -77,8 +77,8 @@ func Test_Haversine(t *testing.T) {
 
 	t.Run("should report a short distance for a narrow antimeridian crossing", func(t *testing.T) {
 		// given: two points only 0.2 degrees apart across the antimeridian
-		a := build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.9).Build()
-		b := build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build()
+		a := builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.9).Build()
+		b := builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build()
 
 		// when
 		distance := domain.Haversine(a, b)
@@ -103,7 +103,7 @@ func Test_TotalDistance(t *testing.T) {
 
 	t.Run("should return zero for a single point", func(t *testing.T) {
 		// given
-		points := []domain.TrackPoint{build_domain.NewTrackPointBuilder().Build()}
+		points := []domain.TrackPoint{builddomain.NewTrackPointBuilder().Build()}
 
 		// when
 		distance := domain.TotalDistance(points)
@@ -115,9 +115,9 @@ func Test_TotalDistance(t *testing.T) {
 	t.Run("should sum the distance of every consecutive segment, including one crossing the antimeridian", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.8).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.9).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.8).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.9).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build(),
 		}
 		expectedDistance := domain.Haversine(points[0], points[1]) + domain.Haversine(points[1], points[2])
 

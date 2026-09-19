@@ -1,7 +1,7 @@
 package domain
 
-//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_inspector.go . GeoDataInspector
-//go:generate go run go.uber.org/mock/mockgen -destination mock_domain/geo_data_repository.go . GeoDataRepository
+//go:generate go run go.uber.org/mock/mockgen -destination mockdomain/geo_data_inspector.go -package mockdomain . GeoDataInspector
+//go:generate go run go.uber.org/mock/mockgen -destination mockdomain/geo_data_repository.go -package mockdomain . GeoDataRepository
 
 import "time"
 

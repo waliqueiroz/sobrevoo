@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
-	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
+	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother"
 )
 
@@ -21,7 +21,7 @@ func jitteryPoints() []domain.TrackPoint {
 		if i%2 == 0 {
 			lat = -0.0001
 		}
-		points = append(points, build_domain.NewTrackPointBuilder().WithLatitude(lat).WithLongitude(float64(i)*0.001).Build())
+		points = append(points, builddomain.NewTrackPointBuilder().WithLatitude(lat).WithLongitude(float64(i)*0.001).Build())
 	}
 	return points
 }
@@ -42,9 +42,9 @@ func Test_Smoother_Smooth(t *testing.T) {
 		// given
 		catmullRom := smoother.NewCatmullRom()
 		points := []domain.TrackPoint{
-			build_domain.NewTrackPointBuilder().WithLatitude(1).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(2).Build(),
-			build_domain.NewTrackPointBuilder().WithLatitude(3).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(1).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(2).Build(),
+			builddomain.NewTrackPointBuilder().WithLatitude(3).Build(),
 		}
 
 		// when
