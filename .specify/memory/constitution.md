@@ -289,8 +289,9 @@ configuração entre cenários.
 
 Quando a construção de uma entidade ou DTO em teste é repetitiva ou tem
 muitos campos, um builder fluente MUST ser criado em um subpacote
-`build_<nome do pacote>` (por exemplo, `internal/domain/build_domain`,
-`internal/application/build_application`), no formato `NewXBuilder()` com
+`build_<nome do pacote>` (por exemplo, `internal/domain/build_domain`; um
+`internal/application/build_application` só passa a existir quando um
+serviço de aplicação precisar de builder próprio), no formato `NewXBuilder()` com
 defaults sensatos, métodos `WithCampo(...)`/`WithoutCampo()` retornando o
 próprio builder, e um método terminal `Build()`.
 

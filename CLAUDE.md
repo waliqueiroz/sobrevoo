@@ -181,14 +181,16 @@ uso) que a redação anterior da constituição permitia.
 - Nada de testes tabulares (`[]struct{...}` + `for`) — um cenário, um
   `t.Run`, mesmo que isso repita configuração.
 - Test data builders vivem em subpacotes `build_<pacote>`
-  (`internal/domain/build_domain`, `internal/application/build_application`):
+  (hoje só `internal/domain/build_domain` existe; `build_application` só
+  seria criado se um serviço passasse a precisar de builder próprio):
   `NewXBuilder()` com defaults sensatos, `WithCampo(...)`/`WithoutCampo()`
   fluentes, `Build()` terminal. Use um sempre que um literal de struct
   repetido ou grande demais deixaria o teste poluído.
 - Cada camada é testada isolada, com o que ela depende mockado: os testes
   de domain/application mockam as portas do domínio (`mock_domain`); os
   testes de `internal/infra/inbound/cli` mockam
-  `application.InspectTrackService` (`mock_application`) e nunca conectam
+  `application.InspectTrackService` e `application.GeoDataService`
+  (`mock_application`) e nunca conectam
   um serviço ou adapter de saída real. Não existe teste automatizado de
   ponta a ponta — `specs/<feature>/quickstart.md` é o checklist manual, com
   o binário real, pra isso.
