@@ -195,6 +195,16 @@ uso) que a redação anterior da constituição permitia.
   ponta a ponta — `specs/<feature>/quickstart.md` é o checklist manual, com
   o binário real, pra isso.
 
+### Receivers (estilo Go)
+
+O nome do receiver é uma abreviação curta do **tipo**, igual em todos os
+métodos dele: `r` para `GeoDataRepository`, `d` para `DiscardStats`, `b`
+para `BoundingBox` e para os `*Builder`, `s` para os `*Service`
+(`geoDataService`, `inspectTrackService`), `p` para `TrackPoint`. Nunca a
+inicial de outra palavra ou de um nome antigo do tipo (o `s` de `Store`
+sobrou em `GeoDataRepository` depois do rename). Receiver sem uso fica sem
+nome (`func (OS) Exists`).
+
 ### Detalhe do Go 1.26
 
 Este módulo usa Go 1.26, que estendeu o builtin `new` para aceitar uma

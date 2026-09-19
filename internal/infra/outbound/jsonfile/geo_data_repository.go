@@ -25,8 +25,8 @@ func NewGeoDataRepository(path string) *GeoDataRepository {
 
 // Save adds or replaces the registered source with the same Name (FR-001,
 // FR-007).
-func (s *GeoDataRepository) Save(source domain.GeoDataSource) error {
-	sources, err := s.read()
+func (r *GeoDataRepository) Save(source domain.GeoDataSource) error {
+	sources, err := r.read()
 	if err != nil {
 		return err
 	}
@@ -43,14 +43,14 @@ func (s *GeoDataRepository) Save(source domain.GeoDataSource) error {
 		sources = append(sources, source)
 	}
 
-	return s.write(sources)
+	return r.write(sources)
 }
 
 // FindByName looks up a registered source by name. It reports
 // (GeoDataSource{}, false, nil) — not an error — when no source with that
 // name is registered.
-func (s *GeoDataRepository) FindByName(name string) (domain.GeoDataSource, bool, error) {
-	sources, err := s.read()
+func (r *GeoDataRepository) FindByName(name string) (domain.GeoDataSource, bool, error) {
+	sources, err := r.read()
 	if err != nil {
 		return domain.GeoDataSource{}, false, err
 	}
@@ -65,16 +65,16 @@ func (s *GeoDataRepository) FindByName(name string) (domain.GeoDataSource, bool,
 }
 
 // List returns every registered source (FR-009).
-func (s *GeoDataRepository) List() ([]domain.GeoDataSource, error) {
-	return s.read()
+func (r *GeoDataRepository) List() ([]domain.GeoDataSource, error) {
+	return r.read()
 }
 
 // Delete removes the registered source with the given name. It never
 // touches the underlying data file on disk (FR-011). Deleting a name that
 // is not registered is a no-op — callers (the application service) are
 // responsible for reporting domain.ErrDataSourceNotRegistered beforehand.
-func (s *GeoDataRepository) Delete(name string) error {
-	sources, err := s.read()
+func (r *GeoDataRepository) Delete(name string) error {
+	sources, err := r.read()
 	if err != nil {
 		return err
 	}
@@ -86,13 +86,13 @@ func (s *GeoDataRepository) Delete(name string) error {
 		}
 	}
 
-	return s.write(filtered)
+	return r.write(filtered)
 }
 
 // read loads the registry file's content. A missing file (e.g. the very
 // first run) is treated as an empty registry, not an error.
-func (s *GeoDataRepository) read() ([]domain.GeoDataSource, error) {
-	data, err := os.ReadFile(s.path)
+func (r *GeoDataRepository) read() ([]domain.GeoDataSource, error) {
+	data, err := os.ReadFile(r.path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -116,8 +116,8 @@ func (s *GeoDataRepository) read() ([]domain.GeoDataSource, error) {
 // same directory and then renames it over the registry file, so a process
 // interrupted mid-write never leaves a corrupted registry behind
 // (research.md item 5).
-func (s *GeoDataRepository) write(sources []domain.GeoDataSource) error {
-	dir := filepath.Dir(s.path)
+func (r *GeoDataRepository) write(sources []domain.GeoDataSource) error {
+	dir := filepath.Dir(r.path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating registry directory: %w", err)
 	}
@@ -143,7 +143,7 @@ func (s *GeoDataRepository) write(sources []domain.GeoDataSource) error {
 		return fmt.Errorf("closing temporary registry file: %w", err)
 	}
 
-	if err := os.Rename(tmpPath, s.path); err != nil {
+	if err := os.Rename(tmpPath, r.path); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("promoting temporary registry file: %w", err)
 	}

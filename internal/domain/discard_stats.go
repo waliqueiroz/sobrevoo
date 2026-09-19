@@ -9,6 +9,6 @@ type DiscardStats struct {
 }
 
 // Total returns the sum of all discarded points, regardless of reason.
-func (s DiscardStats) Total() int {
-	return s.ImpossibleCoordinates + s.ConsecutiveDuplicates + s.ImplausibleJumps
+func (d DiscardStats) Total() int {
+	return d.ImpossibleCoordinates + d.ConsecutiveDuplicates + d.ImplausibleJumps
 }
