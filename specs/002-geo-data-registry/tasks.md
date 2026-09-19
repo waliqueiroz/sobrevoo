@@ -86,16 +86,17 @@ estendido ao longo de todas elas.
 > histórico do que foi feito na época.
 >
 > Uma sexta rodada aplicou o padrão de nomes de adapters do
-> `mystery-gifter-api`: T008 virou `jsonfile.NewGeoDataRepository(path)`
-> (arquivo `geo_data_repository.go`, struct `GeoDataRepository`, antes
-> `jsonfile.New` e `Store`), e os adapters da etapa 1 viraram
-> `simplifier.NewDouglasPeuckerSimplifier()` e
-> `smoother.NewCatmullRomSmoother()`, sem os subpacotes `douglaspeucker/`
-> e `catmullrom/` — ver `research.md` item 18 e a constituição 1.3.0
-> (Princípio IX). Chamadas como `jsonfile.New(...)` em T023 são o registro
-> histórico. O mesmo vale para `geodatainspector.New()`/`filechecker.New()`
-> (hoje `NewGeoDataInspector()`/`NewOSFileChecker()`) e para os nomes de
-> arquivo `filechecker.go`/`geodatainspector.go`/`gpx.go`.
+> `mystery-gifter-api`, depois refinado para o estilo Go (`research.md`
+> itens 18 e 19; constituição 1.3.1, Princípio IX): T008 virou
+> `jsonfile.NewGeoDataRepository(path)` (arquivo `geo_data_repository.go`,
+> struct `GeoDataRepository`, antes `jsonfile.New` e `Store`); os adapters da
+> etapa 1 viraram `simplifier.NewDouglasPeucker()` e
+> `smoother.NewCatmullRom()`, sem os subpacotes `douglaspeucker/` e
+> `catmullrom/`; `trackparser.NewGPX()`; `filechecker.NewOS()`; e
+> `geodatainspector.New()` devolve `Inspector`. Chamadas como
+> `jsonfile.New(...)`, `filechecker.New()` e os nomes de arquivo
+> `filechecker.go`/`geodatainspector.go`/`gpx.go` nas tarefas T008, T016,
+> T023, T032 e T017 (etapa 1) são o registro histórico.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 

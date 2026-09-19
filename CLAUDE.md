@@ -114,13 +114,19 @@ uso) que a redação anterior da constituição permitia.
   no `mystery-gifter-api`), o construtor é nomeado pela **porta**
   (`jsonfile.NewGeoDataRepository(path)`, arquivo `geo_data_repository.go`).
   Se o pacote agrupa **estratégias/algoritmos** de uma única porta, o pacote
-  leva o nome da porta (`simplifier`, `smoother`, como `security`/`identity`
-  lá) e o construtor nomeia a estratégia
-  (`simplifier.NewDouglasPeuckerSimplifier()`, arquivo
-  `douglas_peucker_simplifier.go`). Nada de subpacote por algoritmo só para
-  chamar `algoritmo.New()`. Diferente do `mystery-gifter-api`, o construtor
-  pode devolver o struct concreto do adapter (não precisa devolver a
-  interface do domínio).
+  leva o nome da porta (`simplifier`, `smoother`, `trackparser`,
+  `filechecker`) e o tipo/construtor nomeiam só a estratégia, sem repetir o
+  pacote (`simplifier.NewDouglasPeucker()`, `smoother.NewCatmullRom()`,
+  `trackparser.NewGPX()`, `filechecker.NewOS()`); o arquivo leva o nome
+  completo (`douglas_peucker_simplifier.go`). Pacote com uma implementação
+  só e sem estratégia distinguível usa `New()` (`geodatainspector.New()` →
+  `Inspector`). Estilo Go: nome exportado nunca repete o nome do pacote
+  (nada de `geodatainspector.GeoDataInspector`). Nada de subpacote por
+  algoritmo só para chamar `algoritmo.New()`. Diferente do
+  `mystery-gifter-api`, o construtor pode devolver o struct concreto do
+  adapter (não precisa devolver a interface do domínio). Desvio conhecido:
+  os pacotes `mock_<pacote>`/`build_<pacote>` têm underscore, a rever depois
+  do merge da feature 002.
 - Num arquivo de domínio que declara uma porta, a ordem é: `package`,
   diretiva `//go:generate` (logo após o `package`), imports, **a interface
   logo no início**, e só depois a entidade, os enums e os construtores —

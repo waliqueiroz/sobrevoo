@@ -23,7 +23,7 @@ func (erroringReader) Read([]byte) (int, error) {
 func Test_GPXParser_Parse(t *testing.T) {
 	t.Run("should parse a valid GPX with altitude and time in every point", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := strings.NewReader(helper.ValidGPXWithAltitudeAndTime())
 
 		// when
@@ -43,7 +43,7 @@ func Test_GPXParser_Parse(t *testing.T) {
 
 	t.Run("should parse a valid GPX without altitude", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := strings.NewReader(helper.ValidGPXWithoutAltitude())
 
 		// when
@@ -60,7 +60,7 @@ func Test_GPXParser_Parse(t *testing.T) {
 
 	t.Run("should parse a valid GPX without time", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := strings.NewReader(helper.ValidGPXWithoutTime())
 
 		// when
@@ -77,7 +77,7 @@ func Test_GPXParser_Parse(t *testing.T) {
 
 	t.Run("should return ErrEmptyFile for empty content", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := strings.NewReader(helper.EmptyContent())
 
 		// when
@@ -89,7 +89,7 @@ func Test_GPXParser_Parse(t *testing.T) {
 
 	t.Run("should return ErrUnsupportedFormat for content that is not GPX", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := strings.NewReader(helper.NonGPXContent())
 
 		// when
@@ -101,7 +101,7 @@ func Test_GPXParser_Parse(t *testing.T) {
 
 	t.Run("should return a distinct error for recognized but malformed GPX content", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := strings.NewReader(helper.MalformedGPX())
 
 		// when
@@ -115,7 +115,7 @@ func Test_GPXParser_Parse(t *testing.T) {
 
 	t.Run("should propagate a read error from the underlying reader", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := erroringReader{}
 
 		// when
@@ -129,7 +129,7 @@ func Test_GPXParser_Parse(t *testing.T) {
 
 	t.Run("should not reject a single point itself, leaving that to the service layer", func(t *testing.T) {
 		// given
-		parser := trackparser.NewGPXParser()
+		parser := trackparser.NewGPX()
 		content := strings.NewReader(helper.GPXWithSinglePoint())
 
 		// when

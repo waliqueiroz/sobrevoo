@@ -570,3 +570,28 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   (rejeitada — trata algoritmo como tecnologia); devolver a interface do
   domínio nos construtores, como o repositório de referência (rejeitada
   pelo usuário — o struct concreto já era o padrão do projeto).
+
+## 19. Nomes de adapters no estilo Go: sem repetir o nome do pacote
+
+- **Decisão**: refina o item 18 para seguir o estilo Go (Effective Go / Code
+  Review Comments — nome exportado não repete o nome do pacote). Tipos e
+  construtores agora nomeiam só a estratégia:
+  `simplifier.NewDouglasPeucker()` (tipo `DouglasPeucker`),
+  `smoother.NewCatmullRom()` (`CatmullRom`), `trackparser.NewGPX()` (`GPX`)
+  e `filechecker.NewOS()` (`OS`). `geodatainspector`, que tem uma só
+  implementação e nenhuma estratégia distinguível, usa `geodatainspector.New()`
+  devolvendo `Inspector` (antes `GeoDataInspector`, que repetia o pacote).
+  Os nomes de arquivo continuam completos (`douglas_peucker_simplifier.go`,
+  `os_file_checker.go`, `geo_data_inspector.go`, `gpx_parser.go`). Valem os
+  nomes deste item onde o item 18 cita `NewDouglasPeuckerSimplifier`,
+  `NewCatmullRomSmoother`, `NewGPXParser`, `NewOSFileChecker` ou
+  `NewGeoDataInspector`.
+- **Racional**: pergunta do usuário sobre se o padrão infringia convenções
+  do Go. O `revive`/`golint` sinalizam `geodatainspector.GeoDataInspector`
+  (stutter), e `DouglasPeuckerSimplifier` em `simplifier` repetia a palavra
+  no fim; o pacote já dá o contexto ("simplifier.DouglasPeucker" lê melhor
+  que "simplifier.DouglasPeuckerSimplifier").
+- **Não incluído**: os underscores em `mock_<pacote>`/`build_<pacote>`
+  (também fora do estilo Go) ficam para depois do merge da PR, para ela não
+  crescer demais; a constituição registra isso como desvio conhecido.
+

@@ -163,13 +163,13 @@ internal/
     │   ├── config/
     │   │   └── config.go                         # (estendido) + RegistryPath, resolvido via os.UserHomeDir() (~/.sobrevoo)
     │   ├── geodatainspector/
-    │   │   ├── geo_data_inspector.go              # (novo) adapter GeoDataInspector (NewGeoDataInspector): identifica o formato pela assinatura do arquivo e delega
+    │   │   ├── geo_data_inspector.go              # (novo) adapter GeoDataInspector (New → Inspector): identifica o formato pela assinatura do arquivo e delega
     │   │   ├── mbtiles.go                         # (novo) leitura de tipo/área de um MBTiles (mapa base) via modernc.org/sqlite
     │   │   └── geotiff.go                         # (novo) leitura de tipo/área de um GeoTIFF (relevo) via parser de tags próprio
     │   ├── jsonfile/
     │   │   └── geo_data_repository.go             # (novo) adapter GeoDataRepository (NewGeoDataRepository): registro persistido em JSON, escrita atômica
     │   └── filechecker/
-    │       └── os_file_checker.go                 # (novo) adapter FileChecker (NewOSFileChecker) via os.Stat
+    │       └── os_file_checker.go                 # (novo) adapter FileChecker (NewOS) via os.Stat
     │
     └── inbound/
         └── cli/

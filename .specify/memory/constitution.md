@@ -1,8 +1,19 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.2.1 → 1.3.0
-Rationale: MINOR — adds to Principle IX the naming/organization rule for
+Version change: 1.3.0 → 1.3.1
+Rationale: PATCH — refines the adapter naming rule added in 1.3.0 so it
+follows Go style (Effective Go / Code Review Comments): exported names MUST
+NOT repeat the package name. Strategy adapters therefore name the type and
+constructor after the strategy only (simplifier.NewDouglasPeucker,
+smoother.NewCatmullRom, trackparser.NewGPX, filechecker.NewOS); a package
+with a single implementation and no distinguishing strategy uses
+New()/Inspector (geodatainspector.New). File names keep the full
+strategy+port name. Also records, in the Stack section, that Go conventions
+apply and lists the one known deviation (underscores in the mock_<pkg> and
+build_<pkg> package names, to be reviewed after the PR merge).
+
+Previous amendment (1.2.1 → 1.3.0, MINOR): adds to Principle IX the naming/organization rule for
 outbound adapters (internal/infra/outbound), learned from
 waliqueiroz/mystery-gifter-api (outgoing/postgres, security, identity):
 a technology package (postgres, jsonfile) can serve several ports, so the
@@ -225,12 +236,18 @@ construtor levam o nome da **porta** que implementam (`geo_data_repository.go`,
 `NewGeoDataRepository(...)`). Quando as implementações são **estratégias
 alternativas de uma única porta** (algoritmos, como Douglas-Peucker e
 Catmull-Rom), o pacote leva o nome da porta ou categoria (`simplifier`,
-`smoother`, como `security` e `identity` lá), e o arquivo, o tipo e o
-construtor nomeiam a **estratégia** (`douglas_peucker_simplifier.go`,
-`NewDouglasPeuckerSimplifier()`) — é PROIBIDO criar um subpacote por
-algoritmo só para poder chamar `algoritmo.New()`. Um construtor de adapter
-PODE devolver o struct concreto do adapter; não precisa devolver a interface
-do domínio.
+`smoother`, como `security` e `identity` lá), e o tipo e o construtor nomeiam
+apenas a **estratégia** (`simplifier.DouglasPeucker`,
+`simplifier.NewDouglasPeucker()`, `trackparser.NewGPX()`,
+`filechecker.NewOS()`), enquanto o arquivo leva o nome completo, estratégia
+mais porta (`douglas_peucker_simplifier.go`). Um pacote com uma única
+implementação e sem estratégia distinguível usa `New()` e um tipo curto
+(`geodatainspector.New()` devolvendo `Inspector`). Nomes exportados NÃO
+repetem o nome do pacote (`geodatainspector.GeoDataInspector` e
+`simplifier.DouglasPeuckerSimplifier` são proibidos), e é PROIBIDO criar um
+subpacote por algoritmo só para poder chamar `algoritmo.New()`. Um
+construtor de adapter PODE devolver o struct concreto do adapter; não
+precisa devolver a interface do domínio.
 
 Mocks de qualquer interface — porta de domínio ou serviço de aplicação —
 MUST ser gerados com `go.uber.org/mock/mockgen`, via diretiva `//go:generate`
@@ -295,7 +312,13 @@ que o Princípio VI já exige do núcleo, estendida para os adapters.
 
 ## Stack Tecnológica e Idioma dos Artefatos
 
-Sobrevoo é implementado em Go, como projeto pessoal e open source.
+Sobrevoo é implementado em Go, como projeto pessoal e open source. O código
+segue as convenções da comunidade Go (Effective Go e Code Review Comments),
+em especial nomes exportados que não repetem o nome do pacote. Desvio
+conhecido e temporário: os subpacotes `mock_<pacote>` e `build_<pacote>`
+(Princípios IX e X) usam underscore no nome do pacote, o que o estilo Go
+desaconselha; a revisão desses nomes está adiada para depois do merge da
+feature 002.
 
 Todos os artefatos de especificação do fluxo Spec Kit — `spec.md`, `plan.md`,
 `tasks.md`, `research.md`, checklists, e qualquer documento gerado por esse fluxo
@@ -350,4 +373,4 @@ antes do início da implementação. Qualquer desvio MUST ser justificado
 explicitamente na seção de Complexity Tracking do plano, ou o desvio MUST ser
 eliminado.
 
-**Version**: 1.3.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19
+**Version**: 1.3.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19

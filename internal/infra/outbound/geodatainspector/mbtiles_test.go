@@ -23,7 +23,7 @@ func Test_Inspector_Inspect_MBTiles(t *testing.T) {
 	t.Run("should identify a valid MBTiles file as a base map with the bounds from its metadata table", func(t *testing.T) {
 		// given
 		path := writeFixture(t, "valid.mbtiles", helper.ValidMBTiles())
-		inspector := geodatainspector.NewGeoDataInspector()
+		inspector := geodatainspector.New()
 
 		// when
 		result, err := inspector.Inspect(path)
@@ -41,7 +41,7 @@ func Test_Inspector_Inspect_MBTiles(t *testing.T) {
 	t.Run("should reject a SQLite file without a bounds entry as an unsupported format", func(t *testing.T) {
 		// given
 		path := writeFixture(t, "no-bounds.mbtiles", helper.MBTilesWithoutBounds())
-		inspector := geodatainspector.NewGeoDataInspector()
+		inspector := geodatainspector.New()
 
 		// when
 		_, err := inspector.Inspect(path)

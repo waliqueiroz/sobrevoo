@@ -12,20 +12,20 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// GPXParser implements domain.TrackParser for the GPX format (FR-002,
+// GPX implements domain.TrackParser for the GPX format (FR-002,
 // FR-003, FR-004). It validates the content before delegating the actual
 // parsing to github.com/tkrajina/gpxgo, so a clear domain.ErrUnsupportedFormat
 // is returned for non-GPX content instead of a raw library error.
-type GPXParser struct{}
+type GPX struct{}
 
-// NewGPXParser creates a GPXParser.
-func NewGPXParser() GPXParser {
-	return GPXParser{}
+// NewGPX creates a GPX parser.
+func NewGPX() GPX {
+	return GPX{}
 }
 
 // Parse reads r fully, confirms its root XML element is "gpx", and delegates
 // to gpxgo for the actual parsing.
-func (GPXParser) Parse(r io.Reader) (domain.Track, error) {
+func (GPX) Parse(r io.Reader) (domain.Track, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return domain.Track{}, fmt.Errorf("reading track content: %w", err)

@@ -30,14 +30,14 @@ func run() int {
 		return 4
 	}
 
-	parser := trackparser.NewGPXParser()
-	douglasPeucker := simplifier.NewDouglasPeuckerSimplifier()
-	catmullRom := smoother.NewCatmullRomSmoother()
+	parser := trackparser.NewGPX()
+	douglasPeucker := simplifier.NewDouglasPeucker()
+	catmullRom := smoother.NewCatmullRom()
 	inspectTrackService := application.NewInspectTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
-	geoDataInspector := geodatainspector.NewGeoDataInspector()
+	geoDataInspector := geodatainspector.New()
 	geoDataRepository := jsonfile.NewGeoDataRepository(cfg.RegistryPath)
-	geoDataFileChecker := filechecker.NewOSFileChecker()
+	geoDataFileChecker := filechecker.NewOS()
 	geoDataService := application.NewGeoDataService(geoDataRepository, geoDataInspector, geoDataFileChecker, parser, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
 	geoDataCommand := cli.NewGeoDataCommand()
