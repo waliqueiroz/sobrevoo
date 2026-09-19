@@ -65,7 +65,8 @@ adapter.
   — só decide qual porta/função de domínio chamar, e em qual ordem.
 - **`internal/infra/outbound/*`** — adapters que implementam as portas do
   domínio: `trackparser` (GPX via `tkrajina/gpxgo`),
-  `simplifier/douglaspeucker`, `smoother/catmullrom`, `config` (limiares
+  `simplifier` (Douglas-Peucker), `smoother` (Catmull-Rom), `jsonfile`
+  (registro de dados geográficos), `config` (limiares
   internos fixos: mínimo de pontos, velocidade máxima plausível, nível
   padrão — ainda sem fonte de configuração externa, mas o ponto de extensão
   já existe, conforme o Princípio VIII da constituição).
@@ -108,6 +109,18 @@ uso) que a redação anterior da constituição permitia.
   de persistência é `XRepository` (nunca `XRegistry`, `XStore`, ou
   similar), com o campo correspondente na struct do serviço seguindo o
   mesmo nome (`xRepository domain.XRepository`) — ex.: `GeoDataRepository`.
+- Adapters de saída (`internal/infra/outbound`): se o pacote é uma
+  **tecnologia** que pode servir várias portas (`jsonfile`, como `postgres`
+  no `mystery-gifter-api`), o construtor é nomeado pela **porta**
+  (`jsonfile.NewGeoDataRepository(path)`, arquivo `geo_data_repository.go`).
+  Se o pacote agrupa **estratégias/algoritmos** de uma única porta, o pacote
+  leva o nome da porta (`simplifier`, `smoother`, como `security`/`identity`
+  lá) e o construtor nomeia a estratégia
+  (`simplifier.NewDouglasPeuckerSimplifier()`, arquivo
+  `douglas_peucker_simplifier.go`). Nada de subpacote por algoritmo só para
+  chamar `algoritmo.New()`. Diferente do `mystery-gifter-api`, o construtor
+  pode devolver o struct concreto do adapter (não precisa devolver a
+  interface do domínio).
 - Num arquivo de domínio que declara uma porta, a ordem é: `package`,
   diretiva `//go:generate` (logo após o `package`), imports, **a interface
   logo no início**, e só depois a entidade, os enums e os construtores —

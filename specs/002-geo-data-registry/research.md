@@ -526,7 +526,40 @@ etapas (câmera, renderização, vídeo) não repitam o mesmo engano.
   original, superada — a pasta de categoria só se justificaria se já
   houvesse uma segunda implementação da porta, ex.: `geodatastore/sqlite`,
   o que não existe; se aparecer, `sqlite` entra como irmão de `jsonfile`
-  em `outbound/`, sem precisar de agrupador). Não foram tocados
-  `simplifier/douglaspeucker` e `smoother/catmullrom` (etapa 1), que têm o
-  mesmo formato de pasta de categoria — ficam para uma decisão separada.
+  em `outbound/`, sem precisar de agrupador). `simplifier/douglaspeucker` e
+  `smoother/catmullrom` (etapa 1), que tinham o mesmo formato, foram
+  tratados no item 18.
 
+## 18. Nomes de adapters de saída: pacote por tecnologia ou por categoria
+
+- **Decisão**: dois casos, seguindo `waliqueiroz/mystery-gifter-api`.
+  (1) Pacote de **tecnologia** que pode servir várias portas: pacote com o
+  nome da tecnologia, arquivo e construtor com o nome da **porta** —
+  `jsonfile.NewGeoDataRepository(path)` em `jsonfile/geo_data_repository.go`
+  (o struct `Store` virou `GeoDataRepository`), análogo a
+  `postgres.NewGroupRepository`. (2) Pacote que agrupa **estratégias
+  alternativas** de uma porta: pacote com o nome da porta, arquivo/tipo/
+  construtor com o nome da **estratégia** —
+  `simplifier.NewDouglasPeuckerSimplifier()` em
+  `simplifier/douglas_peucker_simplifier.go` e
+  `smoother.NewCatmullRomSmoother()` em `smoother/catmull_rom_smoother.go`,
+  análogo a `security.NewBcryptPasswordManager` e
+  `identity.NewUUIDIdentityGenerator`. Os subpacotes `douglaspeucker/` e
+  `catmullrom/` deixaram de existir; `trackparser.NewGPXParser()` já seguia
+  o caso (2). **Diferença deliberada** do repositório de referência: os
+  construtores devolvem o struct concreto do adapter (exportado), não a
+  interface do domínio — o `main.go` (composition root) e os serviços
+  continuam recebendo-os pela interface do domínio, por atribuição.
+- **Racional**: pergunta do usuário sobre `geodatastore` e depois sobre os
+  dois adapters da etapa 1. Douglas-Peucker e Catmull-Rom são *algoritmos*
+  (estratégias de uma única porta cada), não tecnologias; o subpacote por
+  algoritmo só existia para permitir `algoritmo.New()`, o que o nome do
+  pacote de categoria + construtor nomeado pela estratégia resolve sem a
+  pasta extra. `jsonfile`, ao contrário, é uma tecnologia de persistência,
+  como `postgres`.
+- **Alternativas consideradas**: manter `simplifier/douglaspeucker` e
+  `smoother/catmullrom` (decisão original, superada — pasta extra sem
+  ganho); achatar para `outbound/douglaspeucker` e `outbound/catmullrom`
+  (rejeitada — trata algoritmo como tecnologia); devolver a interface do
+  domínio nos construtores, como o repositório de referência (rejeitada
+  pelo usuário — o struct concreto já era o padrão do projeto).

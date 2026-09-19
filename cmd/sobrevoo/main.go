@@ -14,8 +14,8 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/filechecker"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/geodatainspector"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/jsonfile"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier/douglaspeucker"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother/catmullrom"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/trackparser"
 )
 
@@ -31,12 +31,12 @@ func run() int {
 	}
 
 	parser := trackparser.NewGPXParser()
-	simplifier := douglaspeucker.New()
-	smoother := catmullrom.New()
-	inspectTrackService := application.NewInspectTrackService(parser, simplifier, smoother, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+	douglasPeucker := simplifier.NewDouglasPeuckerSimplifier()
+	catmullRom := smoother.NewCatmullRomSmoother()
+	inspectTrackService := application.NewInspectTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
 	geoDataInspector := geodatainspector.New()
-	geoDataRepository := jsonfile.New(cfg.RegistryPath)
+	geoDataRepository := jsonfile.NewGeoDataRepository(cfg.RegistryPath)
 	geoDataFileChecker := filechecker.New()
 	geoDataService := application.NewGeoDataService(geoDataRepository, geoDataInspector, geoDataFileChecker, parser, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 

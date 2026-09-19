@@ -1,6 +1,7 @@
-// Package douglaspeucker implements the domain.Simplifier port using the
-// Douglas-Peucker line simplification algorithm.
-package douglaspeucker
+// Package simplifier holds the adapters that implement the
+// domain.Simplifier port. DouglasPeuckerSimplifier uses the Douglas-Peucker
+// line simplification algorithm.
+package simplifier
 
 import (
 	"math"
@@ -8,24 +9,24 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// Simplifier implements domain.Simplifier via the Douglas-Peucker
+// DouglasPeuckerSimplifier implements domain.Simplifier via the Douglas-Peucker
 // algorithm. Latitude/longitude are treated as plane coordinates when
 // measuring perpendicular distance — an approximation that is accurate
 // enough for reducing point density on the small scale of an individual
 // activity's track, and keeps the algorithm simple to implement and test
 // directly (research.md item 4).
-type Simplifier struct{}
+type DouglasPeuckerSimplifier struct{}
 
-// New creates a Simplifier.
-func New() Simplifier {
-	return Simplifier{}
+// NewDouglasPeuckerSimplifier creates a DouglasPeuckerSimplifier.
+func NewDouglasPeuckerSimplifier() DouglasPeuckerSimplifier {
+	return DouglasPeuckerSimplifier{}
 }
 
 // Simplify removes points that lie within level's tolerance of the
 // straight line connecting their neighbors, recursively, while always
 // keeping the first and last point (FR-012, FR-014). Points that are kept
 // retain their original Elevation/Time untouched.
-func (Simplifier) Simplify(points []domain.TrackPoint, level domain.Level) []domain.TrackPoint {
+func (DouglasPeuckerSimplifier) Simplify(points []domain.TrackPoint, level domain.Level) []domain.TrackPoint {
 	if len(points) < 3 {
 		return points
 	}

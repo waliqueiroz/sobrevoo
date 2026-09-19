@@ -84,6 +84,16 @@ estendido ao longo de todas elas.
 > `internal/infra/outbound/jsonfile` — ver `research.md` item 17. Os
 > caminhos antigos nas tarefas T002/T008/T062/T065 abaixo são o registro
 > histórico do que foi feito na época.
+>
+> Uma sexta rodada aplicou o padrão de nomes de adapters do
+> `mystery-gifter-api`: T008 virou `jsonfile.NewGeoDataRepository(path)`
+> (arquivo `geo_data_repository.go`, struct `GeoDataRepository`, antes
+> `jsonfile.New` e `Store`), e os adapters da etapa 1 viraram
+> `simplifier.NewDouglasPeuckerSimplifier()` e
+> `smoother.NewCatmullRomSmoother()`, sem os subpacotes `douglaspeucker/`
+> e `catmullrom/` — ver `research.md` item 18 e a constituição 1.3.0
+> (Princípio IX). Chamadas como `jsonfile.New(...)` em T023 são o registro
+> histórico.
 
 ## Formato: `[ID] [P?] [Story] Descrição`
 

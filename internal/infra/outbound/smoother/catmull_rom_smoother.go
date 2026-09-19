@@ -1,26 +1,27 @@
-// Package catmullrom implements the domain.Smoother port using a
-// Catmull-Rom spline as the reference "smooth" position for each point.
-package catmullrom
+// Package smoother holds the adapters that implement the domain.Smoother
+// port. CatmullRomSmoother uses a Catmull-Rom spline as the reference
+// "smooth" position for each point.
+package smoother
 
 import "github.com/waliqueiroz/sobrevoo/internal/domain"
 
-// Smoother implements domain.Smoother. For each interior point, it computes
+// CatmullRomSmoother implements domain.Smoother. For each interior point, it computes
 // a reference position from a Catmull-Rom spline through its neighbors, and
 // blends the point toward that reference by an amount controlled by level
 // — this reduces point-to-point jitter (FR-013) without discarding any
 // point or touching its Elevation/Time (that stays Simplifier's and the
 // discard functions' job). The first and last point are never touched,
 // since they have no neighbor on one side to smooth against.
-type Smoother struct{}
+type CatmullRomSmoother struct{}
 
-// New creates a Smoother.
-func New() Smoother {
-	return Smoother{}
+// NewCatmullRomSmoother creates a CatmullRomSmoother.
+func NewCatmullRomSmoother() CatmullRomSmoother {
+	return CatmullRomSmoother{}
 }
 
 // Smooth returns a new slice of points with the same length as points; only
 // Latitude/Longitude may change (FR-013, FR-015).
-func (Smoother) Smooth(points []domain.TrackPoint, level domain.Level) []domain.TrackPoint {
+func (CatmullRomSmoother) Smooth(points []domain.TrackPoint, level domain.Level) []domain.TrackPoint {
 	if len(points) < 4 {
 		// Not enough neighbors on both sides to compute a meaningful
 		// Catmull-Rom reference; leave the route as it is.

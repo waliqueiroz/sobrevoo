@@ -11,20 +11,21 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// Store implements domain.GeoDataRepository, persisting registered sources as
-// a single JSON file at Path.
-type Store struct {
+// GeoDataRepository implements domain.GeoDataRepository, persisting
+// registered sources as a single JSON file at Path.
+type GeoDataRepository struct {
 	path string
 }
 
-// New creates a Store that persists the registry at path.
-func New(path string) *Store {
-	return &Store{path: path}
+// NewGeoDataRepository creates a GeoDataRepository that persists the
+// registry at path.
+func NewGeoDataRepository(path string) *GeoDataRepository {
+	return &GeoDataRepository{path: path}
 }
 
 // Save adds or replaces the registered source with the same Name (FR-001,
 // FR-007).
-func (s *Store) Save(source domain.GeoDataSource) error {
+func (s *GeoDataRepository) Save(source domain.GeoDataSource) error {
 	sources, err := s.read()
 	if err != nil {
 		return err
@@ -48,7 +49,7 @@ func (s *Store) Save(source domain.GeoDataSource) error {
 // FindByName looks up a registered source by name. It reports
 // (GeoDataSource{}, false, nil) — not an error — when no source with that
 // name is registered.
-func (s *Store) FindByName(name string) (domain.GeoDataSource, bool, error) {
+func (s *GeoDataRepository) FindByName(name string) (domain.GeoDataSource, bool, error) {
 	sources, err := s.read()
 	if err != nil {
 		return domain.GeoDataSource{}, false, err
@@ -64,7 +65,7 @@ func (s *Store) FindByName(name string) (domain.GeoDataSource, bool, error) {
 }
 
 // List returns every registered source (FR-009).
-func (s *Store) List() ([]domain.GeoDataSource, error) {
+func (s *GeoDataRepository) List() ([]domain.GeoDataSource, error) {
 	return s.read()
 }
 
@@ -72,7 +73,7 @@ func (s *Store) List() ([]domain.GeoDataSource, error) {
 // touches the underlying data file on disk (FR-011). Deleting a name that
 // is not registered is a no-op — callers (the application service) are
 // responsible for reporting domain.ErrDataSourceNotRegistered beforehand.
-func (s *Store) Delete(name string) error {
+func (s *GeoDataRepository) Delete(name string) error {
 	sources, err := s.read()
 	if err != nil {
 		return err
@@ -90,7 +91,7 @@ func (s *Store) Delete(name string) error {
 
 // read loads the registry file's content. A missing file (e.g. the very
 // first run) is treated as an empty registry, not an error.
-func (s *Store) read() ([]domain.GeoDataSource, error) {
+func (s *GeoDataRepository) read() ([]domain.GeoDataSource, error) {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -115,7 +116,7 @@ func (s *Store) read() ([]domain.GeoDataSource, error) {
 // same directory and then renames it over the registry file, so a process
 // interrupted mid-write never leaves a corrupted registry behind
 // (research.md item 5).
-func (s *Store) write(sources []domain.GeoDataSource) error {
+func (s *GeoDataRepository) write(sources []domain.GeoDataSource) error {
 	dir := filepath.Dir(s.path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("creating registry directory: %w", err)

@@ -138,9 +138,9 @@ internal/
     │   ├── trackparser/
     │   │   └── gpx.go                       # adapter TrackParser: valida conteúdo GPX e delega a tkrajina/gpxgo
     │   ├── simplifier/
-    │   │   └── douglaspeucker/douglaspeucker.go  # adapter Simplifier
+    │   │   └── douglas_peucker_simplifier.go  # adapter Simplifier (NewDouglasPeuckerSimplifier)
     │   └── smoother/
-    │       └── catmullrom/catmullrom.go     # adapter Smoother
+    │       └── catmull_rom_smoother.go      # adapter Smoother (NewCatmullRomSmoother)
     │
     └── inbound/
         └── cli/

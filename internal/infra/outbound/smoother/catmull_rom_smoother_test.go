@@ -1,4 +1,4 @@
-package catmullrom_test
+package smoother_test
 
 import (
 	"math"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 	"github.com/waliqueiroz/sobrevoo/internal/domain/build_domain"
-	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother/catmullrom"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother"
 )
 
 // jitteryPoints builds points along a straight line whose latitude
@@ -40,7 +40,7 @@ func jitter(points []domain.TrackPoint) float64 {
 func Test_Smoother_Smooth(t *testing.T) {
 	t.Run("should return fewer than four points unchanged", func(t *testing.T) {
 		// given
-		smoother := catmullrom.New()
+		catmullRom := smoother.NewCatmullRomSmoother()
 		points := []domain.TrackPoint{
 			build_domain.NewTrackPointBuilder().WithLatitude(1).Build(),
 			build_domain.NewTrackPointBuilder().WithLatitude(2).Build(),
@@ -48,7 +48,7 @@ func Test_Smoother_Smooth(t *testing.T) {
 		}
 
 		// when
-		result := smoother.Smooth(points, domain.LevelHigh)
+		result := catmullRom.Smooth(points, domain.LevelHigh)
 
 		// then
 		assert.Equal(t, points, result)
@@ -56,11 +56,11 @@ func Test_Smoother_Smooth(t *testing.T) {
 
 	t.Run("should never change the first and last point", func(t *testing.T) {
 		// given
-		smoother := catmullrom.New()
+		catmullRom := smoother.NewCatmullRomSmoother()
 		points := jitteryPoints()
 
 		// when
-		result := smoother.Smooth(points, domain.LevelHigh)
+		result := catmullRom.Smooth(points, domain.LevelHigh)
 
 		// then
 		assert.Equal(t, points[0], result[0])
@@ -69,14 +69,14 @@ func Test_Smoother_Smooth(t *testing.T) {
 
 	t.Run("should never change elevation", func(t *testing.T) {
 		// given
-		smoother := catmullrom.New()
+		catmullRom := smoother.NewCatmullRomSmoother()
 		points := jitteryPoints()
 		for i := range points {
 			points[i].Elevation = new(float64(i))
 		}
 
 		// when
-		result := smoother.Smooth(points, domain.LevelHigh)
+		result := catmullRom.Smooth(points, domain.LevelHigh)
 
 		// then
 		require.Len(t, result, len(points))
@@ -88,11 +88,11 @@ func Test_Smoother_Smooth(t *testing.T) {
 
 	t.Run("should reduce jitter compared to the original route", func(t *testing.T) {
 		// given
-		smoother := catmullrom.New()
+		catmullRom := smoother.NewCatmullRomSmoother()
 		points := jitteryPoints()
 
 		// when
-		smoothed := smoother.Smooth(points, domain.LevelLow)
+		smoothed := catmullRom.Smooth(points, domain.LevelLow)
 
 		// then
 		assert.Greater(t, jitter(points), jitter(smoothed))
@@ -100,12 +100,12 @@ func Test_Smoother_Smooth(t *testing.T) {
 
 	t.Run("should reduce jitter further at the medium level than at the low level (SC-007)", func(t *testing.T) {
 		// given
-		smoother := catmullrom.New()
+		catmullRom := smoother.NewCatmullRomSmoother()
 		points := jitteryPoints()
 
 		// when
-		low := smoother.Smooth(points, domain.LevelLow)
-		medium := smoother.Smooth(points, domain.LevelMedium)
+		low := catmullRom.Smooth(points, domain.LevelLow)
+		medium := catmullRom.Smooth(points, domain.LevelMedium)
 
 		// then
 		assert.Greater(t, jitter(low), jitter(medium))
@@ -113,12 +113,12 @@ func Test_Smoother_Smooth(t *testing.T) {
 
 	t.Run("should reduce jitter further at the high level than at the medium level (SC-007)", func(t *testing.T) {
 		// given
-		smoother := catmullrom.New()
+		catmullRom := smoother.NewCatmullRomSmoother()
 		points := jitteryPoints()
 
 		// when
-		medium := smoother.Smooth(points, domain.LevelMedium)
-		high := smoother.Smooth(points, domain.LevelHigh)
+		medium := catmullRom.Smooth(points, domain.LevelMedium)
+		high := catmullRom.Smooth(points, domain.LevelHigh)
 
 		// then
 		assert.Greater(t, jitter(medium), jitter(high))

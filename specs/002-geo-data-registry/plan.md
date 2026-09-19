@@ -167,7 +167,7 @@ internal/
     │   │   ├── mbtiles.go                         # (novo) leitura de tipo/área de um MBTiles (mapa base) via modernc.org/sqlite
     │   │   └── geotiff.go                         # (novo) leitura de tipo/área de um GeoTIFF (relevo) via parser de tags próprio
     │   ├── jsonfile/
-    │   │   └── jsonfile.go                        # (novo) adapter GeoDataRepository: registro persistido em JSON, escrita atômica
+    │   │   └── geo_data_repository.go             # (novo) adapter GeoDataRepository (NewGeoDataRepository): registro persistido em JSON, escrita atômica
     │   └── filechecker/
     │       └── filechecker.go                     # (novo) adapter FileChecker via os.Stat
     │
@@ -192,8 +192,8 @@ sem novo módulo nem repositório separado. Os novos adapters de saída ganham
 seus próprios subdiretórios em `internal/infra/outbound` (um por
 dependência externa concreta: `geodatainspector`, `jsonfile`,
 `filechecker`), seguindo o mesmo padrão de um pacote por adapter já
-usado por `trackparser`, `simplifier/douglaspeucker` e
-`smoother/catmullrom`. Dentro de `geodatainspector`, MBTiles e GeoTIFF ficam
+usado por `trackparser`, `simplifier` e
+`smoother` (research.md item 18). Dentro de `geodatainspector`, MBTiles e GeoTIFF ficam
 no mesmo pacote (não em subpacotes por formato) porque, assim como
 `trackparser` na etapa 1, é um único adapter que primeiro identifica o
 formato pela assinatura do conteúdo e depois delega — não dois adapters

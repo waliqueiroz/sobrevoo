@@ -1,8 +1,21 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.2.0 → 1.2.1
-Rationale: PATCH — clarifies file layout within a domain file that declares
+Version change: 1.2.1 → 1.3.0
+Rationale: MINOR — adds to Principle IX the naming/organization rule for
+outbound adapters (internal/infra/outbound), learned from
+waliqueiroz/mystery-gifter-api (outgoing/postgres, security, identity):
+a technology package (postgres, jsonfile) can serve several ports, so the
+constructor is named by the port (NewGroupRepository, NewGeoDataRepository);
+a package that groups alternative strategies of one port is named by the
+port/category (security, simplifier, smoother) and the file, type and
+constructor name the strategy (NewBcryptPasswordManager,
+NewDouglasPeuckerSimplifier). A sub-package per algorithm, created only to
+call algorithm.New(), is banned; adapter constructors MAY return the
+concrete struct (an intentional difference from the reference repo, which
+returns the domain interface). Applied to jsonfile, simplifier and smoother.
+
+Previous amendment (1.2.0 → 1.2.1, PATCH): clarifies file layout within a domain file that declares
 a port: the //go:generate directive goes right after the package clause, and
 the interface is declared at the top of the file (right after imports),
 before the entity, enums and constructors — the layout used by
@@ -204,6 +217,21 @@ entidade, ou uma função livre quando opera sobre coleções ou múltiplas
 entradas sem uma entidade dona. É PROIBIDO qualquer função solta ou helper
 que contenha regra de negócio em `internal/application`.
 
+Os adapters de saída em `internal/infra/outbound` seguem a mesma lógica de
+nomes. Quando o pacote representa uma **tecnologia** ou sistema externo que
+pode servir várias portas (por exemplo `jsonfile`, como `postgres` no
+`mystery-gifter-api`), o pacote leva o nome da tecnologia, e o arquivo e o
+construtor levam o nome da **porta** que implementam (`geo_data_repository.go`,
+`NewGeoDataRepository(...)`). Quando as implementações são **estratégias
+alternativas de uma única porta** (algoritmos, como Douglas-Peucker e
+Catmull-Rom), o pacote leva o nome da porta ou categoria (`simplifier`,
+`smoother`, como `security` e `identity` lá), e o arquivo, o tipo e o
+construtor nomeiam a **estratégia** (`douglas_peucker_simplifier.go`,
+`NewDouglasPeuckerSimplifier()`) — é PROIBIDO criar um subpacote por
+algoritmo só para poder chamar `algoritmo.New()`. Um construtor de adapter
+PODE devolver o struct concreto do adapter; não precisa devolver a interface
+do domínio.
+
 Mocks de qualquer interface — porta de domínio ou serviço de aplicação —
 MUST ser gerados com `go.uber.org/mock/mockgen`, via diretiva `//go:generate`
 posicionada imediatamente acima da própria interface, nunca centralizada em
@@ -322,4 +350,4 @@ antes do início da implementação. Qualquer desvio MUST ser justificado
 explicitamente na seção de Complexity Tracking do plano, ou o desvio MUST ser
 eliminado.
 
-**Version**: 1.2.1 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19
+**Version**: 1.3.0 | **Ratified**: 2026-09-13 | **Last Amended**: 2026-09-19

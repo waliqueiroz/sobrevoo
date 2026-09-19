@@ -20,7 +20,7 @@ func registryPath(t *testing.T) string {
 func Test_Store_List(t *testing.T) {
 	t.Run("should return no sources and no error when the registry file does not exist yet", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 
 		// when
 		sources, err := store.List()
@@ -34,7 +34,7 @@ func Test_Store_List(t *testing.T) {
 func Test_Store_Save(t *testing.T) {
 	t.Run("should persist a new source so it can be listed afterward", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 		source := build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()
 
 		// when
@@ -50,7 +50,7 @@ func Test_Store_Save(t *testing.T) {
 
 	t.Run("should replace the existing source when saving the same name again", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").WithPath("/data/old.mbtiles").Build()))
 
 		// when
@@ -67,10 +67,10 @@ func Test_Store_Save(t *testing.T) {
 	t.Run("should persist across separate Store instances pointed at the same path", func(t *testing.T) {
 		// given
 		path := registryPath(t)
-		require.NoError(t, jsonfile.New(path).Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
+		require.NoError(t, jsonfile.NewGeoDataRepository(path).Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
 
 		// when
-		sources, err := jsonfile.New(path).List()
+		sources, err := jsonfile.NewGeoDataRepository(path).List()
 
 		// then
 		require.NoError(t, err)
@@ -82,7 +82,7 @@ func Test_Store_Save(t *testing.T) {
 func Test_Store_FindByName(t *testing.T) {
 	t.Run("should return the registered source with the given name", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
 
 		// when
@@ -96,7 +96,7 @@ func Test_Store_FindByName(t *testing.T) {
 
 	t.Run("should report not found without an error when no source has that name", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 
 		// when
 		source, found, err := store.FindByName("nao-existe")
@@ -111,7 +111,7 @@ func Test_Store_FindByName(t *testing.T) {
 func Test_Store_Delete(t *testing.T) {
 	t.Run("should remove the registered source with the given name", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
 
 		// when
@@ -126,7 +126,7 @@ func Test_Store_Delete(t *testing.T) {
 
 	t.Run("should leave other registered sources untouched", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
 		require.NoError(t, store.Save(build_domain.NewGeoDataSourceBuilder().WithName("europa-central-relevo").WithType(domain.DataTypeElevation).Build()))
 
@@ -145,7 +145,7 @@ func Test_Store_Delete(t *testing.T) {
 func Test_Store_RoundTrip(t *testing.T) {
 	t.Run("should preserve every field of a saved source, including RegisteredAt", func(t *testing.T) {
 		// given
-		store := jsonfile.New(registryPath(t))
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
 		registeredAt := time.Date(2026, time.March, 4, 10, 30, 0, 0, time.UTC)
 		source := build_domain.NewGeoDataSourceBuilder().
 			WithName("europa-central-relevo").
