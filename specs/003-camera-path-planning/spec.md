@@ -15,6 +15,7 @@
 - Q: Quando o arquivo de exportação já existe no destino escolhido, o que a ferramenta deve fazer por padrão? → A: Recusar com mensagem clara, a menos que o usuário passe uma opção explícita de sobrescrita.
 - Q: Quando o trajeto é curto demais para ser acompanhado (poucos metros ou pontos praticamente no mesmo lugar), a ferramenta deve recusar ou gerar um plano mesmo assim? → A: Recusar com erro próprio e mensagem clara quando a extensão do trajeto ficar abaixo de um mínimo documentado.
 - Q: Existe um intervalo de taxa de quadros aceito pela ferramenta, ou qualquer valor positivo é aceito? → A: Aceitar de 1 a 120 quadros por segundo; fora disso, recusar informando o intervalo válido.
+- Q: A duração padrão do vídeo deve ser fixa (60 s) ou depender do trajeto? → A: Depender do trajeto: quando o usuário não informa a duração, ela é calculada a partir da extensão do trajeto (cresce de forma sublinear), nunca fica abaixo do mínimo daquele trajeto e tem um teto; o usuário continua podendo informar a duração que quiser.
 
 ## Cenários de Usuário e Testes *(obrigatório)*
 
@@ -28,7 +29,7 @@ Como usuário do Sobrevoo, eu tenho um arquivo de trajeto GPS de uma atividade e
 
 **Cenários de Aceitação**:
 
-1. **Dado** um arquivo de trajeto válido, **Quando** o usuário gera o plano de câmera sem informar nenhum parâmetro, **Então** a ferramenta produz um plano com duração e taxa de quadros padrão, em que cada quadro tem latitude, longitude e altitude da câmera, direção, inclinação e posição do marcador ao longo do trajeto.
+1. **Dado** um arquivo de trajeto válido, **Quando** o usuário gera o plano de câmera sem informar nenhum parâmetro, **Então** a ferramenta produz um plano com duração calculada a partir do trajeto e taxa de quadros padrão, em que cada quadro tem latitude, longitude e altitude da câmera, direção, inclinação e posição do marcador ao longo do trajeto.
 2. **Dado** um plano gerado, **Quando** o usuário examina o primeiro e o último quadros, **Então** o marcador está no início do trajeto no primeiro quadro que começa a acompanhá-lo e no fim do trajeto no último quadro, e nunca retrocede entre quadros consecutivos.
 3. **Dado** um arquivo inválido, vazio ou com pontos insuficientes, **Quando** o usuário tenta gerar o plano, **Então** a ferramenta recusa com a mesma mensagem clara e o mesmo tratamento de erro da primeira etapa, sem produzir plano algum.
 4. **Dado** o mesmo trajeto e os mesmos parâmetros, **Quando** o usuário gera o plano duas vezes (inclusive em execuções e momentos diferentes), **Então** os dois planos são exatamente iguais, quadro a quadro.
@@ -72,6 +73,10 @@ Como usuário do Sobrevoo, eu quero escolher a duração do vídeo e a taxa de q
 6. **Dado** uma duração ou taxa de quadros igual a zero ou negativa, **Quando** o usuário tenta gerar o plano, **Então** a ferramenta recusa com uma mensagem que aponta qual parâmetro é inválido.
 7. **Dado** uma duração tão curta que não comporta a abertura, o fechamento e um trecho de acompanhamento suave para aquele trajeto, **Quando** o usuário tenta gerar o plano, **Então** a ferramenta recusa com uma mensagem que informa a duração mínima necessária para o trajeto e taxa de quadros escolhidos.
 8. **Dado** um valor de distância ou de inclinação que não é um dos níveis oferecidos, **Quando** o usuário tenta gerar o plano, **Então** a ferramenta recusa listando os valores aceitos.
+9. **Dado** dois trajetos de extensões diferentes, **Quando** o usuário gera o plano de cada um sem informar a duração, **Então** o vídeo do trajeto mais longo tem duração maior ou igual à do mais curto, e o crescimento é proporcionalmente menor que o da extensão (um trajeto dez vezes mais longo não gera um vídeo dez vezes mais longo).
+10. **Dado** um trajeto tão grande que o mínimo necessário para um voo suave excede a duração que a regra automática daria, **Quando** o usuário gera o plano sem informar a duração, **Então** a duração usada é a mínima necessária, o plano é gerado sem erro e o resumo indica que a duração foi automática.
+11. **Dado** qualquer trajeto válido, **Quando** o usuário gera o plano sem informar a duração, **Então** a duração automática nunca fica abaixo de 20 segundos nem acima de 120 segundos, exceto quando o mínimo necessário para aquele trajeto for maior que 120 segundos (caso em que vale o mínimo).
+12. **Dado** um trajeto qualquer, **Quando** o usuário informa a duração explicitamente, **Então** a duração informada é usada exatamente (respeitando o mínimo e as demais validações), sem ajuste pela regra automática.
 
 ---
 
@@ -129,7 +134,8 @@ Como usuário do Sobrevoo, eu quero exportar o plano completo para um arquivo le
 
 - **FR-001**: O sistema DEVE aceitar como entrada um trajeto GPS, submetê-lo ao mesmo tratamento da primeira etapa (descarte de pontos inválidos, reordenação por tempo, simplificação e suavização) e a partir dele gerar o plano de câmera, sem exigir que o usuário execute manualmente etapas intermediárias.
 - **FR-002**: O plano DEVE conter exatamente um item por quadro do vídeo; cada item DEVE informar a posição da câmera (latitude, longitude e altitude), a direção para a qual ela aponta, a inclinação e a posição do marcador da atividade ao longo do trajeto.
-- **FR-003**: O usuário DEVE poder escolher a duração do vídeo e a taxa de quadros; quando não informados, DEVEM ser usados valores padrão documentados.
+- **FR-003**: O usuário DEVE poder escolher a duração do vídeo e a taxa de quadros; quando a taxa de quadros não for informada, DEVE ser usado um valor padrão documentado (30 quadros por segundo).
+- **FR-003a**: Quando a duração não for informada, o sistema DEVE calculá-la a partir da extensão do trajeto tratado, com crescimento sublinear em relação à extensão, entre um piso de 20 segundos e um teto de 120 segundos, e nunca inferior à duração mínima necessária para aquele trajeto e taxa de quadros (FR-017), que prevalece sobre o teto. O cálculo DEVE ser determinístico (mesmo trajeto e mesma taxa de quadros produzem a mesma duração) e a duração informada explicitamente pelo usuário DEVE sempre prevalecer sobre o cálculo automático. Uma duração calculada nunca DEVE ser recusada por ser curta demais.
 - **FR-004**: A quantidade de quadros do plano DEVE ser exatamente a duração multiplicada pela taxa de quadros (arredondada de forma documentada quando o produto não for inteiro).
 - **FR-005**: O usuário DEVE poder escolher o quanto a câmera fica distante e o quanto fica inclinada em relação ao trajeto, por meio de níveis nomeados (baixo, médio, alto), com um nível padrão documentado para cada um.
 - **FR-006**: O movimento da câmera DEVE ser contínuo: entre dois quadros consecutivos, a posição, a direção e a inclinação DEVEM variar dentro de limites de suavidade definidos pela ferramenta e documentados; nenhum plano gerado pode violar esses limites.
@@ -146,7 +152,7 @@ Como usuário do Sobrevoo, eu quero exportar o plano completo para um arquivo le
 - **FR-017**: O sistema DEVE recusar uma duração curta demais para acomodar abertura, fechamento e um acompanhamento suave do trajeto, com mensagem que informe a duração mínima necessária para aquele trajeto e aquela taxa de quadros.
 - **FR-017a**: O sistema DEVE recusar um trajeto cuja extensão (distância percorrida após o tratamento) seja inferior a um mínimo documentado, com erro próprio e mensagem que informe a extensão encontrada e o mínimo exigido.
 - **FR-018**: O sistema DEVE recusar níveis de distância ou de inclinação desconhecidos, listando os valores aceitos.
-- **FR-019**: O sistema DEVE apresentar um resumo do plano com: duração, taxa de quadros, quantidade de quadros, altitude mínima e máxima da câmera, distância mínima e máxima da câmera ao marcador, referência de tempo usada (horário ou distância) e a lista de trechos suavizados (ou a indicação explícita de que não houve nenhum).
+- **FR-019**: O sistema DEVE apresentar um resumo do plano com: duração (indicando se foi calculada automaticamente ou informada pelo usuário), taxa de quadros, quantidade de quadros, altitude mínima e máxima da câmera, distância mínima e máxima da câmera ao marcador, referência de tempo usada (horário ou distância) e a lista de trechos suavizados (ou a indicação explícita de que não houve nenhum).
 - **FR-020**: O sistema DEVE permitir exportar o plano completo — parâmetros usados, resumo e todos os quadros — para um arquivo de texto estruturado, legível por pessoas e por programas, e a exportação DEVE ser determinística (mesma entrada, arquivo idêntico).
 - **FR-021**: Por padrão, a exportação DEVE recusar, com mensagem clara, um destino que já contenha um arquivo, deixando-o intacto; o usuário DEVE poder pedir explicitamente a sobrescrita por meio de uma opção dedicada, e, em qualquer caso, a exportação NÃO DEVE deixar arquivo parcial em caso de falha.
 - **FR-022**: Arquivos de trajeto inválidos, vazios ou com pontos insuficientes DEVEM ser recusados com as mesmas mensagens e o mesmo tratamento de erro da primeira etapa.
@@ -158,7 +164,7 @@ Como usuário do Sobrevoo, eu quero exportar o plano completo para um arquivo le
 
 - **Plano de Câmera**: o resultado completo da etapa — os parâmetros usados, a sequência ordenada de quadros, a referência de tempo empregada e o resumo. É a entrada das etapas seguintes.
 - **Quadro do Plano**: um instante do vídeo, com seu número e tempo no vídeo, a posição da câmera (latitude, longitude, altitude), a direção, a inclinação e a posição do marcador ao longo do trajeto (por distância percorrida e por coordenada).
-- **Parâmetros do Plano**: duração, taxa de quadros, nível de distância da câmera e nível de inclinação, com seus valores padrão.
+- **Parâmetros do Plano**: duração (calculada a partir do trajeto quando não informada), taxa de quadros, nível de distância da câmera e nível de inclinação, com seus valores padrão.
 - **Fase do Vídeo**: cada quadro pertence a uma de três fases — abertura, acompanhamento ou fechamento —, o que permite às etapas seguintes distinguir o comportamento esperado em cada trecho.
 - **Trecho Suavizado**: um intervalo contínuo do vídeo (início e fim) em que a câmera precisou ter sua mudança limitada para respeitar os limites de suavidade.
 - **Resumo do Plano**: duração, taxa e quantidade de quadros, faixa de altitude e de distância da câmera, referência de tempo usada e lista de trechos suavizados.
@@ -178,11 +184,12 @@ Como usuário do Sobrevoo, eu quero exportar o plano completo para um arquivo le
 - **SC-008**: 100% dos parâmetros inválidos testados (duração e taxa não positivas, taxa fora de 1 a 120, duração abaixo do mínimo, trajeto curto demais, níveis desconhecidos, destino de exportação inválido ou já existente sem opção de sobrescrita) são recusados com uma mensagem que identifica o parâmetro ou destino problemático, e a recusa por duração insuficiente sempre informa a duração mínima necessária.
 - **SC-009**: Um usuário consegue, apenas lendo o resumo, responder em menos de 1 minuto: quanto dura o vídeo, quantos quadros tem, em que faixa de altitude e distância a câmera opera e se algum trecho precisou ser suavizado.
 - **SC-010**: O plano exportado é lido de volta sem perda: todos os quadros e valores do arquivo coincidem com os do plano gerado.
+- **SC-011**: Em 100% dos trajetos de teste (de dezenas de metros a centenas de quilômetros), gerar o plano sem informar a duração produz um plano válido, sem recusa por duração curta, com duração monotonicamente não decrescente em relação à extensão do trajeto e dentro de 20 a 120 segundos (ou igual ao mínimo necessário quando este for maior que 120 segundos).
 
 ## Suposições
 
 - O usuário já dispõe de um arquivo de trajeto que a primeira etapa consegue ler; esta etapa reaproveita integralmente o tratamento da primeira etapa (mesmos formatos aceitos, mesmos erros, mesmos níveis de simplificação e suavização do trajeto) e NÃO depende do registro de dados geográficos da segunda etapa.
-- Os valores padrão são: taxa de quadros de 30 por segundo, duração de 60 segundos, distância da câmera "média" e inclinação "média". Podem ser revistos no planejamento técnico sem alterar esta especificação.
+- Os valores padrão são: taxa de quadros de 30 por segundo, distância da câmera "média" e inclinação "média". A duração padrão não é fixa: é calculada a partir da extensão do trajeto (FR-003a), como fazem outros serviços de vídeo de atividades, com curva de referência de aproximadamente 30 s para 5 km, 45 s para 20 km, 60 s para 50 km e 100 s para 200 km. A curva exata, o piso e o teto podem ser revistos no planejamento técnico sem alterar esta especificação, desde que continuem monotônicos, sublineares e dentro dos limites de FR-003a. A extensão (distância) é usada em vez do tempo real porque existe em qualquer trajeto, inclusive sem horário.
 - Distância e inclinação da câmera são escolhidas por níveis nomeados (baixo, médio, alto), em linha com os níveis já usados nos parâmetros de simplificação e suavização da primeira etapa, e não por valores numéricos livres.
 - A abertura e o fechamento ocupam, cada um, uma fração fixa e documentada da duração total (ordem de 10% cada), e o restante da duração é dedicado ao acompanhamento; a duração mínima aceita é aquela que ainda permite um acompanhamento suave, e é calculada pela ferramenta para cada trajeto e taxa de quadros.
 - Uma "parada longa" é um período contínuo, acima de um limiar documentado (ordem de dezenas de segundos), em que o deslocamento é desprezível; o tempo de vídeo dedicado a cada parada é curto e limitado.
