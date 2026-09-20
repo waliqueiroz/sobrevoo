@@ -19,17 +19,17 @@ import (
 )
 
 // executeInspectCommand runs the "inspect" command against an existing
-// temporary file, with inspectTrackService as its only dependency, and
+// temporary file, with trackService as its only dependency, and
 // returns stdout and the resulting error. The service is a test double —
 // this is a unit test of the CLI adapter alone (Constitution Principle III),
 // never a real track parser/simplifier/smoother.
-func executeInspectCommand(t *testing.T, inspectTrackService application.InspectTrackService, extraArgs ...string) (stdout string, err error) {
+func executeInspectCommand(t *testing.T, trackService application.TrackService, extraArgs ...string) (stdout string, err error) {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "track.gpx")
 	require.NoError(t, os.WriteFile(path, []byte("irrelevant, the service is mocked"), 0o600))
 
-	cmd := cli.NewInspectCommand(inspectTrackService, domain.LevelMedium)
+	cmd := cli.NewInspectCommand(trackService, domain.LevelMedium)
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetArgs(append([]string{path}, extraArgs...))
@@ -76,7 +76,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		summary := builddomain.NewTrackSummaryBuilder().Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(summary, nil)
 
 		// when
@@ -99,7 +99,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		summary := builddomain.NewTrackSummaryBuilder().WithoutElevationGainMeters().Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(summary, nil)
 
 		// when
@@ -115,7 +115,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		summary := builddomain.NewTrackSummaryBuilder().WithoutDuration().Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(summary, nil)
 
 		// when
@@ -136,7 +136,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		summary := builddomain.NewTrackSummaryBuilder().WithBoundingBox(boundingBox).Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(summary, nil)
 
 		// when
@@ -153,7 +153,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		summary := builddomain.NewTrackSummaryBuilder().WithDiscarded(discarded).Build()
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(summary, nil)
 
 		// when
@@ -167,7 +167,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should not print any summary when the service fails", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TrackSummary{}, domain.ErrEmptyFile)
 
 		// when
@@ -181,7 +181,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should map ErrEmptyFile to exit code 1", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TrackSummary{}, domain.ErrEmptyFile)
 
 		// when
@@ -195,7 +195,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should map ErrUnsupportedFormat to exit code 2", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TrackSummary{}, domain.ErrUnsupportedFormat)
 
 		// when
@@ -209,7 +209,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should map ErrInsufficientPoints to exit code 3", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TrackSummary{}, domain.ErrInsufficientPoints)
 
 		// when
@@ -223,7 +223,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should map ErrInsufficientPointsAfterCleaning to exit code 3", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TrackSummary{}, domain.ErrInsufficientPointsAfterCleaning)
 
 		// when
@@ -237,7 +237,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should map an unrecognized error to the generic exit code 4", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TrackSummary{}, errors.New("boom"))
 
 		// when
@@ -251,7 +251,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should map a missing file to the generic exit code 4 without calling the service", func(t *testing.T) {
 		// given: the mock has no EXPECT(), so any call to it fails the test
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 
 		cmd := cli.NewInspectCommand(mockedService, domain.LevelMedium)
 		cmd.SetOut(&bytes.Buffer{})
@@ -268,7 +268,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should convert the --simplification and --smoothing flags into the levels passed to the service", func(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), domain.LevelHigh, domain.LevelLow).
 			Return(builddomain.NewTrackSummaryBuilder().Build(), nil)
 
@@ -285,7 +285,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("irrelevant"), 0o600))
 
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 		mockedService.EXPECT().Inspect(gomock.Any(), domain.LevelHigh, domain.LevelHigh).
 			Return(builddomain.NewTrackSummaryBuilder().Build(), nil)
 
@@ -303,7 +303,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should return a usage error for an invalid --simplification value without calling the service", func(t *testing.T) {
 		// given: the mock has no EXPECT(), so any call to it fails the test
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 
 		// when
 		_, err := executeInspectCommand(t, mockedService, "--simplification=bogus")
@@ -316,7 +316,7 @@ func Test_InspectCommand_Execute(t *testing.T) {
 	t.Run("should return a usage error for an invalid --smoothing value without calling the service", func(t *testing.T) {
 		// given: the mock has no EXPECT(), so any call to it fails the test
 		mockCtrl := gomock.NewController(t)
-		mockedService := mockapplication.NewMockInspectTrackService(mockCtrl)
+		mockedService := mockapplication.NewMockTrackService(mockCtrl)
 
 		// when
 		_, err := executeInspectCommand(t, mockedService, "--smoothing=bogus")

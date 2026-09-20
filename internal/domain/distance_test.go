@@ -27,13 +27,13 @@ func sphericalLawOfCosinesMeters(a, b domain.TrackPoint) float64 {
 	return earthRadiusMeters * math.Acos(cosCentralAngle)
 }
 
-func Test_Haversine(t *testing.T) {
+func Test_TrackPoint_DistanceTo(t *testing.T) {
 	t.Run("should return zero for the same point", func(t *testing.T) {
 		// given
 		point := builddomain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(20).Build()
 
 		// when
-		distance := domain.Haversine(point, point)
+		distance := point.DistanceTo(point)
 
 		// then
 		assert.Equal(t, 0.0, distance)
@@ -45,7 +45,7 @@ func Test_Haversine(t *testing.T) {
 		b := builddomain.NewTrackPointBuilder().WithLatitude(40.5).WithLongitude(-3.5).Build()
 
 		// when
-		distance := domain.Haversine(a, b)
+		distance := a.DistanceTo(b)
 
 		// then
 		assert.InDelta(t, sphericalLawOfCosinesMeters(a, b), distance, 1.0)
@@ -57,7 +57,7 @@ func Test_Haversine(t *testing.T) {
 		b := builddomain.NewTrackPointBuilder().WithLatitude(-1.0).WithLongitude(10.0).Build()
 
 		// when
-		distance := domain.Haversine(a, b)
+		distance := a.DistanceTo(b)
 
 		// then
 		assert.InDelta(t, sphericalLawOfCosinesMeters(a, b), distance, 1.0)
@@ -69,7 +69,7 @@ func Test_Haversine(t *testing.T) {
 		b := builddomain.NewTrackPointBuilder().WithLatitude(0.0).WithLongitude(-179.9).Build()
 
 		// when
-		distance := domain.Haversine(a, b)
+		distance := a.DistanceTo(b)
 
 		// then
 		assert.InDelta(t, sphericalLawOfCosinesMeters(a, b), distance, 1.0)
@@ -81,7 +81,7 @@ func Test_Haversine(t *testing.T) {
 		b := builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build()
 
 		// when
-		distance := domain.Haversine(a, b)
+		distance := a.DistanceTo(b)
 
 		// then: a naive (non-periodic) longitude subtraction would instead
 		// compute a distance close to half the Earth's circumference (~20,000 km)
@@ -89,13 +89,13 @@ func Test_Haversine(t *testing.T) {
 	})
 }
 
-func Test_TotalDistance(t *testing.T) {
+func Test_Route_Length(t *testing.T) {
 	t.Run("should return zero for an empty route", func(t *testing.T) {
 		// given
 		var points []domain.TrackPoint
 
 		// when
-		distance := domain.TotalDistance(points)
+		distance := (domain.Route{Points: points}).Length()
 
 		// then
 		assert.Equal(t, 0.0, distance)
@@ -106,7 +106,7 @@ func Test_TotalDistance(t *testing.T) {
 		points := []domain.TrackPoint{builddomain.NewTrackPointBuilder().Build()}
 
 		// when
-		distance := domain.TotalDistance(points)
+		distance := (domain.Route{Points: points}).Length()
 
 		// then
 		assert.Equal(t, 0.0, distance)
@@ -119,10 +119,10 @@ func Test_TotalDistance(t *testing.T) {
 			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(179.9).Build(),
 			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(-179.9).Build(),
 		}
-		expectedDistance := domain.Haversine(points[0], points[1]) + domain.Haversine(points[1], points[2])
+		expectedDistance := points[0].DistanceTo(points[1]) + points[1].DistanceTo(points[2])
 
 		// when
-		distance := domain.TotalDistance(points)
+		distance := (domain.Route{Points: points}).Length()
 
 		// then
 		assert.InDelta(t, expectedDistance, distance, 0.001)

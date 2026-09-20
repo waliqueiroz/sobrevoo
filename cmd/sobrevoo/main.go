@@ -33,12 +33,15 @@ func run() int {
 	parser := trackparser.NewGPX()
 	douglasPeucker := simplifier.NewDouglasPeucker()
 	catmullRom := smoother.NewCatmullRom()
-	inspectTrackService := application.NewInspectTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+	trackService := application.NewTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+
+	cameraPlanExporter := jsonfile.NewCameraPlanExporter()
+	cameraPlanService := application.NewCameraPlanService(trackService, cameraPlanExporter, domainLevel(cfg.DefaultLevel), domainCameraTuning(cfg.CameraTuning))
 
 	geoDataInspector := geodatainspector.New()
 	geoDataRepository := jsonfile.NewGeoDataRepository(cfg.RegistryPath)
 	geoDataFileChecker := filechecker.NewOS()
-	geoDataService := application.NewGeoDataService(geoDataRepository, geoDataInspector, geoDataFileChecker, parser, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
+	geoDataService := application.NewGeoDataService(geoDataRepository, geoDataInspector, geoDataFileChecker, trackService)
 
 	geoDataCommand := cli.NewGeoDataCommand()
 	geoDataCommand.AddCommand(cli.NewGeoDataRegisterCommand(geoDataService))
@@ -47,7 +50,8 @@ func run() int {
 	geoDataCommand.AddCommand(cli.NewGeoDataRemoveCommand(geoDataService))
 
 	root := cli.NewRootCommand()
-	root.AddCommand(cli.NewInspectCommand(inspectTrackService, cfg.DefaultLevel))
+	root.AddCommand(cli.NewInspectCommand(trackService, domainLevel(cfg.DefaultLevel)))
+	root.AddCommand(cli.NewPlanCommand(cameraPlanService, domainPlanParameters(cfg.PlanDefaults)))
 	root.AddCommand(geoDataCommand)
 
 	if err := root.Execute(); err != nil {

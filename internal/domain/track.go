@@ -24,3 +24,25 @@ type Track struct {
 	Format Format
 	Points []TrackPoint
 }
+
+// CleanedTrack is a Track after parsing and cleaning (reordering by time and
+// discarding invalid, duplicate and implausible points), but before any
+// simplification or smoothing. Consumers that must not have points shifted
+// (such as geo data coverage checks) use it as is.
+type CleanedTrack struct {
+	Track     Track
+	Route     Route
+	Discarded DiscardStats
+}
+
+// TreatedTrack is a CleanedTrack after simplification and smoothing: the
+// route that rendering-oriented consumers (summaries, camera planning) work
+// with. It keeps the cleaned points too, because simplification discards the
+// points that reveal how the activity unfolded in time (a long stop, for
+// instance, collapses into a single straight segment).
+type TreatedTrack struct {
+	Track     Track
+	Cleaned   Route
+	Route     Route
+	Discarded DiscardStats
+}

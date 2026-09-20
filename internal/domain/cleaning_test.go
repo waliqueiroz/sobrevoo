@@ -10,7 +10,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
-func Test_ReorderByTime(t *testing.T) {
+func Test_Route_ReorderByTime(t *testing.T) {
 	start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
 
 	t.Run("should sort the points chronologically when every point has time", func(t *testing.T) {
@@ -22,10 +22,10 @@ func Test_ReorderByTime(t *testing.T) {
 		}
 
 		// when
-		result := domain.ReorderByTime(points)
+		result := domain.Route{Points: points}.ReorderByTime()
 
 		// then
-		assert.Equal(t, []float64{1, 2, 3}, latitudesOf(result))
+		assert.Equal(t, []float64{1, 2, 3}, latitudesOf(result.Points))
 	})
 
 	t.Run("should leave the points unchanged when some are missing time", func(t *testing.T) {
@@ -37,10 +37,10 @@ func Test_ReorderByTime(t *testing.T) {
 		}
 
 		// when
-		result := domain.ReorderByTime(points)
+		result := domain.Route{Points: points}.ReorderByTime()
 
 		// then
-		assert.Equal(t, []float64{3, 1, 2}, latitudesOf(result))
+		assert.Equal(t, []float64{3, 1, 2}, latitudesOf(result.Points))
 	})
 
 	t.Run("should leave the points unchanged when none has time", func(t *testing.T) {
@@ -52,14 +52,14 @@ func Test_ReorderByTime(t *testing.T) {
 		}
 
 		// when
-		result := domain.ReorderByTime(points)
+		result := domain.Route{Points: points}.ReorderByTime()
 
 		// then
-		assert.Equal(t, []float64{3, 1, 2}, latitudesOf(result))
+		assert.Equal(t, []float64{3, 1, 2}, latitudesOf(result.Points))
 	})
 }
 
-func Test_DiscardImpossibleCoordinates(t *testing.T) {
+func Test_Route_DiscardImpossibleCoordinates(t *testing.T) {
 	t.Run("should discard a couple of impossible points scattered in the track", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
@@ -70,11 +70,11 @@ func Test_DiscardImpossibleCoordinates(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImpossibleCoordinates(points)
+		kept, discarded := domain.Route{Points: points}.DiscardImpossibleCoordinates()
 
 		// then
 		assert.Equal(t, 2, discarded)
-		assert.Equal(t, []float64{10, -90}, latitudesOf(kept))
+		assert.Equal(t, []float64{10, -90}, latitudesOf(kept.Points))
 	})
 
 	t.Run("should discard many impossible points throughout a longer track", func(t *testing.T) {
@@ -91,15 +91,15 @@ func Test_DiscardImpossibleCoordinates(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImpossibleCoordinates(points)
+		kept, discarded := domain.Route{Points: points}.DiscardImpossibleCoordinates()
 
 		// then
 		assert.Equal(t, 4, discarded)
-		assert.Equal(t, []float64{1, 2, 3, 4}, latitudesOf(kept))
+		assert.Equal(t, []float64{1, 2, 3, 4}, latitudesOf(kept.Points))
 	})
 }
 
-func Test_DiscardConsecutiveDuplicates(t *testing.T) {
+func Test_Route_DiscardConsecutiveDuplicates(t *testing.T) {
 	t.Run("should discard a single duplicate", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{
@@ -110,11 +110,11 @@ func Test_DiscardConsecutiveDuplicates(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardConsecutiveDuplicates(points)
+		kept, discarded := domain.Route{Points: points}.DiscardConsecutiveDuplicates()
 
 		// then
 		assert.Equal(t, 1, discarded)
-		assert.Equal(t, []float64{1, 2, 1}, latitudesOf(kept))
+		assert.Equal(t, []float64{1, 2, 1}, latitudesOf(kept.Points))
 	})
 
 	t.Run("should collapse a long run of consecutive duplicates to a single point", func(t *testing.T) {
@@ -130,15 +130,15 @@ func Test_DiscardConsecutiveDuplicates(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardConsecutiveDuplicates(points)
+		kept, discarded := domain.Route{Points: points}.DiscardConsecutiveDuplicates()
 
 		// then
 		assert.Equal(t, 4, discarded)
-		assert.Equal(t, []float64{1, 2}, latitudesOf(kept))
+		assert.Equal(t, []float64{1, 2}, latitudesOf(kept.Points))
 	})
 }
 
-func Test_DiscardImplausibleJumps(t *testing.T) {
+func Test_Route_DiscardImplausibleJumps(t *testing.T) {
 	start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
 
 	t.Run("should keep a plausible walking/running/cycling pace", func(t *testing.T) {
@@ -149,11 +149,11 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImplausibleJumps(points, 130)
+		kept, discarded := domain.Route{Points: points}.DiscardImplausibleJumps(130)
 
 		// then
 		assert.Equal(t, 0, discarded)
-		assert.Len(t, kept, 2)
+		assert.Len(t, kept.Points, 2)
 	})
 
 	t.Run("should discard a jump implying a speed far beyond any human-powered activity", func(t *testing.T) {
@@ -164,11 +164,11 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImplausibleJumps(points, 130)
+		kept, discarded := domain.Route{Points: points}.DiscardImplausibleJumps(130)
 
 		// then
 		assert.Equal(t, 1, discarded)
-		assert.Len(t, kept, 1)
+		assert.Len(t, kept.Points, 1)
 	})
 
 	t.Run("should never evaluate a jump when either point is missing time", func(t *testing.T) {
@@ -179,11 +179,11 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImplausibleJumps(points, 130)
+		kept, discarded := domain.Route{Points: points}.DiscardImplausibleJumps(130)
 
 		// then
 		assert.Equal(t, 0, discarded)
-		assert.Len(t, kept, 2)
+		assert.Len(t, kept.Points, 2)
 	})
 
 	t.Run("should keep a jump right at the threshold speed", func(t *testing.T) {
@@ -196,11 +196,11 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImplausibleJumps(points, 130)
+		kept, discarded := domain.Route{Points: points}.DiscardImplausibleJumps(130)
 
 		// then
 		assert.Equal(t, 0, discarded)
-		assert.Len(t, kept, 2)
+		assert.Len(t, kept.Points, 2)
 	})
 
 	t.Run("should treat zero or negative elapsed time with real distance as always implausible", func(t *testing.T) {
@@ -211,11 +211,11 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImplausibleJumps(points, 130)
+		kept, discarded := domain.Route{Points: points}.DiscardImplausibleJumps(130)
 
 		// then
 		assert.Equal(t, 1, discarded)
-		assert.Len(t, kept, 1)
+		assert.Len(t, kept.Points, 1)
 	})
 
 	t.Run("should not consider zero elapsed time with zero distance implausible", func(t *testing.T) {
@@ -224,11 +224,11 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		points := []domain.TrackPoint{point, point}
 
 		// when
-		kept, discarded := domain.DiscardImplausibleJumps(points, 130)
+		kept, discarded := domain.Route{Points: points}.DiscardImplausibleJumps(130)
 
 		// then
 		assert.Equal(t, 0, discarded)
-		assert.Len(t, kept, 2)
+		assert.Len(t, kept.Points, 2)
 	})
 
 	t.Run("should compare a point against the last point actually kept, not the discarded one", func(t *testing.T) {
@@ -242,16 +242,16 @@ func Test_DiscardImplausibleJumps(t *testing.T) {
 		}
 
 		// when
-		kept, discarded := domain.DiscardImplausibleJumps(points, 130)
+		kept, discarded := domain.Route{Points: points}.DiscardImplausibleJumps(130)
 
 		// then
 		assert.Equal(t, 1, discarded)
-		require.Len(t, kept, 2)
-		assert.Equal(t, []float64{0, 0.00002}, latitudesOf(kept))
+		require.Len(t, kept.Points, 2)
+		assert.Equal(t, []float64{0, 0.00002}, latitudesOf(kept.Points))
 	})
 }
 
-func Test_CleanTrack(t *testing.T) {
+func Test_Track_Clean(t *testing.T) {
 	start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
 
 	t.Run("should reject fewer than the minimum points before any cleaning", func(t *testing.T) {
@@ -261,7 +261,7 @@ func Test_CleanTrack(t *testing.T) {
 		}
 
 		// when
-		_, _, err := domain.CleanTrack(points, 2, 130)
+		_, err := domain.Track{Points: points}.Clean(2, 130)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrInsufficientPoints)
@@ -276,7 +276,7 @@ func Test_CleanTrack(t *testing.T) {
 		}
 
 		// when
-		_, _, err := domain.CleanTrack(points, 2, 130)
+		_, err := domain.Track{Points: points}.Clean(2, 130)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrInsufficientPointsAfterCleaning)
@@ -295,12 +295,12 @@ func Test_CleanTrack(t *testing.T) {
 		}
 
 		// when
-		kept, discarded, err := domain.CleanTrack(points, 2, 130)
+		cleaned, err := domain.Track{Points: points}.Clean(2, 130)
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, 1, discarded.ImpossibleCoordinates)
-		assert.Equal(t, []float64{2, 3}, latitudesOf(kept), "reordered chronologically, then the impossible point removed")
+		assert.Equal(t, 1, cleaned.Discarded.ImpossibleCoordinates)
+		assert.Equal(t, []float64{2, 3}, latitudesOf(cleaned.Route.Points), "reordered chronologically, then the impossible point removed")
 	})
 }
 

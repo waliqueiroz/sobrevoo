@@ -43,4 +43,32 @@ var (
 	// ErrDataSourceNotRegistered is returned when a name does not match any
 	// registered geo data source (FR-012).
 	ErrDataSourceNotRegistered = errors.New("geo data source not registered")
+
+	// ErrInvalidDuration reports a requested video duration that is not
+	// greater than zero or exceeds the maximum accepted duration.
+	ErrInvalidDuration = errors.New("invalid duration")
+
+	// ErrInvalidFrameRate reports a frame rate that is not a finite number
+	// within the accepted range.
+	ErrInvalidFrameRate = errors.New("invalid frame rate")
+
+	// ErrDurationTooShort reports a requested duration shorter than the
+	// minimum needed to plan a smooth flight over the track.
+	ErrDurationTooShort = errors.New("duration too short for this track")
+
+	// ErrTrackTooShort reports a track whose length is below the minimum
+	// that can be followed by a camera.
+	ErrTrackTooShort = errors.New("track too short to plan a camera path")
+
+	// ErrTrackTooLarge reports a track whose span exceeds the maximum the
+	// planner supports.
+	ErrTrackTooLarge = errors.New("track too large to plan a camera path")
+
+	// ErrPlanDestinationExists reports an export destination that already
+	// holds a file, when overwriting was not requested.
+	ErrPlanDestinationExists = errors.New("plan destination already exists")
+
+	// ErrPlanDestinationInvalid reports an export destination that cannot be
+	// written (missing directory, no permission, ...).
+	ErrPlanDestinationInvalid = errors.New("plan destination is not writable")
 )

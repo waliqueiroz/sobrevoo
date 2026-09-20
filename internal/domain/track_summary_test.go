@@ -10,7 +10,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
-func Test_SummarizeTrack(t *testing.T) {
+func Test_NewTrackSummary(t *testing.T) {
 	t.Run("should build a summary from the track and its treated route when both have complete data", func(t *testing.T) {
 		// given
 		start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
@@ -22,7 +22,7 @@ func Test_SummarizeTrack(t *testing.T) {
 		route := domain.Route{Points: points}
 
 		// when
-		summary := domain.SummarizeTrack(track, route, domain.DiscardStats{})
+		summary := domain.NewTrackSummary(track, route, domain.DiscardStats{})
 
 		// then
 		assert.Equal(t, domain.FormatGPX, summary.Format)
@@ -33,7 +33,7 @@ func Test_SummarizeTrack(t *testing.T) {
 		assert.InDelta(t, 50.0, *summary.ElevationGainMeters, 0.0001)
 		require.NotNil(t, summary.Duration)
 		assert.Equal(t, time.Hour, *summary.Duration)
-		assert.Equal(t, domain.ComputeBoundingBox(points), summary.BoundingBox)
+		assert.Equal(t, (domain.Route{Points: points}).BoundingBox(), summary.BoundingBox)
 	})
 
 	t.Run("should report elevation gain and duration as unavailable when the route has no such data", func(t *testing.T) {
@@ -46,7 +46,7 @@ func Test_SummarizeTrack(t *testing.T) {
 		route := domain.Route{Points: points}
 
 		// when
-		summary := domain.SummarizeTrack(track, route, domain.DiscardStats{})
+		summary := domain.NewTrackSummary(track, route, domain.DiscardStats{})
 
 		// then
 		assert.Nil(t, summary.ElevationGainMeters)
@@ -67,7 +67,7 @@ func Test_SummarizeTrack(t *testing.T) {
 		}}
 
 		// when
-		summary := domain.SummarizeTrack(track, route, domain.DiscardStats{})
+		summary := domain.NewTrackSummary(track, route, domain.DiscardStats{})
 
 		// then
 		assert.Equal(t, 3, summary.PointCountOriginal)
@@ -81,7 +81,7 @@ func Test_SummarizeTrack(t *testing.T) {
 		discarded := domain.DiscardStats{ImpossibleCoordinates: 1, ConsecutiveDuplicates: 2, ImplausibleJumps: 3}
 
 		// when
-		summary := domain.SummarizeTrack(track, route, discarded)
+		summary := domain.NewTrackSummary(track, route, discarded)
 
 		// then
 		assert.Equal(t, discarded, summary.Discarded)

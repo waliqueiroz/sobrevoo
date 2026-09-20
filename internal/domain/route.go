@@ -1,8 +1,9 @@
 package domain
 
-// Route is a track after all treatment steps (reordering, discarding,
-// simplification, smoothing) have been applied. It is what the final
-// summary statistics are computed from.
+// Route is a sequence of track points: what a track becomes once its points
+// are cleaned, and then simplified and smoothed. The statistics of a track
+// (length, duration, elevation gain, bounding box) and the checks made over
+// it (coverage by geo data) are computed from it.
 type Route struct {
 	Points []TrackPoint
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
-func Test_Duration(t *testing.T) {
+func Test_Route_Duration(t *testing.T) {
 	start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
 
 	t.Run("should return not ok for an empty route", func(t *testing.T) {
@@ -17,7 +17,7 @@ func Test_Duration(t *testing.T) {
 		var points []domain.TrackPoint
 
 		// when
-		duration, ok := domain.Duration(points)
+		duration, ok := (domain.Route{Points: points}).Duration()
 
 		// then
 		assert.False(t, ok)
@@ -32,7 +32,7 @@ func Test_Duration(t *testing.T) {
 		}
 
 		// when
-		duration, ok := domain.Duration(points)
+		duration, ok := (domain.Route{Points: points}).Duration()
 
 		// then
 		assert.False(t, ok)
@@ -47,7 +47,7 @@ func Test_Duration(t *testing.T) {
 		}
 
 		// when
-		duration, ok := domain.Duration(points)
+		duration, ok := (domain.Route{Points: points}).Duration()
 
 		// then
 		assert.False(t, ok)
@@ -63,7 +63,7 @@ func Test_Duration(t *testing.T) {
 		}
 
 		// when
-		duration, ok := domain.Duration(points)
+		duration, ok := (domain.Route{Points: points}).Duration()
 
 		// then
 		assert.True(t, ok)

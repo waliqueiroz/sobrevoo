@@ -17,14 +17,15 @@ type BoundingBox struct {
 	CrossesAntimeridian bool
 }
 
-// ComputeBoundingBox returns the geographic area covered by points. Latitude
+// BoundingBox returns the geographic area covered by the route. Latitude
 // never needs special handling (it does not wrap around). Longitude is
 // unwrapped by walking the points in order and accumulating each
 // consecutive delta, so a route that crosses the antimeridian produces a
 // short, correct occupied area instead of one spanning nearly the whole
 // planet (FR-024) — no assumption about hemisphere or region is made
 // (research.md item 6).
-func ComputeBoundingBox(points []TrackPoint) BoundingBox {
+func (r Route) BoundingBox() BoundingBox {
+	points := r.Points
 	if len(points) == 0 {
 		return BoundingBox{}
 	}

@@ -8,13 +8,13 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
-func Test_ComputeBoundingBox(t *testing.T) {
+func Test_Route_BoundingBox(t *testing.T) {
 	t.Run("should return the zero value for an empty route", func(t *testing.T) {
 		// given
 		var points []domain.TrackPoint
 
 		// when
-		boundingBox := domain.ComputeBoundingBox(points)
+		boundingBox := (domain.Route{Points: points}).BoundingBox()
 
 		// then
 		assert.Equal(t, domain.BoundingBox{}, boundingBox)
@@ -29,7 +29,7 @@ func Test_ComputeBoundingBox(t *testing.T) {
 		}
 
 		// when
-		boundingBox := domain.ComputeBoundingBox(points)
+		boundingBox := (domain.Route{Points: points}).BoundingBox()
 
 		// then
 		assert.False(t, boundingBox.CrossesAntimeridian)
@@ -48,7 +48,7 @@ func Test_ComputeBoundingBox(t *testing.T) {
 		}
 
 		// when
-		boundingBox := domain.ComputeBoundingBox(points)
+		boundingBox := (domain.Route{Points: points}).BoundingBox()
 
 		// then
 		assert.False(t, boundingBox.CrossesAntimeridian)
@@ -68,7 +68,7 @@ func Test_ComputeBoundingBox(t *testing.T) {
 		}
 
 		// when
-		boundingBox := domain.ComputeBoundingBox(points)
+		boundingBox := (domain.Route{Points: points}).BoundingBox()
 
 		// then
 		assert.True(t, boundingBox.CrossesAntimeridian)
@@ -86,7 +86,7 @@ func Test_ComputeBoundingBox(t *testing.T) {
 		}
 
 		// when
-		boundingBox := domain.ComputeBoundingBox(points)
+		boundingBox := (domain.Route{Points: points}).BoundingBox()
 
 		// then
 		assert.True(t, boundingBox.CrossesAntimeridian)
@@ -102,7 +102,7 @@ func Test_ComputeBoundingBox(t *testing.T) {
 		}
 
 		// when
-		boundingBox := domain.ComputeBoundingBox(points)
+		boundingBox := (domain.Route{Points: points}).BoundingBox()
 
 		// then
 		assert.True(t, boundingBox.CrossesAntimeridian)

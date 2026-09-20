@@ -8,13 +8,13 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
-func Test_ElevationGain(t *testing.T) {
+func Test_Route_ElevationGain(t *testing.T) {
 	t.Run("should return not ok for an empty route", func(t *testing.T) {
 		// given
 		var points []domain.TrackPoint
 
 		// when
-		gain, ok := domain.ElevationGain(points)
+		gain, ok := (domain.Route{Points: points}).ElevationGain()
 
 		// then
 		assert.False(t, ok)
@@ -29,7 +29,7 @@ func Test_ElevationGain(t *testing.T) {
 		}
 
 		// when
-		gain, ok := domain.ElevationGain(points)
+		gain, ok := (domain.Route{Points: points}).ElevationGain()
 
 		// then
 		assert.False(t, ok)
@@ -45,7 +45,7 @@ func Test_ElevationGain(t *testing.T) {
 		}
 
 		// when
-		gain, ok := domain.ElevationGain(points)
+		gain, ok := (domain.Route{Points: points}).ElevationGain()
 
 		// then
 		assert.False(t, ok)
@@ -61,7 +61,7 @@ func Test_ElevationGain(t *testing.T) {
 		}
 
 		// when
-		gain, ok := domain.ElevationGain(points)
+		gain, ok := (domain.Route{Points: points}).ElevationGain()
 
 		// then
 		assert.True(t, ok)
@@ -78,7 +78,7 @@ func Test_ElevationGain(t *testing.T) {
 		}
 
 		// when
-		gain, ok := domain.ElevationGain(points)
+		gain, ok := (domain.Route{Points: points}).ElevationGain()
 
 		// then: only the 80 -> 120 climb counts
 		assert.True(t, ok)
@@ -93,7 +93,7 @@ func Test_ElevationGain(t *testing.T) {
 		}
 
 		// when
-		gain, ok := domain.ElevationGain(points)
+		gain, ok := (domain.Route{Points: points}).ElevationGain()
 
 		// then
 		assert.True(t, ok)

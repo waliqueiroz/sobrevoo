@@ -12,11 +12,11 @@ import (
 )
 
 // NewInspectCommand creates the "inspect" command, which exposes
-// InspectTrackService (FR-001 through FR-027). defaultLevel (FR-016) is
+// TrackService (FR-001 through FR-027). defaultLevel (FR-016) is
 // used as the --simplification/--smoothing flags' default value, so the
 // service always receives a concrete Level either way — it has no notion
 // of an "unset" level to fall back on itself.
-func NewInspectCommand(inspectTrackService application.InspectTrackService, defaultLevel domain.Level) *cobra.Command {
+func NewInspectCommand(trackService application.TrackService, defaultLevel domain.Level) *cobra.Command {
 	var simplificationFlag, smoothingFlag string
 
 	cmd := &cobra.Command{
@@ -45,7 +45,7 @@ func NewInspectCommand(inspectTrackService application.InspectTrackService, defa
 				return newUsageError(fmt.Errorf("--smoothing: %w", err))
 			}
 
-			return runInspect(cmd, inspectTrackService, args[0], simplificationLevel, smoothingLevel)
+			return runInspect(cmd, trackService, args[0], simplificationLevel, smoothingLevel)
 		},
 	}
 
@@ -56,14 +56,14 @@ func NewInspectCommand(inspectTrackService application.InspectTrackService, defa
 	return cmd
 }
 
-func runInspect(cmd *cobra.Command, inspectTrackService application.InspectTrackService, path string, simplificationLevel, smoothingLevel domain.Level) error {
+func runInspect(cmd *cobra.Command, trackService application.TrackService, path string, simplificationLevel, smoothingLevel domain.Level) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	summary, err := inspectTrackService.Inspect(file, simplificationLevel, smoothingLevel)
+	summary, err := trackService.Inspect(file, simplificationLevel, smoothingLevel)
 	if err != nil {
 		return err
 	}
