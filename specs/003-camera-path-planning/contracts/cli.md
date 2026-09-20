@@ -57,9 +57,11 @@ Smoothed spans: 2
 
 - `Duration` traz `(automatic)` quando calculada pela ferramenta e
   `(requested)` quando informada pelo usuário.
-- `Time reference` é `clock` ou `distance`. Quando o trajeto tinha horário
-  mas ele não pôde ser usado, a linha traz o motivo:
-  `Time reference: distance (time data is inconsistent)`.
+- `Time reference` é `clock` ou `distance`. Quando a distância foi usada, a
+  linha traz o motivo: `Time reference: distance (no time data)` (o trajeto
+  não tem horário em todos os pontos) ou
+  `Time reference: distance (time data is inconsistent)` (tem horário, mas
+  ele não pôde ser usado).
 - Sem trechos suavizados, a linha é `Smoothed spans: none` e nenhuma lista
   segue.
 - Com `--export`, uma última linha `Plan written to <caminho>` é impressa.
@@ -68,8 +70,9 @@ Smoothed spans: 2
 
 ### Saída (erro)
 
-Mensagem em `stderr`, sem plano e — em qualquer erro — sem arquivo criado
-ou alterado no destino da exportação.
+Mensagem em `stderr`, sem resumo impresso (a exportação, quando pedida, é feita
+antes de qualquer saída) e — em qualquer erro — sem arquivo criado ou
+alterado no destino da exportação.
 
 | Cenário | Erro sentinela do domínio | Código |
 |---|---|---|

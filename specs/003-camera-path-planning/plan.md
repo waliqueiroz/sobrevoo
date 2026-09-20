@@ -217,8 +217,9 @@ Nenhuma violação da constituição; nada a justificar.
   duração mínima, nunca é recusada; uma duração *informada* abaixo do
   mínimo continua sendo recusada, com a mensagem que informa o mínimo. A
   curva (√, piso 20 s, teto 120 s) é inicial e fica em `CameraTuning`.
-- **Paradas fundidas pela simplificação** da etapa 1 podem não ser detectadas
-  (`research.md` item 3, "Limitação conhecida"); efeito conservador.
+- **Paradas fundidas pela simplificação** da etapa 1: resolvido usando os
+  pontos limpos (`TreatedTrack.CleanedPoints`) para o ritmo do marcador
+  (`research.md` item 3); a câmera segue a rota simplificada.
 - **Determinismo entre arquiteturas** limitado à quantização
   (`research.md` item 9).
 - **Refatoração das etapas 1 e 2** (`research.md` item 13): toca

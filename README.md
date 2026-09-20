@@ -5,14 +5,16 @@ de sobrevoo de trajetos a partir de arquivos de GPS.
 
 ## Status atual
 
-Duas etapas estão implementadas:
+Três etapas estão implementadas:
 
 1. Leitura e tratamento de um trajeto GPX, exposta pelo comando `inspect`.
 2. Registro local de dados geográficos (mapas base e relevo que você já
    baixou) e verificação de cobertura de um trajeto, expostos pelo grupo de
    comandos `geodata`.
+3. Planejamento do movimento de câmera do vídeo de sobrevoo, exposto pelo
+   comando `plan`.
 
-Ainda não há geração de mapa, câmera ou vídeo.
+Ainda não há desenho de mapa, renderização de quadros nem geração de vídeo.
 
 ## Instalação
 
@@ -110,6 +112,51 @@ Os erros de `register` e `remove` têm código de saída próprio (`5` a `9`:
 arquivo não encontrado, ilegível, formato não suportado, nome já em uso,
 nome não registrado), documentados em
 `specs/002-geo-data-registry/contracts/cli.md`.
+
+### `plan`: planejar o movimento de câmera
+
+```sh
+sobrevoo plan <arquivo.gpx> [--duration <segundos>] [--fps <n>] \
+    [--distance low|medium|high] [--tilt low|medium|high] \
+    [--export <plano.json>] [--overwrite]
+```
+
+A partir de um trajeto (tratado como em `inspect`), calcula o caminho que uma
+câmera virtual percorre ao acompanhá-lo do início ao fim: para cada quadro do
+futuro vídeo, onde a câmera está (latitude, longitude e altitude), para onde
+aponta (direção e inclinação) e em que ponto do trajeto está o marcador da
+atividade. O vídeo abre mostrando o trajeto inteiro, passa a acompanhar o
+marcador e fecha mostrando o trajeto completo. O movimento é sempre suave,
+inclusive em curvas fechadas, retornos e voltas no mesmo lugar; paradas longas
+são comprimidas; e o mesmo trajeto com os mesmos parâmetros produz sempre o
+mesmo plano, em qualquer lugar do planeta.
+
+```console
+$ sobrevoo plan atividade.gpx --export plano.json
+Duration: 42.0 s (automatic)
+Frame rate: 30.0 fps
+Frames: 1260
+Camera altitude: 2098.6 m - 11711.6 m
+Camera distance: 2780.9 m - 15982.9 m
+Time reference: clock
+Smoothed spans: none
+Plan written to plano.json
+```
+
+| Flag | Valores | Padrão | Descrição |
+|---|---|---|---|
+| `--duration` | segundos (até 3600) | automática | Duração do vídeo. Sem ela, é calculada a partir do comprimento do trajeto (de 20 s a 120 s) |
+| `--fps` | 1 a 120 | `30` | Quadros por segundo |
+| `--distance` | `low`, `medium`, `high` | `medium` | Quão longe a câmera fica do trajeto |
+| `--tilt` | `low`, `medium`, `high` | `medium` | Quão de cima a câmera olha (`high` é quase vertical) |
+| `--export` | caminho | — | Grava o plano completo em JSON (formato em `specs/003-camera-path-planning/contracts/plan-file.md`) |
+| `--overwrite` | — | — | Com `--export`, substitui um arquivo que já exista |
+
+Sem `--export`, só o resumo é impresso e nada é gravado em disco. O arquivo
+exportado nunca sobrescreve outro sem `--overwrite`. Os erros têm código de
+saída próprio (`10` a `16`: duração ou taxa inválida, duração curta demais para
+o trajeto, trajeto curto ou grande demais, destino da exportação já existente
+ou inválido), documentados em `specs/003-camera-path-planning/contracts/cli.md`.
 
 ## Desenvolvimento
 

@@ -92,13 +92,18 @@ biblioteca padrão e `encoding/json`.
 - **Racional**: comprimir só o `dt` (e não descartar pontos) mantém o
   marcador sem saltos durante a parada — ele apenas atravessa o trecho
   parado mais rápido. O teto de 5% torna SC-005 verdadeiro por construção.
-- **Limitação conhecida**: a simplificação da etapa 1 (Douglas-Peucker)
-  pode fundir uma parada com o trecho seguinte num só segmento, cuja
-  velocidade média fica acima do limiar; nesse caso a parada não é
-  detectada e permanece proporcional. Aceito: não vale reprocessar o
-  trajeto antes da simplificação para esta etapa, e o efeito é conservador
-  (o vídeo fica mais lento nesse trecho, nunca errado). Registrado como
-  risco, não como requisito.
+- **Ritmo pelos pontos limpos, geometria pela rota tratada**: a simplificação
+  da etapa 1 (Douglas-Peucker) funde uma parada com o trecho seguinte num
+  só segmento cuja velocidade média fica acima do limiar — descoberto ao
+  rodar o quickstart com uma parada real de 10 min, que passava despercebida.
+  Por isso `TreatedTrack` carrega também os `CleanedPoints`, e a linha do
+  tempo (referência de tempo, paradas, ritmo) é construída sobre eles; a
+  câmera continua seguindo a rota simplificada e suavizada. A posição do
+  marcador é a fração do comprimento da rota tratada correspondente à fração
+  do percurso limpo (`distância_limpa × comprimento_rota / comprimento_limpo`).
+  O jitter de GPS dentro de uma parada longa não conta como distância
+  percorrida na linha do tempo, senão as poucas frames restantes da parada
+  fariam o marcador "pular" dezenas de metros.
 - **Alternativas rejeitadas**: velocidade constante do marcador ignorando o
   horário (contraria FR-009); descartar pontos parados (cria salto).
 
@@ -190,12 +195,17 @@ biblioteca padrão e `encoding/json`.
   primeiro quadro de acompanhamento** na abertura e **ao do último** no
   fechamento (a câmera não gira durante a abertura nem o fechamento — só
   se aproxima ou se afasta), e distância
-  `D_geral = max(margem · R / tan(FOV/2), OverviewMinDistanceFactor · D₀)`
-  com `R` = raio do menor círculo (a partir do centro) que contém o
-  trajeto projetado, margem 1,2, fator 2 e `D₀` = distância base do nível
-  escolhido. O piso `2·D₀` garante que a abertura sempre aproxime a câmera
-  (trajetos menores que a distância de acompanhamento também ganham uma
-  visão de conjunto mais afastada que o acompanhamento), e o campo de visão
+  `D_geral = max(margem · R / tan(FOV/2), OverviewMinDistanceFactor · D_a)`
+  com `R` = maior distância do centro da caixa envolvente do trajeto
+  projetado a um de seus pontos (aproxima o menor círculo que o contém),
+  margem 1,2, fator 2 e `D_a` = distância de acompanhamento do quadro
+  adjacente (o primeiro na abertura, o último no fechamento; sempre ≥ `D₀`,
+  a distância base do nível escolhido). O piso `2·D_a` garante que a abertura
+  sempre aproxime a câmera e o fechamento sempre a afaste (trajetos pequenos,
+  ou de ritmo muito rápido no vídeo, também ganham uma visão de conjunto
+  mais afastada que o acompanhamento). Como `D_a ≥ D₀`, a razão de zoom
+  fica limitada por `D_geral/D₀`, que é o que `MinimumDuration` (item 8)
+  usa como cota conservadora. O campo de visão
   vertical de referência é de 45° (`OverviewVerticalFOV` — a etapa de
   renderização poderá usar outro, mas o plano precisa de um valor para
   garantir que "o trajeto inteiro esteja enquadrado", FR-012).

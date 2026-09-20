@@ -6,13 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Duas features estão implementadas até agora:
+Relive/Strava). Três features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
 registro local de mapas base e dados de relevo que o usuário já baixou, e
 verifica se um trajeto está coberto por eles (comandos `geodata
-register|list|remove|check`) — ainda sem câmera ou renderização de vídeo.
+register|list|remove|check`); `specs/003-camera-path-planning/` calcula o
+plano de câmera do vídeo de sobrevoo — para cada quadro, onde a câmera está,
+para onde aponta e onde está o marcador da atividade —, imprime um resumo e
+o exporta em JSON (comando `plan`). Ainda não há desenho de mapa, renderização
+de quadros nem geração de vídeo.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -32,6 +36,7 @@ go test ./internal/infra/inbound/cli/... -run 'Test_InspectCommand_Execute/shoul
 
 # Rodar a CLI direto, sem compilar um binário:
 go run ./cmd/sobrevoo inspect path/to/track.gpx --simplification=low --smoothing=high
+go run ./cmd/sobrevoo plan path/to/track.gpx --duration 45 --distance high --export plan.json
 ```
 
 ## Arquitetura
@@ -44,15 +49,25 @@ adapter.
 
 - **`internal/domain`** — entidades (`TrackPoint`, `Track`, `Route`,
   `BoundingBox`, `Level`, `DiscardStats`, `GeoDataSource`, `GeoDataSummary`,
-  `CoverageReport`, `TrackSummary`), construtores que carregam regra de
-  negócio (`NewGeoDataSource`, `SummarizeTrack`), funções puras (distância
+  `CoverageReport`, `TrackSummary`, `CleanedTrack`, `TreatedTrack`,
+  `PlanParameters`, `CameraTuning`, `CameraPlan`, `CameraFrame`), construtores
+  que carregam regra de negócio (`NewGeoDataSource`, `SummarizeTrack`,
+  `NewCameraPlan`, que calcula o resumo a partir dos quadros), funções puras
+  (planejamento de câmera: `PlanCamera`, `MinimumDuration`, `DefaultDuration`
+  e as primitivas exportadas `NewLocalPlane`, `BuildMarkerTimeline`,
+  `LimitRate`, `GaussianSmooth`, `OverviewView`, ... — exportadas para poderem
+  ser testadas isoladas a partir de `domain_test`, ver
+  `specs/003-camera-path-planning/research.md` item 17; distância
   de Haversine, ganho de elevação, duração, cálculo de bounding box —
   incluindo o "unwrap" de longitude no antimeridiano —, `ReorderByTime` e
   os `Discard*` compostos em `CleanTrack`, e o algoritmo de verificação de
   cobertura, `ComputeCoverage`), erros sentinela (`ErrEmptyFile`,
-  `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`), e as
-  portas `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
-  `GeoDataRepository`, `FileChecker`. Qualquer DTO de saída que não seja um
+  `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`, e os do
+  planejamento de câmera: `ErrInvalidDuration`, `ErrInvalidFrameRate`,
+  `ErrDurationTooShort`, `ErrTrackTooShort`, `ErrTrackTooLarge`,
+  `ErrPlanDestinationExists`, `ErrPlanDestinationInvalid`), e as portas
+  `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
+  `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`. Qualquer DTO de saída que não seja um
   valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
   também é um tipo de domínio comum — não um DTO de `internal/application`
   — e qualquer lógica não trivial (construir uma entidade, calcular algo a
@@ -62,18 +77,26 @@ adapter.
 - **`internal/application`** — a *service layer*. Orquestra portas e
   construtores/funções puras do domínio; não conhece Cobra, arquivo, nem
   código de saída, e não decide nenhuma regra de negócio por conta própria
-  — só decide qual porta/função de domínio chamar, e em qual ordem.
+  — só decide qual porta/função de domínio chamar, e em qual ordem. Há um
+  serviço por recurso: `TrackService` (`Clean`, `Treat`, `Inspect` — o único
+  lugar que sabe transformar um trajeto bruto em limpo ou tratado),
+  `GeoDataService` e `CameraPlanService` (`Generate`, `Export`); os dois
+  últimos dependem de `TrackService` em vez de repetir parse/limpeza/
+  simplificação/suavização.
 - **`internal/infra/outbound/*`** — adapters que implementam as portas do
   domínio: `trackparser` (GPX via `tkrajina/gpxgo`),
   `simplifier` (Douglas-Peucker), `smoother` (Catmull-Rom), `jsonfile`
-  (registro de dados geográficos), `config` (limiares
-  internos fixos: mínimo de pontos, velocidade máxima plausível, nível
-  padrão — ainda sem fonte de configuração externa, mas o ponto de extensão
-  já existe, conforme o Princípio VIII da constituição).
+  (registro de dados geográficos e exportação do plano de câmera em JSON,
+  atômica e sem sobrescrita por padrão), `config` (limiares internos fixos:
+  mínimo de pontos, velocidade máxima plausível, nível padrão, os
+  `CameraTuning` do planejamento de câmera e os parâmetros padrão do plano —
+  ainda sem fonte de configuração externa, mas o ponto de extensão já
+  existe, conforme o Princípio VIII da constituição).
 - **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
   traduz erros sentinela do domínio em códigos de saída de processo
   (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
-  `specs/002-geo-data-registry/contracts/cli.md` para o mapeamento exato.
+  `specs/002-geo-data-registry/contracts/cli.md` e
+  `specs/003-camera-path-planning/contracts/cli.md` para o mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso
@@ -83,7 +106,9 @@ adapter.
   continua sendo quem abre o arquivo só quando o método do serviço exige um
   `io.Reader` (`register` não abre nada, pois passa um caminho;
   `check` abre, pois `GeoDataService.CheckCoverage` exige um `Reader`,
-  igual a `inspect`). Ambos os padrões respeitam os Princípios I e II da
+  igual a `inspect` e a `plan`, cujo `CameraPlanService.Generate` também
+  recebe um `Reader`; já o arquivo do plano exportado é escrito pelo
+  adapter `jsonfile`, dado só o caminho). Ambos os padrões respeitam os Princípios I e II da
   constituição — é só uma questão de qual adapter concreto faz a chamada de
   I/O real (`specs/002-geo-data-registry/research.md`, item 8).
 - **`cmd/sobrevoo/main.go`** — composition root; o único lugar que conecta
@@ -189,8 +214,8 @@ uso) que a redação anterior da constituição permitia.
 - Cada camada é testada isolada, com o que ela depende mockado: os testes
   de domain/application mockam as portas do domínio (`mockdomain`); os
   testes de `internal/infra/inbound/cli` mockam
-  `application.InspectTrackService` e `application.GeoDataService`
-  (`mockapplication`) e nunca conectam
+  `application.TrackService`, `application.GeoDataService` e
+  `application.CameraPlanService` (`mockapplication`) e nunca conectam
   um serviço ou adapter de saída real. Não existe teste automatizado de
   ponta a ponta — `specs/<feature>/quickstart.md` é o checklist manual, com
   o binário real, pra isso.

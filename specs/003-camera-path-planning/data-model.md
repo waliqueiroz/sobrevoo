@@ -16,7 +16,7 @@ Parâmetros que o usuário escolhe (FR-003, FR-005).
 
 | Campo | Tipo | Regra |
 |---|---|---|
-| `Duration` | `*time.Duration` | `nil` = automática (FR-003a); se informada, > 0 (`ErrInvalidDuration`) e ≥ duração mínima do trajeto (`ErrDurationTooShort`, verificada em `PlanCamera`) |
+| `Duration` | `*time.Duration` | `nil` = automática (FR-003a); se informada, > 0 e ≤ 3 600 s (`ErrInvalidDuration`) e ≥ duração mínima do trajeto (`ErrDurationTooShort`, verificada em `PlanCamera`) |
 | `FrameRate` | `float64` | 1 ≤ valor ≤ 120 (`ErrInvalidFrameRate`); NaN/infinito também inválidos |
 | `Distance` | `Level` | `low`, `medium` ou `high` (tipo já existente) |
 | `Tilt` | `Level` | idem |
@@ -135,10 +135,12 @@ domínio junto de `Track`:
 | Tipo | Campos | Produzido por |
 |---|---|---|
 | `CleanedTrack` | `Track Track`, `Points []TrackPoint`, `Discarded DiscardStats` | `TrackService.Clean` (parse + limpeza; sem simplificar nem suavizar) |
-| `TreatedTrack` | `Track Track`, `Route Route`, `Discarded DiscardStats` | `TrackService.Treat` (`Clean` + simplificação + suavização) |
+| `TreatedTrack` | `Track Track`, `CleanedPoints []TrackPoint`, `Route Route`, `Discarded DiscardStats` | `TrackService.Treat` (`Clean` + simplificação + suavização) |
 
-`TreatedTrack` carrega exatamente os três valores que
-`domain.SummarizeTrack(track, route, discarded)` já recebe.
+`TreatedTrack` carrega os três valores que
+`domain.SummarizeTrack(track, route, discarded)` já recebe e, além deles, os
+pontos limpos: a simplificação descarta os pontos que revelam paradas longas,
+então o ritmo do marcador (`research.md` item 3) precisa deles.
 
 ### Reuso (sem mudança)
 
@@ -151,11 +153,11 @@ domínio junto de `Track`:
 
 | Função | Arquivo | Responsabilidade |
 |---|---|---|
-| `PlanCamera(points, parameters, tuning) (CameraPlan, error)` | `camera_planning.go` | orquestra as funções abaixo; único ponto de entrada da regra |
+| `PlanCamera(treated TreatedTrack, parameters, tuning) (CameraPlan, error)` | `camera_planning.go` | orquestra as funções abaixo; único ponto de entrada da regra |
 | `MinimumDuration(points, frameRate, distance, tilt Level, tuning) time.Duration` | `camera_planning.go` | FR-017 (research.md item 8) |
 | `DefaultDuration(points, frameRate, distance, tilt Level, tuning) time.Duration` | `camera_planning.go` | FR-003a: curva sublinear com piso/teto, nunca abaixo de `MinimumDuration` (research.md item 8.1); chamada por `PlanCamera` quando `Parameters.Duration` é `nil` |
 | `NewLocalPlane(points)` / `(l LocalPlane) Project` / `Unproject` | `camera_projection.go` | projeção azimutal equidistante (item 2) |
-| `BuildMarkerTimeline(points, plane, tuning) MarkerTimeline` | `camera_timeline.go` | referência de tempo, compressão de paradas, `s(t)` (item 3) |
+| `BuildMarkerTimeline(cleanedPoints, tuning) MarkerTimeline` | `camera_timeline.go` | referência de tempo, compressão de paradas, `s(t)` (item 3) |
 | `DesiredHeading`, `UnwrapAngles`, `FollowDistance`, `ComputeCameraPose` | `camera_motion.go` | rumo, distância e pose orbital (itens 1, 4, 6) |
 | `LimitRate`, `GaussianSmooth`, `DetectSmoothedSpans` | `camera_motion.go` | limitação de taxa, suavização e trechos suavizados (item 5) |
 | `OverviewPose`, `BlendPose` | `camera_framing.go` | abertura/fechamento (item 7) |

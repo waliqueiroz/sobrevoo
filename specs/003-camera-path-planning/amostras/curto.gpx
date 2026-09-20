@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="sobrevoo-samples" xmlns="http://www.topografix.com/GPX/1/1">
+<trk><name>curto.gpx</name><trkseg>
+<trkpt lat="40.4168000" lon="-3.7038000"><ele>85.7</ele><time>2026-05-01T08:00:00Z</time></trkpt>
+<trkpt lat="40.4168000" lon="-3.7037409"><ele>85.7</ele><time>2026-05-01T08:00:05Z</time></trkpt>
+<trkpt lat="40.4168000" lon="-3.7036819"><ele>85.7</ele><time>2026-05-01T08:00:10Z</time></trkpt>
+<trkpt lat="40.4168000" lon="-3.7036228"><ele>85.7</ele><time>2026-05-01T08:00:15Z</time></trkpt>
+<trkpt lat="40.4168000" lon="-3.7035638"><ele>85.7</ele><time>2026-05-01T08:00:20Z</time></trkpt>
+</trkseg></trk></gpx>
