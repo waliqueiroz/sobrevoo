@@ -34,7 +34,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(60 * time.Second).WithFrameRate(30).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -51,7 +51,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(60 * time.Second).WithFrameRate(24).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -65,12 +65,12 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, 0.0, plan.Frames[0].MarkerDistance)
-		assert.InDelta(t, domain.TotalDistance(points), plan.Frames[len(plan.Frames)-1].MarkerDistance, 0.001)
+		assert.InDelta(t, (domain.Route{Points: points}).Length(), plan.Frames[len(plan.Frames)-1].MarkerDistance, 0.001)
 		assertMarkerMonotonic(t, plan)
 	})
 
@@ -78,12 +78,12 @@ func Test_PlanCamera(t *testing.T) {
 		// given
 		points := builddomain.NewSyntheticRouteBuilder().WithUTurn(2000).WithConstantSpeed(4).Build()
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(40 * time.Second).Build()
-		first, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		first, err := treatedOf(points).PlanCamera(parameters, tuning)
 		require.NoError(t, err)
 
 		for i := 0; i < 100; i++ {
 			// when
-			plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+			plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 			// then
 			require.NoError(t, err)
@@ -97,7 +97,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -121,7 +121,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -144,7 +144,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then: consecutive markers are never more than a fraction of a degree apart (mod 360)
 		require.NoError(t, err)
@@ -160,7 +160,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -175,7 +175,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -189,7 +189,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithoutDuration().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -205,7 +205,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(45 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -220,7 +220,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithFrameRate(0).Build()
 
 		// when
-		_, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		_, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrInvalidFrameRate)
@@ -232,7 +232,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithoutDuration().Build()
 
 		// when
-		_, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		_, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -250,7 +250,7 @@ func Test_PlanCamera(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(2 * time.Second).WithFrameRate(1).Build()
 
 		// when
-		_, err := domain.PlanCamera(treatedOf(points), parameters, tightTuning)
+		_, err := treatedOf(points).PlanCamera(parameters, tightTuning)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrDurationTooShort)
@@ -266,7 +266,7 @@ func Test_PlanCamera_Smoothness(t *testing.T) {
 			parameters := builddomain.NewPlanParametersBuilder().WithDuration(120 * time.Second).Build()
 
 			// when
-			plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+			plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 			// then
 			require.NoError(t, err)
@@ -282,7 +282,7 @@ func Test_PlanCamera_Smoothness(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(120 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then: heading changes by well over 150 degrees, over many frames, none of them abrupt
 		require.NoError(t, err)
@@ -297,7 +297,7 @@ func Test_PlanCamera_Smoothness(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(120 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then: the total heading rotation over the following phase is a small fraction of 8 full turns
 		require.NoError(t, err)
@@ -318,7 +318,7 @@ func Test_PlanCamera_OpeningAndClosing(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(100 * time.Second).WithFrameRate(30).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then: 3000 frames, 10% each
 		require.NoError(t, err)
@@ -336,11 +336,11 @@ func Test_PlanCamera_OpeningAndClosing(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(100 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
-		total := domain.TotalDistance(points)
+		total := (domain.Route{Points: points}).Length()
 		for _, f := range plan.Frames {
 			switch f.Phase {
 			case domain.PhaseOpening:
@@ -356,7 +356,7 @@ func Test_PlanCamera_OpeningAndClosing(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(100 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -378,7 +378,7 @@ func Test_PlanCamera_OpeningAndClosing(t *testing.T) {
 		assert.InDelta(t, firstFollowing.Heading, first.Heading, 0.5)
 		assert.InDelta(t, lastFollowing.Heading, last.Heading, 0.5)
 
-		plane := domain.NewLocalPlane(points)
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 		for _, frame := range []domain.CameraFrame{first, last} {
 			view := cameraViewOf(plane, frame)
 			for _, p := range points {
@@ -393,7 +393,7 @@ func Test_PlanCamera_OpeningAndClosing(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(100 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -425,7 +425,7 @@ func Test_PlanCamera_SmoothedSpans(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(30 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -442,7 +442,7 @@ func Test_PlanCamera_SmoothedSpans(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(60 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -455,7 +455,7 @@ func Test_PlanCamera_SmoothedSpans(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(60 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -472,7 +472,7 @@ func Test_PlanCamera_RegionEquivalence(t *testing.T) {
 	plan := func(t *testing.T, lat, lon float64) domain.CameraPlan {
 		t.Helper()
 		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(lat, lon).WithUTurn(3000).WithConstantSpeed(4).Build()
-		result, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		result, err := treatedOf(points).PlanCamera(parameters, tuning)
 		require.NoError(t, err)
 		return result
 	}
@@ -503,7 +503,7 @@ func Test_DefaultDuration(t *testing.T) {
 	tuning := defaultTuning()
 	durationFor := func(km float64) time.Duration {
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(km*1000, 90).Build()
-		return domain.DefaultDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
+		return defaultDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
 	}
 
 	t.Run("should follow the curve 15 s + 6 s × sqrt(km), rounded to the second", func(t *testing.T) {
@@ -572,10 +572,10 @@ func Test_PlanCamera_LongStopHiddenBySimplification(t *testing.T) {
 
 	t.Run("should compress the stop found in the cleaned points even though the route no longer shows it", func(t *testing.T) {
 		// given
-		treated := domain.TreatedTrack{CleanedPoints: cleaned, Route: domain.Route{Points: route}}
+		treated := domain.TreatedTrack{Cleaned: domain.Route{Points: cleaned}, Route: domain.Route{Points: route}}
 
 		// when
-		plan, err := domain.PlanCamera(treated, parameters, tuning)
+		plan, err := treated.PlanCamera(parameters, tuning)
 
 		// then: the marker stands still for a few frames only, at most 5 percent of the following phase
 		require.NoError(t, err)
@@ -586,10 +586,10 @@ func Test_PlanCamera_LongStopHiddenBySimplification(t *testing.T) {
 
 	t.Run("should not find any stop when the cleaned points are the simplified route itself", func(t *testing.T) {
 		// given
-		treated := domain.TreatedTrack{CleanedPoints: route, Route: domain.Route{Points: route}}
+		treated := domain.TreatedTrack{Cleaned: domain.Route{Points: route}, Route: domain.Route{Points: route}}
 
 		// when
-		plan, err := domain.PlanCamera(treated, parameters, tuning)
+		plan, err := treated.PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -598,14 +598,14 @@ func Test_PlanCamera_LongStopHiddenBySimplification(t *testing.T) {
 
 	t.Run("should still move the marker along the treated route, from its start to its end", func(t *testing.T) {
 		// given
-		treated := domain.TreatedTrack{CleanedPoints: cleaned, Route: domain.Route{Points: route}}
+		treated := domain.TreatedTrack{Cleaned: domain.Route{Points: cleaned}, Route: domain.Route{Points: route}}
 
 		// when
-		plan, err := domain.PlanCamera(treated, parameters, tuning)
+		plan, err := treated.PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
-		assert.InDelta(t, domain.TotalDistance(route), plan.Frames[len(plan.Frames)-1].MarkerDistance, 0.001)
+		assert.InDelta(t, (domain.Route{Points: route}).Length(), plan.Frames[len(plan.Frames)-1].MarkerDistance, 0.001)
 		assertMarkerMonotonic(t, plan)
 	})
 }

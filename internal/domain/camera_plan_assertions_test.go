@@ -3,6 +3,7 @@ package domain_test
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -12,7 +13,7 @@ import (
 // treatedOf wraps points as a treated track whose cleaned points and route are
 // the same, for tests that do not depend on their difference.
 func treatedOf(points []domain.TrackPoint) domain.TreatedTrack {
-	return domain.TreatedTrack{CleanedPoints: points, Route: domain.Route{Points: points}}
+	return domain.TreatedTrack{Cleaned: domain.Route{Points: points}, Route: domain.Route{Points: points}}
 }
 
 func abs(v float64) float64 { return math.Abs(v) }
@@ -39,10 +40,7 @@ func assertSmooth(t *testing.T, plan domain.CameraPlan, tuning domain.CameraTuni
 		assert.LessOrEqual(t, abs(b.Tilt-a.Tilt), tuning.MaxTiltRateDegPerSecond/fps+tolerance, "tilt step at frame %d", i)
 		assert.LessOrEqual(t, abs(math.Log(b.CameraToMarkerDistance/a.CameraToMarkerDistance)), tuning.MaxLogDistanceRatePerSecond/fps+tolerance/100, "zoom step at frame %d", i)
 
-		horizontal := domain.Haversine(
-			domain.TrackPoint{Latitude: a.CameraLatitude, Longitude: a.CameraLongitude},
-			domain.TrackPoint{Latitude: b.CameraLatitude, Longitude: b.CameraLongitude},
-		)
+		horizontal := domain.TrackPoint{Latitude: a.CameraLatitude, Longitude: a.CameraLongitude}.DistanceTo(domain.TrackPoint{Latitude: b.CameraLatitude, Longitude: b.CameraLongitude})
 		move := math.Hypot(horizontal, b.CameraAltitude-a.CameraAltitude)
 		limit := 1.5 * tuning.MaxTargetSpeedInDistances * math.Max(a.CameraToMarkerDistance, b.CameraToMarkerDistance) / fps
 		assert.LessOrEqual(t, move, limit, "camera movement at frame %d", i)
@@ -71,4 +69,16 @@ func assertMarkerMonotonic(t *testing.T, plan domain.CameraPlan) {
 	for i := 1; i < len(plan.Frames); i++ {
 		assert.GreaterOrEqual(t, plan.Frames[i].MarkerDistance, plan.Frames[i-1].MarkerDistance, "marker distance at frame %d", i)
 	}
+}
+
+// minimumDuration and defaultDuration adapt the plan parameters' methods to
+// the short form the tests use: a route, a frame rate and the two levels.
+func minimumDuration(points []domain.TrackPoint, frameRate float64, distance, tilt domain.Level, tuning domain.CameraTuning) time.Duration {
+	parameters := domain.PlanParameters{FrameRate: frameRate, Distance: distance, Tilt: tilt}
+	return parameters.MinimumDuration(domain.Route{Points: points}, tuning)
+}
+
+func defaultDuration(points []domain.TrackPoint, frameRate float64, distance, tilt domain.Level, tuning domain.CameraTuning) time.Duration {
+	parameters := domain.PlanParameters{FrameRate: frameRate, Distance: distance, Tilt: tilt}
+	return parameters.DefaultDuration(domain.Route{Points: points}, tuning)
 }

@@ -44,7 +44,8 @@ por `Level`. Valores iniciais em `research.md` itens 3 a 8.
 
 Os padrões dos parâmetros do usuário (taxa 30, distância e inclinação
 `medium`) **não** fazem parte de `CameraTuning`: vêm de
-`Config.DefaultPlanParameters` (`research.md` item 12).
+`Config.PlanDefaults`, tipo do próprio pacote `config`, mapeado para o domínio
+pelo composition root (`research.md` itens 12 e 18).
 
 ### `CameraPlan` (`camera_plan.go`)
 
@@ -134,11 +135,11 @@ domínio junto de `Track`:
 
 | Tipo | Campos | Produzido por |
 |---|---|---|
-| `CleanedTrack` | `Track Track`, `Points []TrackPoint`, `Discarded DiscardStats` | `TrackService.Clean` (parse + limpeza; sem simplificar nem suavizar) |
-| `TreatedTrack` | `Track Track`, `CleanedPoints []TrackPoint`, `Route Route`, `Discarded DiscardStats` | `TrackService.Treat` (`Clean` + simplificação + suavização) |
+| `CleanedTrack` | `Track Track`, `Route Route`, `Discarded DiscardStats` | `TrackService.Clean` (parse + limpeza; sem simplificar nem suavizar) |
+| `TreatedTrack` | `Track Track`, `Cleaned Route`, `Route Route`, `Discarded DiscardStats` | `TrackService.Treat` (`Clean` + simplificação + suavização) |
 
 `TreatedTrack` carrega os três valores que
-`domain.SummarizeTrack(track, route, discarded)` já recebe e, além deles, os
+`domain.NewTrackSummary(track, route, discarded)` já recebe e, além deles, os
 pontos limpos: a simplificação descarta os pontos que revelam paradas longas,
 então o ritmo do marcador (`research.md` item 3) precisa deles.
 
@@ -149,23 +150,28 @@ então o ritmo do marcador (`research.md` item 3) precisa deles.
 `TrackParser`, `Simplifier`, `Smoother` e os sentinelas `ErrEmptyFile`,
 `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]` (FR-022).
 
-## Funções puras de domínio
+## Comportamento nas entidades
 
-| Função | Arquivo | Responsabilidade |
+O comportamento vive nos métodos das entidades (`research.md` item 17); nada
+disso faz I/O, lê relógio ou usa aleatoriedade, e cada método tem comentário
+de documentação em inglês.
+
+| Entidade | Métodos | Responsabilidade |
 |---|---|---|
-| `PlanCamera(treated TreatedTrack, parameters, tuning) (CameraPlan, error)` | `camera_planning.go` | orquestra as funções abaixo; único ponto de entrada da regra |
-| `MinimumDuration(points, frameRate, distance, tilt Level, tuning) time.Duration` | `camera_planning.go` | FR-017 (research.md item 8) |
-| `DefaultDuration(points, frameRate, distance, tilt Level, tuning) time.Duration` | `camera_planning.go` | FR-003a: curva sublinear com piso/teto, nunca abaixo de `MinimumDuration` (research.md item 8.1); chamada por `PlanCamera` quando `Parameters.Duration` é `nil` |
-| `NewLocalPlane(points)` / `(l LocalPlane) Project` / `Unproject` | `camera_projection.go` | projeção azimutal equidistante (item 2) |
-| `BuildMarkerTimeline(cleanedPoints, tuning) MarkerTimeline` | `camera_timeline.go` | referência de tempo, compressão de paradas, `s(t)` (item 3) |
-| `DesiredHeading`, `UnwrapAngles`, `FollowDistance`, `ComputeCameraPose` | `camera_motion.go` | rumo, distância e pose orbital (itens 1, 4, 6) |
-| `LimitRate`, `GaussianSmooth`, `DetectSmoothedSpans` | `camera_motion.go` | limitação de taxa, suavização e trechos suavizados (item 5) |
-| `OverviewPose`, `BlendPose` | `camera_framing.go` | abertura/fechamento (item 7) |
+| `TrackPoint` | `DistanceTo(other)` | distância de Haversine |
+| `Route` | `Length`, `Duration`, `BoundingBox`, `ElevationGain`, `Coverage`, `Distances`, `ReorderByTime`, `Discard*` | estatísticas, cobertura e limpeza de uma sequência de pontos |
+| `Track` | `Clean(minPoints, maxSpeed) (CleanedTrack, error)` | limpeza composta |
+| `TreatedTrack` | `PlanCamera(parameters, tuning) (CameraPlan, error)` | único ponto de entrada da regra de planejamento |
+| `PlanParameters` | `Validate`, `FrameCount`, `MinimumDuration(route, tuning)`, `DefaultDuration(route, tuning)` | FR-016/017/003a (`research.md` itens 8 e 8.1) |
+| `CameraTuning` | `FollowDistance(level, markerSpeed)` | distância de acompanhamento (item 6) |
+| `LocalPlane` | `Project`, `Unproject`, `ProjectRoute(route)` | projeção azimutal equidistante (item 2) |
+| `PlanarRoute` (novo) | `Length`, `Span`, `PointAt`, `ChordHeading`, `HeadingAt`, `OverviewView` | geometria da rota no plano: rumo, visão geral (itens 4 e 7) |
+| `MarkerTimeline` | `DistanceAt`, `Total`; construtor `NewMarkerTimeline(cleanedRoute, tuning)` | referência de tempo, compressão de paradas (item 3) |
+| `CameraView` | `Pose`, `Blend(other, u)` | pose orbital e abertura/fechamento (itens 1 e 7) |
+| `Signal` (novo, um valor por quadro) | `Unwrap`, `LimitRate`, `Smooth`, `SmoothedSpans` | limitação de taxa, suavização e trechos suavizados (item 5) |
 
-As funções são **exportadas** para permitir teste isolado a partir do pacote
-`domain_test` (`research.md` item 17).
-
-Todas puras: sem I/O, sem relógio, sem aleatoriedade, cada uma com comentário de documentação em inglês.
+`cameraPlanner` (não exportado) guarda o que o planejamento usa enquanto roda
+e concentra os passos internos (`followViews`, `limitAndSmooth`, `frame`).
 
 ## Erros sentinela novos (`errors.go`)
 
@@ -191,13 +197,13 @@ CameraPlanService (interface; NOVO)
 
 - `trackService` depende de `TrackParser`, `Simplifier`, `Smoother` e dos
   limiares `minPoints`/`maxPlausibleSpeedKmh`. `Clean`: `Parse` →
-  `CleanTrack`. `Treat`: `Clean` → `Simplify` → `Smooth`. `Inspect`:
-  `Treat` → `domain.SummarizeTrack`.
+  `Track.Clean`. `Treat`: `Clean` → `Simplify` → `Smooth`. `Inspect`:
+  `Treat` → `domain.NewTrackSummary`.
 - `geoDataService.CheckCoverage` passa a chamar `TrackService.Clean` e
   deixa de receber `TrackParser` e os limiares (o construtor encolhe).
 - `cameraPlanService` depende de `TrackService`, `CameraPlanExporter`, do
   nível padrão de tratamento e de `domain.CameraTuning`. `Generate`:
-  `parameters.Validate()` → `TrackService.Treat` → `domain.PlanCamera`.
+  `parameters.Validate()` → `TrackService.Treat` → `TreatedTrack.PlanCamera`.
   `Export`: delega à porta.
 
 ## Transições e ciclo de vida

@@ -32,22 +32,19 @@ type MarkerTimeline struct {
 	FallbackReason string
 }
 
-// BuildMarkerTimeline builds the timeline of points (the cleaned points of a
+// NewMarkerTimeline builds the timeline of a route (the cleaned route of a
 // track, before simplification, since simplification hides stops). Timestamps are used
 // when every point has one, the total duration is positive and no two points
 // sharing a timestamp are more than one meter apart; otherwise the distance
 // travelled is used, and FallbackReason says why. Long stops (see
 // CameraTuning) are compressed so they take a short, capped time in the
 // video.
-func BuildMarkerTimeline(points []TrackPoint, tuning CameraTuning) MarkerTimeline {
-	cumulative := make([]float64, len(points))
-	for i := 1; i < len(points); i++ {
-		cumulative[i] = cumulative[i-1] + Haversine(points[i-1], points[i])
-	}
+func NewMarkerTimeline(route Route, tuning CameraTuning) MarkerTimeline {
+	cumulative := route.Distances()
 
 	timeline := MarkerTimeline{Cumulative: cumulative}
 
-	if reason := untimedReason(points, cumulative); reason != "" {
+	if reason := route.unusableTimeReason(cumulative); reason != "" {
 		timeline.Reference = TimeReferenceDistance
 		timeline.FallbackReason = reason
 		timeline.Effective = append([]float64{}, cumulative...)
@@ -55,14 +52,15 @@ func BuildMarkerTimeline(points []TrackPoint, tuning CameraTuning) MarkerTimelin
 	}
 
 	timeline.Reference = TimeReferenceClock
-	timeline.Effective, timeline.Cumulative = compressLongStops(points, cumulative, tuning)
+	timeline.Effective, timeline.Cumulative = route.compressLongStops(cumulative, tuning)
 	return timeline
 }
 
-// untimedReason returns why the timestamps cannot drive the marker, or ""
-// when they can.
-func untimedReason(points []TrackPoint, cumulative []float64) string {
-	if len(points) == 0 || !allHaveTime(points) {
+// unusableTimeReason returns why the route's timestamps cannot drive the
+// marker, or "" when they can.
+func (r Route) unusableTimeReason(cumulative []float64) string {
+	points := r.Points
+	if len(points) == 0 || !r.allHaveTime() {
 		return noTimeDataReason
 	}
 
@@ -86,7 +84,8 @@ func untimedReason(points []TrackPoint, cumulative []float64) string {
 // of the moving time). It also returns the distance travelled at each point
 // with the jitter inside long stops removed, so the marker does not hop when
 // a stop's few remaining moments are played.
-func compressLongStops(points []TrackPoint, cumulative []float64, tuning CameraTuning) (effective, distances []float64) {
+func (r Route) compressLongStops(cumulative []float64, tuning CameraTuning) (effective, distances []float64) {
+	points := r.Points
 	segments := len(points) - 1
 	real := make([]float64, segments)
 	stopped := make([]bool, segments)

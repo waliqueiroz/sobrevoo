@@ -133,12 +133,12 @@ func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport,
 
 	baseMaps, elevations := s.partitionAvailableSources(sources)
 
-	return domain.ComputeCoverage(cleaned.Points, baseMaps, elevations), nil
+	return cleaned.Route.Coverage(baseMaps, elevations), nil
 }
 
 // partitionAvailableSources splits sources into base map and elevation
 // candidates, excluding any whose file is no longer found (FR-017) —
-// needs s.fileChecker, so it stays here rather than in domain.ComputeCoverage,
+// needs s.fileChecker, so it stays here rather than in domain.Route.Coverage,
 // which is a pure function.
 func (s *geoDataService) partitionAvailableSources(sources []domain.GeoDataSource) (baseMaps, elevations []domain.GeoDataSource) {
 	for _, source := range sources {

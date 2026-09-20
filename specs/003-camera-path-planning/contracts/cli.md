@@ -26,7 +26,7 @@ sobrevoo plan <arquivo-de-trajeto> [--duration <segundos>] [--fps <n>]
   comprimento do trajeto** (de 20 s a 120 s, crescimento sublinear, nunca
   abaixo do mínimo daquele trajeto; FR-003a). Quando informada, é usada
   exatamente e passa pelas validações de duração.
-- `--fps` (padrão `30`, de `Config.DefaultPlanParameters`): quadros por segundo; número decimal aceito
+- `--fps` (padrão `30`, de `Config.PlanDefaults`): quadros por segundo; número decimal aceito
   (ex.: `29.97`), entre 1 e 120.
 - `--distance` (padrão `medium`): afastamento da câmera em relação ao
   trajeto.

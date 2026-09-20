@@ -19,7 +19,7 @@ func Test_PlanCamera_TrackTooShort(t *testing.T) {
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(40, 90).Build()
 
 		// when
-		_, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		_, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.ErrorIs(t, err, domain.ErrTrackTooShort)
@@ -31,10 +31,10 @@ func Test_PlanCamera_TrackTooShort(t *testing.T) {
 		// given
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(50, 90).Build()
 		exact := tuning
-		exact.MinTrackLengthMeters = domain.TotalDistance(points)
+		exact.MinTrackLengthMeters = (domain.Route{Points: points}).Length()
 
 		// when
-		_, err := domain.PlanCamera(treatedOf(points), parameters, exact)
+		_, err := treatedOf(points).PlanCamera(parameters, exact)
 
 		// then
 		assert.NoError(t, err)
@@ -45,7 +45,7 @@ func Test_PlanCamera_TrackTooShort(t *testing.T) {
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(60, 90).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -62,7 +62,7 @@ func Test_PlanCamera_TrackTooLarge(t *testing.T) {
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(2_100_000, 90).WithPointCount(400).Build()
 
 		// when
-		_, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		_, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.ErrorIs(t, err, domain.ErrTrackTooLarge)
@@ -75,7 +75,7 @@ func Test_PlanCamera_TrackTooLarge(t *testing.T) {
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(1_990_000, 90).WithPointCount(400).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -87,7 +87,7 @@ func Test_PlanCamera_TrackTooLarge(t *testing.T) {
 		points := builddomain.NewSyntheticRouteBuilder().WithCircle(100, 100).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)

@@ -20,9 +20,9 @@ import (
 func treatedRoute(lengthMeters float64) domain.TreatedTrack {
 	points := builddomain.NewSyntheticRouteBuilder().WithLine(lengthMeters, 90).WithConstantSpeed(5).Build()
 	return domain.TreatedTrack{
-		Track:         builddomain.NewTrackBuilder().WithPoints(points...).Build(),
-		CleanedPoints: points,
-		Route:         domain.Route{Points: points},
+		Track:   builddomain.NewTrackBuilder().WithPoints(points...).Build(),
+		Cleaned: domain.Route{Points: points},
+		Route:   domain.Route{Points: points},
 	}
 }
 
@@ -76,7 +76,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		// given
 		treated := treatedRoute(5000)
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(45 * time.Second).Build()
-		want, err := domain.PlanCamera(treated, parameters, tuning)
+		want, err := treated.PlanCamera(parameters, tuning)
 		require.NoError(t, err)
 
 		mockCtrl := gomock.NewController(t)

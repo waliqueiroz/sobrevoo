@@ -31,7 +31,7 @@ make generate   # go generate ./...  (regenera os mocks; precisa do mockgen, dec
 make lint       # go vet ./...
 
 # Rodar um teste específico (por pacote + nome do teste/subteste):
-go test ./internal/domain/... -run Test_Haversine -v
+go test ./internal/domain/... -run Test_TrackPoint_DistanceTo -v
 go test ./internal/infra/inbound/cli/... -run 'Test_InspectCommand_Execute/should_map_ErrEmptyFile' -v
 
 # Rodar a CLI direto, sem compilar um binário:
@@ -51,17 +51,22 @@ adapter.
   `BoundingBox`, `Level`, `DiscardStats`, `GeoDataSource`, `GeoDataSummary`,
   `CoverageReport`, `TrackSummary`, `CleanedTrack`, `TreatedTrack`,
   `PlanParameters`, `CameraTuning`, `CameraPlan`, `CameraFrame`), construtores
-  que carregam regra de negócio (`NewGeoDataSource`, `SummarizeTrack`,
-  `NewCameraPlan`, que calcula o resumo a partir dos quadros), funções puras
-  (planejamento de câmera: `PlanCamera`, `MinimumDuration`, `DefaultDuration`
-  e as primitivas exportadas `NewLocalPlane`, `BuildMarkerTimeline`,
-  `LimitRate`, `GaussianSmooth`, `OverviewView`, ... — exportadas para poderem
-  ser testadas isoladas a partir de `domain_test`, ver
-  `specs/003-camera-path-planning/research.md` item 17; distância
+  que carregam regra de negócio (`NewGeoDataSource`, `NewTrackSummary`,
+  `NewCameraPlan`, que calcula o resumo a partir dos quadros), e métodos de
+  entidade que carregam o comportamento de cada uma: `TrackPoint.DistanceTo`
+  (Haversine, com o "wrap" do antimeridiano), `Route` (`Length`, `Duration`,
+  `BoundingBox`, `ElevationGain`, `Coverage`, `ReorderByTime` e os `Discard*`),
+  `Track.Clean`, `TreatedTrack.PlanCamera`, `PlanParameters`
+  (`MinimumDuration`, `DefaultDuration`), `CameraTuning.FollowDistance`,
+  `LocalPlane`, `PlanarRoute` (`HeadingAt`, `OverviewView`, ...), `CameraView`
+  (`Pose`, `Blend`) e `Signal` (`Unwrap`, `LimitRate`, `Smooth`,
+  `SmoothedSpans`) — ver `specs/003-camera-path-planning/research.md` item 17;
+  o que sobra como função livre é matemática sem dono (`clamp`, `quantize`,
+  `frameTime`, `normalizeDegrees`). Distância
   de Haversine, ganho de elevação, duração, cálculo de bounding box —
-  incluindo o "unwrap" de longitude no antimeridiano —, `ReorderByTime` e
-  os `Discard*` compostos em `CleanTrack`, e o algoritmo de verificação de
-  cobertura, `ComputeCoverage`), erros sentinela (`ErrEmptyFile`,
+  incluindo o "unwrap" de longitude no antimeridiano —, a limpeza composta
+  em `Track.Clean` e o algoritmo de verificação de cobertura,
+  `Route.Coverage`), erros sentinela (`ErrEmptyFile`,
   `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`, e os do
   planejamento de câmera: `ErrInvalidDuration`, `ErrInvalidFrameRate`,
   `ErrDurationTooShort`, `ErrTrackTooShort`, `ErrTrackTooLarge`,
@@ -91,7 +96,10 @@ adapter.
   mínimo de pontos, velocidade máxima plausível, nível padrão, os
   `CameraTuning` do planejamento de câmera e os parâmetros padrão do plano —
   ainda sem fonte de configuração externa, mas o ponto de extensão já
-  existe, conforme o Princípio VIII da constituição).
+  existe, conforme o Princípio VIII da constituição). O pacote `config`
+  tem tipos próprios (`config.Level`, `config.CameraTuning`,
+  `config.PlanDefaults`) e **não importa o domínio**; quem os mapeia para os
+  tipos de domínio é o composition root (`cmd/sobrevoo/config_mapping.go`).
 - **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
   traduz erros sentinela do domínio em códigos de saída de processo
   (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
@@ -175,15 +183,19 @@ uso) que a redação anterior da constituição permitia.
   `internal/domain`, nunca em `internal/application` — nem como DTO
   próprio da camada de aplicação, nem como função solta no pacote
   `application`. Um método de serviço busca/checa via porta, delega a
-  regra para um construtor (`domain.NewGeoDataSource`) ou função pura de
-  domínio (`domain.ComputeCoverage`), e devolve o resultado — a mesma
+  regra para um construtor (`domain.NewGeoDataSource`) ou método de uma
+  entidade de domínio (`Route.Coverage`), e devolve o resultado — a mesma
   divisão de `GroupService.AddUser` (busca via repositório, delega para
-  `domain.Group.AddUser`) em `waliqueiroz/mystery-gifter-api`. Dentro do
-  domínio, tanto faz a lógica virar método de uma entidade
-  (`Group.AddUser`, `Group.GenerateMatches`) quanto função livre operando
-  sobre coleções (`ComputeBoundingBox`, `Haversine`, `ComputeCoverage`) —
-  o segundo já é o padrão deste projeto desde a etapa 1, e o repositório de
-  referência do usuário usa os dois conforme o caso.
+  `domain.Group.AddUser`) em `waliqueiroz/mystery-gifter-api`. **Dentro do
+  domínio, o comportamento vai para a entidade que o possui**: se existe um
+  tipo dono do dado (`TrackPoint`, `Route`, `Track`, `PlanParameters`,
+  `CameraView`, `Signal`, ...), a lógica é método dele (`route.Length()`,
+  `point.DistanceTo(other)`, `track.Clean(...)`); se uma lista de pontos ou de
+  números virou o argumento de uma função, falta um tipo — dê a ele um nome e
+  mova a função para lá (foi o que `Route`, `PlanarRoute` e `Signal` fizeram).
+  Função livre só para matemática sem dono e sem estado (`clamp`, `quantize`)
+  ou para um construtor (`NewXxx`). Foi um ajuste pedido em revisão de PR:
+  não repita o desvio de escrever funções `Compute...`/`Build...` soltas.
 - Uma chamada direta a uma função pura da biblioteca padrão do Go (ex.:
   `time.Now()`) não é dependência externa (Princípio II) e não precisa de
   porta nem de abstração — não reintroduza algo como um `Clock` só para

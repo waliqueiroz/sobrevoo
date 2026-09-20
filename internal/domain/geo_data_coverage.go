@@ -48,25 +48,25 @@ type CoverageReport struct {
 	ElevationSourcesUsed []GeoDataSource
 }
 
-// ComputeCoverage checks route against the registered base map and
+// Coverage checks the route against the registered base map and
 // elevation candidates that are still available on disk (FR-013 through
 // FR-018) — candidates whose file is no longer found are the caller's
-// responsibility to exclude before calling this function (it is a pure
-// function: no port, no I/O).
+// responsibility to exclude before calling this method (it is pure: no port,
+// no I/O).
 //
 // For each point, the candidate of each type that wins is the most
 // specific one (smallest BoundingBox.AreaDegrees), ties broken by the
 // oldest RegisteredAt (FR-016, Clarification — spec.md). Points are then
 // grouped into contiguous UncoveredSegment runs by their missing-data
 // status (FR-015, Clarification — spec.md).
-func ComputeCoverage(route []TrackPoint, baseMaps, elevations []GeoDataSource) CoverageReport {
+func (r Route) Coverage(baseMaps, elevations []GeoDataSource) CoverageReport {
 	baseMapUsed := map[string]GeoDataSource{}
 	elevationUsed := map[string]GeoDataSource{}
 
 	var segments []UncoveredSegment
 	segmentOpen := false
 
-	for _, point := range route {
+	for _, point := range r.Points {
 		baseMap, hasBaseMap := pickCoverageWinner(baseMaps, point.Latitude, point.Longitude)
 		elevation, hasElevation := pickCoverageWinner(elevations, point.Latitude, point.Longitude)
 

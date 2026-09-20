@@ -421,3 +421,11 @@ Cada história agrega valor sem quebrar as anteriores.
 - **Testes do fallback `O_EXCL`** em `camera_plan_exporter_fallback_test.go`
   (pacote interno), forçando a falha do hard link com um arquivo temporário
   inexistente — o que `research.md` item 11 dava como não testável.
+- **Revisão do PR #2** (dois comentários): (1) o comportamento do domínio saiu de
+  funções livres para métodos das entidades, com os tipos `PlanarRoute` e
+  `Signal` criados onde faltava um dono (`research.md` item 17); (2) o pacote
+  `config` passou a ter tipos próprios e não importa mais o domínio, com o
+  mapeamento no composition root (`research.md` item 18). Sem mudança de
+  comportamento: os planos exportados de seis amostras saem byte a byte iguais.
+  As funções e assinaturas citadas nas tarefas T020–T047 refletem o desenho
+  original; os nomes vigentes estão em `data-model.md`.

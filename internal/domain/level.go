@@ -9,3 +9,9 @@ const (
 	LevelMedium
 	LevelHigh
 )
+
+// index is the position of the level in the per-level tables of CameraTuning,
+// clamped so an out-of-range level can never index outside them.
+func (l Level) index() int {
+	return min(max(int(l), 0), levelCount-1)
+}

@@ -29,7 +29,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 		points := timedLine(5, 10, 20)
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		assert.Equal(t, domain.TimeReferenceClock, timeline.Reference)
@@ -41,7 +41,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(1000, 90).Build()
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		assert.Equal(t, domain.TimeReferenceDistance, timeline.Reference)
@@ -54,7 +54,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 		points[4].Time = nil
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		assert.Equal(t, domain.TimeReferenceDistance, timeline.Reference)
@@ -70,7 +70,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 		}
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		assert.Equal(t, domain.TimeReferenceDistance, timeline.Reference)
@@ -83,7 +83,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 		points[5].Time = points[4].Time
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		assert.Equal(t, domain.TimeReferenceDistance, timeline.Reference)
@@ -98,7 +98,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 		points[1].Time = points[0].Time
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		assert.Equal(t, domain.TimeReferenceClock, timeline.Reference)
@@ -107,7 +107,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 	t.Run("should start at zero, end at the total length and never go backwards", func(t *testing.T) {
 		// given
 		points := timedLine(5, 10, 30)
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// when
 		previous := -1.0
@@ -121,15 +121,15 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 
 		// then
 		assert.Equal(t, 0.0, timeline.DistanceAt(0))
-		assert.InDelta(t, domain.TotalDistance(points), timeline.DistanceAt(1), 1e-6)
-		assert.InDelta(t, domain.TotalDistance(points), timeline.Total(), 1e-6)
+		assert.InDelta(t, (domain.Route{Points: points}).Length(), timeline.DistanceAt(1), 1e-6)
+		assert.InDelta(t, (domain.Route{Points: points}).Length(), timeline.Total(), 1e-6)
 	})
 
 	t.Run("should advance linearly when the speed is constant", func(t *testing.T) {
 		// given
 		points := timedLine(5, 10, 30)
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
-		total := domain.TotalDistance(points)
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
+		total := (domain.Route{Points: points}).Length()
 
 		// when
 		quarter, half := timeline.DistanceAt(0.25), timeline.DistanceAt(0.5)
@@ -142,7 +142,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 	t.Run("should advance by distance when there is no time data", func(t *testing.T) {
 		// given
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(3000, 90).Build()
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// when
 		half := timeline.DistanceAt(0.5)
@@ -154,7 +154,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 	t.Run("should clamp fractions outside [0, 1]", func(t *testing.T) {
 		// given
 		points := timedLine(5, 10, 10)
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// when / then
 		assert.Equal(t, timeline.DistanceAt(0), timeline.DistanceAt(-1))
@@ -174,7 +174,7 @@ func Test_BuildMarkerTimeline(t *testing.T) {
 		// given: two points a few centimeters apart sharing a timestamp
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(1000, 90).WithPointCount(4).WithConstantSpeed(5).Build()
 		points[2].Time = points[1].Time
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// when
 		distance := timeline.DistanceAt(0.5)
@@ -235,7 +235,7 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 		points := routeWithStop(600)
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		assert.LessOrEqual(t, stopShare(points, timeline), 0.05)
@@ -245,10 +245,10 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 	t.Run("should not alter a stop shorter than the long stop threshold", func(t *testing.T) {
 		// given: a 20 s stop, not a long one
 		points := routeWithStop(20)
-		uncompressed := domain.TotalDistance(points)
+		uncompressed := (domain.Route{Points: points}).Length()
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then: the stop keeps its real weight, 20 s out of about 1220 s
 		assert.InDelta(t, 20.0/1220.0, stopShare(points, timeline), 0.005)
@@ -258,7 +258,7 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 	t.Run("should keep the video/real time ratio constant outside the stops", func(t *testing.T) {
 		// given
 		points := routeWithStop(600)
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// when: speed in meters per unit of progress, first and second moving halves
 		firstSpeed := (timeline.DistanceAt(0.20) - timeline.DistanceAt(0.10)) / 0.10
@@ -271,7 +271,7 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 	t.Run("should not make the marker jump while stopped", func(t *testing.T) {
 		// given
 		points := routeWithStop(600)
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// when
 		maxStep := 0.0
@@ -296,7 +296,7 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 			}
 		}
 		require.Positive(t, jitter)
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// when
 		maxStep := 0.0
@@ -306,7 +306,7 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 		}
 
 		// then: the jitter adds up to tens of meters, none of which the marker travels
-		assert.Less(t, timeline.Total(), domain.TotalDistance(points)-30)
+		assert.Less(t, timeline.Total(), (domain.Route{Points: points}).Length()-30)
 		assert.Less(t, maxStep, 3*timeline.Total()/steps)
 	})
 
@@ -318,7 +318,7 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 		}
 
 		// when
-		timeline := domain.BuildMarkerTimeline(points, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: points}, defaultTuning())
 
 		// then
 		require.Equal(t, domain.TimeReferenceDistance, timeline.Reference)
@@ -339,7 +339,7 @@ func Test_BuildMarkerTimeline_LongStops(t *testing.T) {
 		}
 
 		// when
-		timeline := domain.BuildMarkerTimeline(first, defaultTuning())
+		timeline := domain.NewMarkerTimeline(domain.Route{Points: first}, defaultTuning())
 
 		// then
 		assert.Equal(t, domain.TimeReferenceClock, timeline.Reference)

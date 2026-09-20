@@ -31,7 +31,7 @@ type Track struct {
 // (such as geo data coverage checks) use it as is.
 type CleanedTrack struct {
 	Track     Track
-	Points    []TrackPoint
+	Route     Route
 	Discarded DiscardStats
 }
 
@@ -41,8 +41,8 @@ type CleanedTrack struct {
 // points that reveal how the activity unfolded in time (a long stop, for
 // instance, collapses into a single straight segment).
 type TreatedTrack struct {
-	Track         Track
-	CleanedPoints []TrackPoint
-	Route         Route
-	Discarded     DiscardStats
+	Track     Track
+	Cleaned   Route
+	Route     Route
+	Discarded DiscardStats
 }

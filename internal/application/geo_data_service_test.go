@@ -359,5 +359,5 @@ func cleanedCoverageTrack() domain.CleanedTrack {
 		builddomain.NewTrackPointBuilder().WithLatitude(45).WithLongitude(15).Build(),
 		builddomain.NewTrackPointBuilder().WithLatitude(46).WithLongitude(16).Build(),
 	}
-	return domain.CleanedTrack{Track: builddomain.NewTrackBuilder().WithPoints(points...).Build(), Points: points}
+	return domain.CleanedTrack{Track: builddomain.NewTrackBuilder().WithPoints(points...).Build(), Route: domain.Route{Points: points}}
 }

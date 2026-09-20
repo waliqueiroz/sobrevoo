@@ -2,31 +2,31 @@ package domain
 
 import "sort"
 
-// ReorderByTime sorts points chronologically by Time, but only when every
-// point in the track carries one. When some points have a timestamp and
-// others do not, the track is left unchanged: a partial ordering could
-// interleave timed and untimed points arbitrarily, producing a route with
-// no real physical meaning (FR-027, research.md item 8).
-func ReorderByTime(points []TrackPoint) []TrackPoint {
-	if !allHaveTime(points) {
-		return points
+// ReorderByTime returns the route with its points sorted chronologically by
+// Time, but only when every point carries one. When some points have a
+// timestamp and others do not, the route is returned unchanged: a partial
+// ordering could interleave timed and untimed points arbitrarily, producing a
+// route with no real physical meaning (FR-027, research.md item 8).
+func (r Route) ReorderByTime() Route {
+	if !r.allHaveTime() {
+		return r
 	}
 
-	sorted := make([]TrackPoint, len(points))
-	copy(sorted, points)
+	sorted := make([]TrackPoint, len(r.Points))
+	copy(sorted, r.Points)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		return sorted[i].Time.Before(*sorted[j].Time)
 	})
 
-	return sorted
+	return Route{Points: sorted}
 }
 
 // DiscardImpossibleCoordinates removes points whose latitude or longitude
 // falls outside the geographically valid range (FR-008).
-func DiscardImpossibleCoordinates(points []TrackPoint) (kept []TrackPoint, discarded int) {
-	for _, p := range points {
-		if hasPossibleCoordinate(p) {
-			kept = append(kept, p)
+func (r Route) DiscardImpossibleCoordinates() (kept Route, discarded int) {
+	for _, p := range r.Points {
+		if p.hasPossibleCoordinate() {
+			kept.Points = append(kept.Points, p)
 			continue
 		}
 		discarded++
@@ -34,49 +34,51 @@ func DiscardImpossibleCoordinates(points []TrackPoint) (kept []TrackPoint, disca
 	return kept, discarded
 }
 
-func hasPossibleCoordinate(p TrackPoint) bool {
+func (p TrackPoint) hasPossibleCoordinate() bool {
 	return p.Latitude >= -90 && p.Latitude <= 90 && p.Longitude >= -180 && p.Longitude <= 180
 }
 
 // DiscardConsecutiveDuplicates removes a point when its coordinate is
 // identical to the previous point kept so far (FR-009).
-func DiscardConsecutiveDuplicates(points []TrackPoint) (kept []TrackPoint, discarded int) {
-	for _, p := range points {
-		if len(kept) > 0 && isSameCoordinate(kept[len(kept)-1], p) {
+func (r Route) DiscardConsecutiveDuplicates() (kept Route, discarded int) {
+	for _, p := range r.Points {
+		if len(kept.Points) > 0 && kept.Points[len(kept.Points)-1].hasSameCoordinateAs(p) {
 			discarded++
 			continue
 		}
-		kept = append(kept, p)
+		kept.Points = append(kept.Points, p)
 	}
 	return kept, discarded
 }
 
-func isSameCoordinate(a, b TrackPoint) bool {
-	return a.Latitude == b.Latitude && a.Longitude == b.Longitude
+func (p TrackPoint) hasSameCoordinateAs(other TrackPoint) bool {
+	return p.Latitude == other.Latitude && p.Longitude == other.Longitude
 }
 
 // DiscardImplausibleJumps removes a point when the speed implied between it
 // and the previous point kept so far exceeds maxPlausibleSpeedKmh. A jump is
 // only evaluated when both points carry a timestamp; points missing time are
-// always kept by this function (FR-010).
-func DiscardImplausibleJumps(points []TrackPoint, maxPlausibleSpeedKmh float64) (kept []TrackPoint, discarded int) {
-	for _, p := range points {
-		if len(kept) > 0 && isImplausibleJump(kept[len(kept)-1], p, maxPlausibleSpeedKmh) {
+// always kept by this method (FR-010).
+func (r Route) DiscardImplausibleJumps(maxPlausibleSpeedKmh float64) (kept Route, discarded int) {
+	for _, p := range r.Points {
+		if len(kept.Points) > 0 && kept.Points[len(kept.Points)-1].isImplausibleJumpTo(p, maxPlausibleSpeedKmh) {
 			discarded++
 			continue
 		}
-		kept = append(kept, p)
+		kept.Points = append(kept.Points, p)
 	}
 	return kept, discarded
 }
 
-func isImplausibleJump(prev, curr TrackPoint, maxPlausibleSpeedKmh float64) bool {
-	if !prev.HasTime() || !curr.HasTime() {
+// isImplausibleJumpTo reports whether getting from p to next takes an
+// implausible speed.
+func (p TrackPoint) isImplausibleJumpTo(next TrackPoint, maxPlausibleSpeedKmh float64) bool {
+	if !p.HasTime() || !next.HasTime() {
 		return false
 	}
 
-	distanceKm := Haversine(prev, curr) / 1000
-	elapsedHours := curr.Time.Sub(*prev.Time).Hours()
+	distanceKm := p.DistanceTo(next) / 1000
+	elapsedHours := next.Time.Sub(*p.Time).Hours()
 
 	if elapsedHours <= 0 {
 		// Zero or negative elapsed time with any real distance implies an
@@ -87,30 +89,30 @@ func isImplausibleJump(prev, curr TrackPoint, maxPlausibleSpeedKmh float64) bool
 	return distanceKm/elapsedHours > maxPlausibleSpeedKmh
 }
 
-// CleanTrack turns a track's raw parsed points into a trustworthy route,
-// composing the functions above in the one order that makes sense (FR-006
+// Clean turns a track's raw parsed points into a trustworthy route,
+// composing the Route methods above in the one order that makes sense (FR-006
 // through FR-010, FR-027): reorder by time, then discard impossible
 // coordinates, consecutive duplicates and implausible jumps. The minimum
 // point count is checked both before and after, as two distinguishable
 // error cases — shared by every use case that needs a cleaned route from a
-// parsed track (TrackService, GeoDataService.CheckCoverage), so
-// this composition itself, not just its parts, lives here instead of being
+// parsed track (TrackService, GeoDataService.CheckCoverage), so this
+// composition itself, not just its parts, lives here instead of being
 // duplicated or reinvented by each service (Constitution Principle III).
-func CleanTrack(points []TrackPoint, minPoints int, maxPlausibleSpeedKmh float64) ([]TrackPoint, DiscardStats, error) {
-	if len(points) < minPoints {
-		return nil, DiscardStats{}, ErrInsufficientPoints
+func (t Track) Clean(minPoints int, maxPlausibleSpeedKmh float64) (CleanedTrack, error) {
+	if len(t.Points) < minPoints {
+		return CleanedTrack{}, ErrInsufficientPoints
 	}
 
-	points = ReorderByTime(points)
+	route := Route{Points: t.Points}.ReorderByTime()
 
 	var discarded DiscardStats
-	points, discarded.ImpossibleCoordinates = DiscardImpossibleCoordinates(points)
-	points, discarded.ConsecutiveDuplicates = DiscardConsecutiveDuplicates(points)
-	points, discarded.ImplausibleJumps = DiscardImplausibleJumps(points, maxPlausibleSpeedKmh)
+	route, discarded.ImpossibleCoordinates = route.DiscardImpossibleCoordinates()
+	route, discarded.ConsecutiveDuplicates = route.DiscardConsecutiveDuplicates()
+	route, discarded.ImplausibleJumps = route.DiscardImplausibleJumps(maxPlausibleSpeedKmh)
 
-	if len(points) < minPoints {
-		return nil, DiscardStats{}, ErrInsufficientPointsAfterCleaning
+	if len(route.Points) < minPoints {
+		return CleanedTrack{}, ErrInsufficientPointsAfterCleaning
 	}
 
-	return points, discarded, nil
+	return CleanedTrack{Track: t, Route: route, Discarded: discarded}, nil
 }

@@ -110,7 +110,7 @@ func Test_trackService_Inspect(t *testing.T) {
 		// ports were actually applied to build the summary
 		require.NoError(t, err)
 		assert.Equal(t, 1, summary.PointCountTreated)
-		assert.Equal(t, domain.ComputeBoundingBox(smoothed), summary.BoundingBox)
+		assert.Equal(t, (domain.Route{Points: smoothed}).BoundingBox(), summary.BoundingBox)
 	})
 
 	t.Run("should return the summary built from the cleaned, simplified and smoothed route", func(t *testing.T) {
@@ -201,7 +201,7 @@ func Test_trackService_Clean(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, track, cleaned.Track)
-		assert.Len(t, cleaned.Points, 2)
+		assert.Len(t, cleaned.Route.Points, 2)
 		assert.Equal(t, 1, cleaned.Discarded.ConsecutiveDuplicates)
 	})
 }
@@ -253,7 +253,7 @@ func Test_trackService_Treat(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, track, treated.Track)
 		assert.Equal(t, domain.Route{Points: smoothed}, treated.Route)
-		assert.Equal(t, track.Points, treated.CleanedPoints)
+		assert.Equal(t, domain.Route{Points: track.Points}, treated.Cleaned)
 		assert.Zero(t, treated.Discarded.Total())
 	})
 }

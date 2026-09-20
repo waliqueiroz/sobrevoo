@@ -13,7 +13,7 @@ func Test_NewLocalPlane(t *testing.T) {
 	t.Run("should center a track that crosses the antimeridian near 180 degrees, not near 0", func(t *testing.T) {
 		// given
 		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(10, 179.95).WithLine(20000, 90).Build()
-		plane := domain.NewLocalPlane(points)
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 
 		// when
 		lat, lon := plane.Unproject(domain.PlanePoint{})
@@ -26,7 +26,7 @@ func Test_NewLocalPlane(t *testing.T) {
 	t.Run("should not collapse the center of a track at a high latitude", func(t *testing.T) {
 		// given
 		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(85, 10).WithLine(20000, 45).Build()
-		plane := domain.NewLocalPlane(points)
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 
 		// when
 		lat, lon := plane.Unproject(domain.PlanePoint{})
@@ -41,7 +41,7 @@ func Test_NewLocalPlane(t *testing.T) {
 		points := []domain.TrackPoint{builddomain.NewTrackPointBuilder().WithLatitude(-23.55).WithLongitude(-46.63).Build()}
 
 		// when
-		plane := domain.NewLocalPlane(points)
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 
 		// then
 		lat, lon := plane.Unproject(domain.PlanePoint{})
@@ -57,7 +57,7 @@ func Test_NewLocalPlane(t *testing.T) {
 		}
 
 		// when
-		plane := domain.NewLocalPlane(points)
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 
 		// then
 		lat, lon := plane.Unproject(domain.PlanePoint{})
@@ -81,7 +81,7 @@ func Test_LocalPlane_ProjectUnproject(t *testing.T) {
 		t.Run("should return to the same coordinate after a round trip at "+c.name, func(t *testing.T) {
 			// given
 			points := builddomain.NewSyntheticRouteBuilder().WithOrigin(c.lat, c.lon).WithLine(20000, 45).Build()
-			plane := domain.NewLocalPlane(points)
+			plane := domain.NewLocalPlane(domain.Route{Points: points})
 
 			for _, p := range points {
 				// when
@@ -89,7 +89,7 @@ func Test_LocalPlane_ProjectUnproject(t *testing.T) {
 
 				// then: less than a millimeter apart, longitude in [-180, 180)
 				back := domain.TrackPoint{Latitude: lat, Longitude: lon}
-				assert.Less(t, domain.Haversine(p, back), 0.001)
+				assert.Less(t, p.DistanceTo(back), 0.001)
 				assert.GreaterOrEqual(t, lon, -180.0)
 				assert.Less(t, lon, 180.0)
 			}
@@ -111,7 +111,7 @@ func Test_LocalPlane_Project(t *testing.T) {
 		t.Run("should preserve distances within 0.1 percent at "+c.name, func(t *testing.T) {
 			// given
 			points := builddomain.NewSyntheticRouteBuilder().WithOrigin(c.lat, c.lon).WithLine(20000, 45).WithPointCount(3).Build()
-			plane := domain.NewLocalPlane(points)
+			plane := domain.NewLocalPlane(domain.Route{Points: points})
 			first, last := points[0], points[len(points)-1]
 
 			// when
@@ -120,7 +120,7 @@ func Test_LocalPlane_Project(t *testing.T) {
 
 			// then
 			planar := hypot(b.X-a.X, b.Y-a.Y)
-			assert.InEpsilon(t, domain.Haversine(first, last), planar, 0.001)
+			assert.InEpsilon(t, first.DistanceTo(last), planar, 0.001)
 		})
 	}
 
@@ -129,7 +129,7 @@ func Test_LocalPlane_Project(t *testing.T) {
 		points := []domain.TrackPoint{
 			builddomain.NewTrackPointBuilder().WithLatitude(0).WithLongitude(0).Build(),
 		}
-		plane := domain.NewLocalPlane(points)
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 
 		// when
 		north := plane.Project(0.01, 0)
@@ -145,7 +145,7 @@ func Test_LocalPlane_Project(t *testing.T) {
 	t.Run("should project the center to the origin", func(t *testing.T) {
 		// given
 		points := []domain.TrackPoint{builddomain.NewTrackPointBuilder().WithLatitude(10).WithLongitude(20).Build()}
-		plane := domain.NewLocalPlane(points)
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 
 		// when
 		p := plane.Project(10, 20)

@@ -18,7 +18,7 @@ func lineOfKm(km float64) []domain.TrackPoint {
 func Test_MinimumDuration(t *testing.T) {
 	tuning := defaultTuning()
 	minimumFor := func(km float64) time.Duration {
-		return domain.MinimumDuration(lineOfKm(km), 30, domain.LevelMedium, domain.LevelMedium, tuning)
+		return minimumDuration(lineOfKm(km), 30, domain.LevelMedium, domain.LevelMedium, tuning)
 	}
 
 	t.Run("should be 20 seconds for a track of a few kilometers: the two second phase floor over a tenth", func(t *testing.T) {
@@ -47,7 +47,7 @@ func Test_MinimumDuration(t *testing.T) {
 
 	t.Run("should be a whole number of frames", func(t *testing.T) {
 		// when
-		minimum := domain.MinimumDuration(lineOfKm(20), 24, domain.LevelMedium, domain.LevelMedium, tuning)
+		minimum := minimumDuration(lineOfKm(20), 24, domain.LevelMedium, domain.LevelMedium, tuning)
 
 		// then
 		frames := minimum.Seconds() * 24
@@ -61,8 +61,8 @@ func Test_MinimumDuration(t *testing.T) {
 
 	t.Run("should be smaller for a lower distance level only by the zoom the opening needs", func(t *testing.T) {
 		// when
-		low := domain.MinimumDuration(lineOfKm(20), 30, domain.LevelLow, domain.LevelMedium, tuning)
-		high := domain.MinimumDuration(lineOfKm(20), 30, domain.LevelHigh, domain.LevelMedium, tuning)
+		low := minimumDuration(lineOfKm(20), 30, domain.LevelLow, domain.LevelMedium, tuning)
+		high := minimumDuration(lineOfKm(20), 30, domain.LevelHigh, domain.LevelMedium, tuning)
 
 		// then: closer flights need a larger zoom, so they need more time
 		assert.Greater(t, low, high)
@@ -75,11 +75,11 @@ func Test_PlanCamera_Duration(t *testing.T) {
 
 	t.Run("should accept a duration exactly equal to the minimum and produce a smooth plan", func(t *testing.T) {
 		// given
-		minimum := domain.MinimumDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
+		minimum := minimumDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(minimum).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -89,11 +89,11 @@ func Test_PlanCamera_Duration(t *testing.T) {
 
 	t.Run("should reject a duration one frame below the minimum and mention the minimum", func(t *testing.T) {
 		// given
-		minimum := domain.MinimumDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
+		minimum := minimumDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(minimum - time.Second/30).Build()
 
 		// when
-		_, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		_, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.ErrorIs(t, err, domain.ErrDurationTooShort)
@@ -105,7 +105,7 @@ func Test_PlanCamera_Duration(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(45 * time.Second).Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -118,7 +118,7 @@ func Test_PlanCamera_Duration(t *testing.T) {
 			parameters := builddomain.NewPlanParametersBuilder().WithoutDuration().Build()
 
 			// when
-			plan, err := domain.PlanCamera(treatedOf(shape), parameters, tuning)
+			plan, err := treatedOf(shape).PlanCamera(parameters, tuning)
 
 			// then
 			require.NoError(t, err, name)
@@ -134,11 +134,11 @@ func Test_DefaultDuration_AtLeastMinimum(t *testing.T) {
 		// given: ten times slower zoom than the initial tuning
 		tuning := builddomain.NewCameraTuningBuilder().WithMaxLogDistanceRatePerSecond(0.1).Build()
 		points := lineOfKm(200)
-		minimum := domain.MinimumDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
+		minimum := minimumDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
 		require.Greater(t, minimum, 120*time.Second)
 
 		// when
-		duration := domain.DefaultDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
+		duration := defaultDuration(points, 30, domain.LevelMedium, domain.LevelMedium, tuning)
 
 		// then
 		assert.Equal(t, minimum, duration)
@@ -151,7 +151,7 @@ func Test_DefaultDuration_AtLeastMinimum(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithoutDuration().Build()
 
 		// when
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 
 		// then
 		require.NoError(t, err)
@@ -164,7 +164,7 @@ func Test_DefaultDuration_AtLeastMinimum(t *testing.T) {
 
 		for _, km := range []float64{0.06, 1, 20, 100, 1000, 1990} {
 			// when
-			minimum := domain.MinimumDuration(lineOfKm(km), 30, domain.LevelLow, domain.LevelLow, tuning)
+			minimum := minimumDuration(lineOfKm(km), 30, domain.LevelLow, domain.LevelLow, tuning)
 
 			// then
 			assert.Less(t, minimum, tuning.AutoDurationMax, "%v km", km)
@@ -178,7 +178,7 @@ func Test_DefaultDuration_AtLeastMinimum(t *testing.T) {
 
 		for _, km := range []float64{0.1, 1, 5, 20, 100, 400, 1000, 1990} {
 			// when
-			current := domain.DefaultDuration(lineOfKm(km), 30, domain.LevelMedium, domain.LevelMedium, tuning)
+			current := defaultDuration(lineOfKm(km), 30, domain.LevelMedium, domain.LevelMedium, tuning)
 
 			// then
 			assert.GreaterOrEqual(t, current, previous, "%v km", km)

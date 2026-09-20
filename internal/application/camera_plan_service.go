@@ -62,7 +62,7 @@ func (s *cameraPlanService) Generate(reader io.Reader, parameters domain.PlanPar
 		return domain.CameraPlan{}, err
 	}
 
-	return domain.PlanCamera(treated, parameters, s.tuning)
+	return treated.PlanCamera(parameters, s.tuning)
 }
 
 func (s *cameraPlanService) Export(plan domain.CameraPlan, path string, overwrite bool) error {

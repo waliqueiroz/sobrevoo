@@ -10,7 +10,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
-func Test_ComputeCoverage(t *testing.T) {
+func Test_Route_Coverage(t *testing.T) {
 	t.Run("should report full coverage when a base map and an elevation source cover every point", func(t *testing.T) {
 		// given
 		route := []domain.TrackPoint{
@@ -21,7 +21,7 @@ func Test_ComputeCoverage(t *testing.T) {
 		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
+		report := (domain.Route{Points: route}).Coverage([]domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
 
 		// then
 		assert.Equal(t, domain.CoverageStatusFull, report.Status)
@@ -41,7 +41,7 @@ func Test_ComputeCoverage(t *testing.T) {
 		baseMap := builddomain.NewGeoDataSourceBuilder().WithName("europa-mapa").WithType(domain.DataTypeBaseMap).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, nil)
+		report := (domain.Route{Points: route}).Coverage([]domain.GeoDataSource{baseMap}, nil)
 
 		// then
 		assert.Equal(t, domain.CoverageStatusPartial, report.Status)
@@ -60,7 +60,7 @@ func Test_ComputeCoverage(t *testing.T) {
 		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, nil, []domain.GeoDataSource{elevation})
+		report := (domain.Route{Points: route}).Coverage(nil, []domain.GeoDataSource{elevation})
 
 		// then
 		assert.Equal(t, domain.CoverageStatusPartial, report.Status)
@@ -79,7 +79,7 @@ func Test_ComputeCoverage(t *testing.T) {
 		elevation := builddomain.NewGeoDataSourceBuilder().WithName("europa-relevo").WithType(domain.DataTypeElevation).WithBoundingBox(covered).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
+		report := (domain.Route{Points: route}).Coverage([]domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
 
 		// then
 		assert.Equal(t, domain.CoverageStatusPartial, report.Status)
@@ -99,7 +99,7 @@ func Test_ComputeCoverage(t *testing.T) {
 		}
 
 		// when
-		report := domain.ComputeCoverage(route, nil, nil)
+		report := (domain.Route{Points: route}).Coverage(nil, nil)
 
 		// then
 		assert.Equal(t, domain.CoverageStatusNone, report.Status)
@@ -120,7 +120,7 @@ func Test_ComputeCoverage(t *testing.T) {
 			WithBoundingBox(domain.BoundingBox{MinLatitude: 44, MaxLatitude: 47, MinLongitude: 14, MaxLongitude: 17}).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, []domain.GeoDataSource{wide, narrow}, nil)
+		report := (domain.Route{Points: route}).Coverage([]domain.GeoDataSource{wide, narrow}, nil)
 
 		// then
 		require.Len(t, report.BaseMapSourcesUsed, 1)
@@ -140,7 +140,7 @@ func Test_ComputeCoverage(t *testing.T) {
 			WithBoundingBox(box).WithRegisteredAt(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, []domain.GeoDataSource{newer, older}, nil)
+		report := (domain.Route{Points: route}).Coverage([]domain.GeoDataSource{newer, older}, nil)
 
 		// then
 		require.Len(t, report.BaseMapSourcesUsed, 1)
@@ -158,7 +158,7 @@ func Test_ComputeCoverage(t *testing.T) {
 		elevation := builddomain.NewGeoDataSourceBuilder().WithName("antimeridiano-relevo").WithType(domain.DataTypeElevation).WithBoundingBox(box).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, []domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
+		report := (domain.Route{Points: route}).Coverage([]domain.GeoDataSource{baseMap}, []domain.GeoDataSource{elevation})
 
 		// then
 		assert.Equal(t, domain.CoverageStatusFull, report.Status)
@@ -176,7 +176,7 @@ func Test_ComputeCoverage(t *testing.T) {
 			WithBoundingBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 2, MinLongitude: 0, MaxLongitude: 2}).Build()
 
 		// when
-		report := domain.ComputeCoverage(route, []domain.GeoDataSource{sourceB, sourceA}, nil)
+		report := (domain.Route{Points: route}).Coverage([]domain.GeoDataSource{sourceB, sourceA}, nil)
 
 		// then
 		require.Len(t, report.BaseMapSourcesUsed, 2)

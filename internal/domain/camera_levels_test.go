@@ -27,7 +27,7 @@ func Test_PlanCamera_DistanceLevels(t *testing.T) {
 	plan := func(t *testing.T, level domain.Level) domain.CameraPlan {
 		t.Helper()
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(120e9).WithDistance(level).Build()
-		result, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		result, err := treatedOf(points).PlanCamera(parameters, tuning)
 		require.NoError(t, err)
 		return result
 	}
@@ -60,7 +60,7 @@ func Test_PlanCamera_TiltLevels(t *testing.T) {
 	middleTilt := func(t *testing.T, level domain.Level) float64 {
 		t.Helper()
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(120e9).WithTilt(level).Build()
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 		require.NoError(t, err)
 		frames := followingFrames(plan)
 		return frames[len(frames)/2].Tilt
@@ -79,7 +79,7 @@ func Test_PlanCamera_TiltLevels(t *testing.T) {
 	t.Run("should keep the tilt constant through the following phase", func(t *testing.T) {
 		// given
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(120e9).WithTilt(domain.LevelHigh).Build()
-		plan, err := domain.PlanCamera(treatedOf(points), parameters, tuning)
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
 		require.NoError(t, err)
 
 		// when

@@ -74,12 +74,7 @@ func (s *trackService) Clean(reader io.Reader) (domain.CleanedTrack, error) {
 		return domain.CleanedTrack{}, err
 	}
 
-	points, discarded, err := domain.CleanTrack(track.Points, s.minPoints, s.maxPlausibleSpeedKmh)
-	if err != nil {
-		return domain.CleanedTrack{}, err
-	}
-
-	return domain.CleanedTrack{Track: track, Points: points, Discarded: discarded}, nil
+	return track.Clean(s.minPoints, s.maxPlausibleSpeedKmh)
 }
 
 func (s *trackService) Treat(reader io.Reader, simplificationLevel, smoothingLevel domain.Level) (domain.TreatedTrack, error) {
@@ -88,14 +83,14 @@ func (s *trackService) Treat(reader io.Reader, simplificationLevel, smoothingLev
 		return domain.TreatedTrack{}, err
 	}
 
-	points := s.simplifier.Simplify(cleaned.Points, simplificationLevel)
+	points := s.simplifier.Simplify(cleaned.Route.Points, simplificationLevel)
 	points = s.smoother.Smooth(points, smoothingLevel)
 
 	return domain.TreatedTrack{
-		Track:         cleaned.Track,
-		CleanedPoints: cleaned.Points,
-		Route:         domain.Route{Points: points},
-		Discarded:     cleaned.Discarded,
+		Track:     cleaned.Track,
+		Cleaned:   cleaned.Route,
+		Route:     domain.Route{Points: points},
+		Discarded: cleaned.Discarded,
 	}, nil
 }
 
@@ -105,5 +100,5 @@ func (s *trackService) Inspect(reader io.Reader, simplificationLevel, smoothingL
 		return domain.TrackSummary{}, err
 	}
 
-	return domain.SummarizeTrack(treated.Track, treated.Route, treated.Discarded), nil
+	return domain.NewTrackSummary(treated.Track, treated.Route, treated.Discarded), nil
 }

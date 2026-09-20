@@ -96,7 +96,7 @@ biblioteca padrão e `encoding/json`.
   da etapa 1 (Douglas-Peucker) funde uma parada com o trecho seguinte num
   só segmento cuja velocidade média fica acima do limiar — descoberto ao
   rodar o quickstart com uma parada real de 10 min, que passava despercebida.
-  Por isso `TreatedTrack` carrega também os `CleanedPoints`, e a linha do
+  Por isso `TreatedTrack` carrega também a rota limpa (`Cleaned`), e a linha do
   tempo (referência de tempo, paradas, ritmo) é construída sobre eles; a
   câmera continua seguindo a rota simplificada e suavizada. A posição do
   marcador é a fração do comprimento da rota tratada correspondente à fração
@@ -232,8 +232,9 @@ biblioteca padrão e `encoding/json`.
   acomp_mín/0,80)`, arredondada para cima ao próximo quadro. O fator 1,5 é o
   pico de inclinação do smoothstep. A duração `d` é aceita se `d ≥
   duração_mín` (igualdade aceita; FR: "limítrofe").
-- **Assinatura**: `MinimumDuration(points, frameRate, distance, tilt Level,
-  tuning)` — depende dos níveis escolhidos, pois `θ` e `D₀` entram na fórmula.
+- **Assinatura**: `PlanParameters.MinimumDuration(route Route, tuning)` —
+  depende dos níveis e da taxa de quadros dos parâmetros, pois `θ` e `D₀`
+  entram na fórmula.
 - **Trajeto curto**: comprimento (distância acumulada pós-tratamento)
   abaixo de 50 m → `ErrTrackTooShort`, com o comprimento encontrado e o
   mínimo exigidos na mensagem. Acima disso o plano é gerado (Clarification Q2).
@@ -249,13 +250,13 @@ biblioteca padrão e `encoding/json`.
 
 ## 8.1 Duração automática (FR-003a, Clarification Q4)
 
-- **Decisão**: sem `--duration`, a duração vem de `DefaultDuration(points,
-  frameRate, tuning)`, função pura do domínio:
+- **Decisão**: sem `--duration`, a duração vem de
+  `PlanParameters.DefaultDuration(route, tuning)`, método puro do domínio:
   `base = clamp(15 s + 6 s·√(comprimento_km), 20 s, 120 s)`, arredondada ao
   segundo mais próximo, e `duração = max(base, duração_mín)`, onde
   `duração_mín` é a de `MinimumDuration` (item 8, já arredondada ao próximo
   quadro). Comprimento = distância acumulada do trajeto tratado
-  (`TotalDistance`). A duração informada pelo usuário nunca passa por esta
+  (`Route.Length`). A duração informada pelo usuário nunca passa por esta
   função.
 - **Valores de referência** (piso, teto e coeficientes ficam em
   `CameraTuning`): 1 km → 21 s; 5 km → 28 s; 20 km → 42 s; 50 km → 57 s;
@@ -353,9 +354,11 @@ biblioteca padrão e `encoding/json`.
 - **Padrões de parâmetros do usuário**: taxa de quadros 30, distância
   `medium` e inclinação `medium` (FR-003, FR-005) não são heurísticas do
   algoritmo e não ficam em `CameraTuning`. Vêm de
-  `Config.DefaultPlanParameters` (um `domain.PlanParameters` com `Duration`
-  `nil`), preenchido por `config.Load()` e injetado no comando `plan`, que o
-  usa como valor padrão das flags (Princípio VIII). O `defaultLevel` da etapa
+  `Config.PlanDefaults` (tipo do próprio pacote `config`: taxa, distância e
+  inclinação; sem duração), preenchido por `config.Load()`, mapeado para um
+  `domain.PlanParameters` (com `Duration` `nil`) pelo composition root e
+  injetado no comando `plan`, que o usa como valor padrão das flags
+  (Princípio VIII). O `defaultLevel` da etapa
   1 continua sendo só o nível de simplificação/suavização do trajeto; os
   dois conceitos deixam de compartilhar a mesma constante.
 
@@ -430,7 +433,7 @@ biblioteca padrão e `encoding/json`.
 - **Decisão**: `sobrevoo plan <arquivo>` (comando único, sem grupo
   `camera`), com `--duration <segundos>` (opcional; ausente = duração
   automática, item 8.1), `--fps <n>` (padrão 30, vindo de
-  `Config.DefaultPlanParameters`), `--distance
+  `Config.PlanDefaults`), `--distance
   low|medium|high`, `--tilt low|medium|high`, `--export <caminho>` e
   `--overwrite`. Segundos e quadros por segundo são números; valor não
   numérico é erro de uso (código 2, como `parseLevel` na etapa 1); valor
@@ -458,27 +461,53 @@ Erros de leitura/tratamento do trajeto reaproveitam os códigos 1–3 já
 existentes (FR-022). Valor não numérico e níveis desconhecidos continuam
 sendo erro de uso, código 2.
 
-## 17. Funções puras de câmera exportadas para teste isolado
+## 17. Comportamento nas entidades, não em funções soltas (revisão do PR #2)
 
-- **Problema**: os testes de `internal/domain` são do pacote externo
-  `domain_test` (necessário porque usam `internal/domain/builddomain`, que
-  importa `domain`; um teste de pacote interno criaria ciclo de importação).
-  Funções não exportadas não seriam testáveis isoladamente.
-- **Decisão**: as primitivas puras de câmera são **exportadas**, seguindo o
-  precedente de `Haversine`, `ComputeBoundingBox` e `ComputeCoverage`:
-  `NewLocalPlane` (com `Project` e `Unproject` em `LocalPlane`),
-  `BuildMarkerTimeline` (devolve `MarkerTimeline`), `DesiredHeading`,
-  `UnwrapAngles`, `FollowDistance`, `ComputeCameraPose` (devolve
-  `CameraPose`), `LimitRate`, `GaussianSmooth`, `DetectSmoothedSpans`,
-  `OverviewPose`, `BlendPose`, `MinimumDuration`, `DefaultDuration` e
-  `PlanCamera`. Cada uma tem comentário de documentação em inglês e nenhuma
-  depende de I/O, relógio ou estado. Só helpers triviais e de escopo
-  estrito (por exemplo a quantização) permanecem não exportados e são
-  cobertos via `PlanCamera`.
-- **Racional**: testar cada regra numérica isoladamente (com entradas
-  pequenas e exatas) é bem mais barato e preciso do que inferi-las de planos
-  completos, e não custa nada de arquitetura: são funções de domínio, não de
-  infraestrutura.
-- **Alternativa rejeitada**: testar tudo apenas por `PlanCamera` (falhas
-  ficariam difíceis de localizar); usar um arquivo `export_test.go` para
-  expor as funções internas (mascara o contrato real do pacote).
+- **Problema**: a primeira versão tinha dezenas de funções livres no domínio
+  (`Haversine`, `TotalDistance`, `ComputeBoundingBox`, `CleanTrack`,
+  `PlanCamera`, `DesiredHeading`, `LimitRate`, `BlendView`, ...) recebendo
+  `[]TrackPoint` ou `[]float64` como argumento. O Princípio IX já pede um
+  método da entidade quando a lógica pertence a uma entidade; o que faltava
+  eram os tipos donos.
+- **Decisão**: cada função virou método do tipo que possui o dado, e onde não
+  havia tipo ele foi criado:
+
+  | Antes | Depois |
+  |---|---|
+  | `Haversine(a, b)` | `TrackPoint.DistanceTo(other)` |
+  | `TotalDistance`, `Duration`, `ComputeBoundingBox`, `ElevationGain`, `ComputeCoverage` | `Route.Length`, `Duration`, `BoundingBox`, `ElevationGain`, `Coverage` |
+  | `ReorderByTime`, `Discard*` | `Route.ReorderByTime`, `Route.Discard*` |
+  | `CleanTrack` | `Track.Clean` (devolve `CleanedTrack`) |
+  | `SummarizeTrack` | `NewTrackSummary` (construtor) |
+  | `PlanCamera(treated, ...)` | `TreatedTrack.PlanCamera(parameters, tuning)` |
+  | `MinimumDuration`, `DefaultDuration` | `PlanParameters.MinimumDuration`, `DefaultDuration` |
+  | `FollowDistance` | `CameraTuning.FollowDistance(level, speed)` |
+  | `NewLocalPlane(points)` | `NewLocalPlane(route)`; `LocalPlane.ProjectRoute` |
+  | `DesiredHeading`, `OverviewView`, `pointAt`, `trackSpan` | `PlanarRoute.HeadingAt`, `OverviewView`, `PointAt`, `Span` (tipo novo) |
+  | `ComputeCameraPose`, `BlendView` | `CameraView.Pose`, `CameraView.Blend` |
+  | `UnwrapAngles`, `LimitRate`, `GaussianSmooth`, `DetectSmoothedSpans` | `Signal.Unwrap`, `LimitRate`, `Smooth`, `SmoothedSpans` (tipo novo: um valor por quadro) |
+  | `BuildMarkerTimeline` | `NewMarkerTimeline` (construtor) |
+  | `followViews`, `limitAndSmooth`, `buildFrame` | métodos do `cameraPlanner`, tipo não exportado que guarda o que o planejamento usa enquanto roda |
+
+  `CleanedTrack` e `TreatedTrack` passaram a carregar `Route` (não mais
+  `[]TrackPoint`). O que sobra como função livre é matemática sem dono e sem
+  estado (`clamp`, `quantize`, `frameTime`, `normalizeDegrees`, `roundHalfUp`).
+- **Resultado**: nenhuma mudança de comportamento — os planos exportados de
+  seis trajetos de amostra saem byte a byte idênticos antes e depois.
+- **Testes**: os testes de `internal/domain` são do pacote externo
+  `domain_test` (necessário porque usam `builddomain`, que importa `domain`);
+  por isso os métodos são exportados e testados como qualquer API do pacote.
+
+## 18. Configuração com tipos próprios (revisão do PR #2)
+
+- **Problema**: `internal/infra/outbound/config` importava `domain` só para
+  expor `domain.CameraTuning`, `domain.PlanParameters` e `domain.Level` — um
+  adapter de saída dependendo de tipos do núcleo, e a configuração ficando
+  acoplada a eles.
+- **Decisão**: o pacote `config` tem tipos próprios (`Level`, `LevelValues`,
+  `CameraTuning`, `PlanDefaults`) e não importa o domínio. O composition
+  root (`cmd/sobrevoo/config_mapping.go`) os mapeia para os tipos de domínio
+  onde o núcleo precisa deles, e um teste garante que o mapeamento da
+  configuração inicial coincide com os valores do `CameraTuningBuilder` usado
+  pelos testes de domínio. O `DefaultLevel` da etapa 1 (que já usava
+  `domain.Level`) foi convertido do mesmo jeito.

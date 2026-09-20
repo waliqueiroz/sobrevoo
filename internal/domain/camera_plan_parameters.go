@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// smoothstepPeakSlope is the steepest slope of a smoothstep (3u² - 2u³): the
+// opening and closing need that many times the average rate of change.
+const smoothstepPeakSlope = 1.5
+
 const (
 	// MinFrameRate and MaxFrameRate bound the accepted frame rates, in
 	// frames per second (inclusive).
@@ -107,4 +111,74 @@ type CameraTuning struct {
 	BaseDistanceMeters [levelCount]float64
 	LookAheadSeconds   [levelCount]float64
 	TiltDegrees        [levelCount]float64
+}
+
+// FollowDistance is how far the camera flies from the marker while following
+// it at the given distance level: a base distance plus the distance the
+// marker covers, in the video, in the level's look-ahead time — so
+// fast-moving markers stay in view.
+func (t CameraTuning) FollowDistance(level Level, markerSpeed float64) float64 {
+	return t.BaseDistanceMeters[level.index()] + t.LookAheadSeconds[level.index()]*markerSpeed
+}
+
+// MinimumDuration is the shortest video duration over route that still lets
+// the opening and the closing reach the follow pose within the smoothness
+// limits, and leaves enough time to follow the route. It is computed from
+// conservative bounds that do not depend on the duration itself, and rounded
+// up to a whole frame.
+func (p PlanParameters) MinimumDuration(route Route, tuning CameraTuning) time.Duration {
+	return p.minimumDuration(NewLocalPlane(route).ProjectRoute(route), tuning)
+}
+
+func (p PlanParameters) minimumDuration(route PlanarRoute, tuning CameraTuning) time.Duration {
+	base := tuning.BaseDistanceMeters[p.Distance.index()]
+	overview := route.OverviewView(0, tuning.OverviewMinDistanceFactor*base, tuning)
+	followTilt := tuning.TiltDegrees[p.Tilt.index()]
+
+	phase := math.Max(tuning.MinPhaseDuration.Seconds(), math.Max(
+		smoothstepPeakSlope*math.Abs(overview.TiltDegrees-followTilt)/tuning.MaxTiltRateDegPerSecond,
+		smoothstepPeakSlope*math.Abs(math.Log(overview.Distance/base))/tuning.MaxLogDistanceRatePerSecond,
+	))
+
+	followShare := 1 - tuning.OpeningFraction - tuning.ClosingFraction
+	seconds := math.Max(
+		math.Max(phase/tuning.OpeningFraction, phase/tuning.ClosingFraction),
+		tuning.MinFollowDuration.Seconds()/followShare,
+	)
+
+	frames := math.Ceil(seconds*p.FrameRate - 1e-9)
+	return time.Duration(math.Ceil(frames / p.FrameRate * float64(time.Second)))
+}
+
+// DefaultDuration is the video duration used when the user does not choose
+// one: a base duration that grows with the square root of the route's length,
+// clamped to the configured range, and never below MinimumDuration.
+func (p PlanParameters) DefaultDuration(route Route, tuning CameraTuning) time.Duration {
+	return p.defaultDuration(route.Length(), p.MinimumDuration(route, tuning), tuning)
+}
+
+func (p PlanParameters) defaultDuration(length float64, minimum time.Duration, tuning CameraTuning) time.Duration {
+	km := length / 1000
+	seconds := tuning.AutoDurationBase.Seconds() + tuning.AutoDurationPerSqrtKm.Seconds()*math.Sqrt(km)
+	seconds = clamp(seconds, tuning.AutoDurationMin.Seconds(), tuning.AutoDurationMax.Seconds())
+
+	return max(time.Duration(math.Round(seconds))*time.Second, minimum)
+}
+
+// resolveDuration returns the duration of the video and whether the user
+// chose it: the requested one, if it is at least the minimum for the route,
+// or else the default one.
+func (p PlanParameters) resolveDuration(length float64, minimum time.Duration, tuning CameraTuning) (time.Duration, DurationMode, error) {
+	if p.Duration == nil {
+		return p.defaultDuration(length, minimum, tuning), DurationModeAutomatic, nil
+	}
+
+	if *p.Duration < minimum {
+		return 0, "", fmt.Errorf("%w: %s requested, minimum for this track is %.2f s", ErrDurationTooShort, *p.Duration, roundUpToCentiseconds(minimum))
+	}
+	return *p.Duration, DurationModeExplicit, nil
+}
+
+func roundUpToCentiseconds(d time.Duration) float64 {
+	return math.Ceil(d.Seconds()*100-1e-9) / 100
 }

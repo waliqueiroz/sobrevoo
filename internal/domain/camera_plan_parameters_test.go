@@ -153,3 +153,28 @@ func Test_PlanParameters_FrameCount(t *testing.T) {
 		assert.Equal(t, 3, count)
 	})
 }
+
+func Test_CameraTuning_FollowDistance(t *testing.T) {
+	t.Run("should add the distance covered in the look-ahead time to the base distance", func(t *testing.T) {
+		// given
+		tuning := defaultTuning()
+
+		// when
+		distance := tuning.FollowDistance(domain.LevelMedium, 10)
+
+		// then
+		assert.Equal(t, 640.0, distance)
+	})
+
+	t.Run("should be larger for the high level than for the low level at the same speed", func(t *testing.T) {
+		// given
+		tuning := defaultTuning()
+
+		// when
+		low := tuning.FollowDistance(domain.LevelLow, 20)
+		high := tuning.FollowDistance(domain.LevelHigh, 20)
+
+		// then
+		assert.Greater(t, high, low)
+	})
+}

@@ -19,12 +19,12 @@ type LocalPlane struct {
 	longitude float64 // radians
 }
 
-// NewLocalPlane centers a plane on the centroid of points, computed as the
-// mean of their unit vectors, which is continuous across the antimeridian and
-// near the poles (an arithmetic mean of longitudes is not).
-func NewLocalPlane(points []TrackPoint) LocalPlane {
+// NewLocalPlane centers a plane on the centroid of the route's points,
+// computed as the mean of their unit vectors, which is continuous across the
+// antimeridian and near the poles (an arithmetic mean of longitudes is not).
+func NewLocalPlane(route Route) LocalPlane {
 	var sx, sy, sz float64
-	for _, p := range points {
+	for _, p := range route.Points {
 		lat, lon := degreesToRadians(p.Latitude), degreesToRadians(p.Longitude)
 		sx += float64(math.Cos(lat) * math.Cos(lon))
 		sy += float64(math.Cos(lat) * math.Sin(lon))
@@ -90,4 +90,14 @@ func (l LocalPlane) Unproject(p PlanePoint) (lat, lon float64) {
 
 func radiansToDegrees(radians float64) float64 {
 	return radians * 180 / math.Pi
+}
+
+// ProjectRoute projects every point of the route onto the plane, keeping the
+// distance travelled at each point.
+func (l LocalPlane) ProjectRoute(route Route) PlanarRoute {
+	points := make([]PlanePoint, len(route.Points))
+	for i, p := range route.Points {
+		points[i] = l.Project(p.Latitude, p.Longitude)
+	}
+	return PlanarRoute{Points: points, Distances: route.Distances()}
 }
