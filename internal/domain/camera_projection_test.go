@@ -67,62 +67,120 @@ func Test_NewLocalPlane(t *testing.T) {
 }
 
 func Test_LocalPlane_ProjectUnproject(t *testing.T) {
-	cases := []struct {
-		name     string
-		lat, lon float64
-	}{
-		{"the equator", 0, 0},
-		{"the antimeridian", 10, 179.95},
-		{"latitude 85", 85, 10},
-		{"latitude -85", -85, -30},
-	}
+	t.Run("should return to the same coordinate after a round trip at the equator", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(0, 0).WithLine(20000, 45).Build()
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
 
-	for _, c := range cases {
-		t.Run("should return to the same coordinate after a round trip at "+c.name, func(t *testing.T) {
-			// given
-			points := builddomain.NewSyntheticRouteBuilder().WithOrigin(c.lat, c.lon).WithLine(20000, 45).Build()
-			plane := domain.NewLocalPlane(domain.Route{Points: points})
+		for _, p := range points {
+			// when
+			lat, lon := plane.Unproject(plane.Project(p.Latitude, p.Longitude))
 
-			for _, p := range points {
-				// when
-				lat, lon := plane.Unproject(plane.Project(p.Latitude, p.Longitude))
+			// then: less than a millimeter apart, longitude in [-180, 180)
+			back := domain.TrackPoint{Latitude: lat, Longitude: lon}
+			assert.Less(t, p.DistanceTo(back), 0.001)
+			assert.GreaterOrEqual(t, lon, -180.0)
+			assert.Less(t, lon, 180.0)
+		}
+	})
 
-				// then: less than a millimeter apart, longitude in [-180, 180)
-				back := domain.TrackPoint{Latitude: lat, Longitude: lon}
-				assert.Less(t, p.DistanceTo(back), 0.001)
-				assert.GreaterOrEqual(t, lon, -180.0)
-				assert.Less(t, lon, 180.0)
-			}
-		})
-	}
+	t.Run("should return to the same coordinate after a round trip at the antimeridian", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(10, 179.95).WithLine(20000, 45).Build()
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
+
+		for _, p := range points {
+			// when
+			lat, lon := plane.Unproject(plane.Project(p.Latitude, p.Longitude))
+
+			// then: less than a millimeter apart, longitude in [-180, 180)
+			back := domain.TrackPoint{Latitude: lat, Longitude: lon}
+			assert.Less(t, p.DistanceTo(back), 0.001)
+			assert.GreaterOrEqual(t, lon, -180.0)
+			assert.Less(t, lon, 180.0)
+		}
+	})
+
+	t.Run("should return to the same coordinate after a round trip at latitude 85", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(85, 10).WithLine(20000, 45).Build()
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
+
+		for _, p := range points {
+			// when
+			lat, lon := plane.Unproject(plane.Project(p.Latitude, p.Longitude))
+
+			// then: less than a millimeter apart, longitude in [-180, 180)
+			back := domain.TrackPoint{Latitude: lat, Longitude: lon}
+			assert.Less(t, p.DistanceTo(back), 0.001)
+			assert.GreaterOrEqual(t, lon, -180.0)
+			assert.Less(t, lon, 180.0)
+		}
+	})
+
+	t.Run("should return to the same coordinate after a round trip at latitude -85", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(-85, -30).WithLine(20000, 45).Build()
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
+
+		for _, p := range points {
+			// when
+			lat, lon := plane.Unproject(plane.Project(p.Latitude, p.Longitude))
+
+			// then: less than a millimeter apart, longitude in [-180, 180)
+			back := domain.TrackPoint{Latitude: lat, Longitude: lon}
+			assert.Less(t, p.DistanceTo(back), 0.001)
+			assert.GreaterOrEqual(t, lon, -180.0)
+			assert.Less(t, lon, 180.0)
+		}
+	})
 }
 
 func Test_LocalPlane_Project(t *testing.T) {
-	cases := []struct {
-		name     string
-		lat, lon float64
-	}{
-		{"the equator", 0, 0},
-		{"the antimeridian", 10, 179.95},
-		{"latitude 85", 85, 10},
-	}
+	t.Run("should preserve distances within 0.1 percent at the equator", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(0, 0).WithLine(20000, 45).WithPointCount(3).Build()
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
+		first, last := points[0], points[len(points)-1]
 
-	for _, c := range cases {
-		t.Run("should preserve distances within 0.1 percent at "+c.name, func(t *testing.T) {
-			// given
-			points := builddomain.NewSyntheticRouteBuilder().WithOrigin(c.lat, c.lon).WithLine(20000, 45).WithPointCount(3).Build()
-			plane := domain.NewLocalPlane(domain.Route{Points: points})
-			first, last := points[0], points[len(points)-1]
+		// when
+		a := plane.Project(first.Latitude, first.Longitude)
+		b := plane.Project(last.Latitude, last.Longitude)
 
-			// when
-			a := plane.Project(first.Latitude, first.Longitude)
-			b := plane.Project(last.Latitude, last.Longitude)
+		// then
+		planar := hypot(b.X-a.X, b.Y-a.Y)
+		assert.InEpsilon(t, first.DistanceTo(last), planar, 0.001)
+	})
 
-			// then
-			planar := hypot(b.X-a.X, b.Y-a.Y)
-			assert.InEpsilon(t, first.DistanceTo(last), planar, 0.001)
-		})
-	}
+	t.Run("should preserve distances within 0.1 percent at the antimeridian", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(10, 179.95).WithLine(20000, 45).WithPointCount(3).Build()
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
+		first, last := points[0], points[len(points)-1]
+
+		// when
+		a := plane.Project(first.Latitude, first.Longitude)
+		b := plane.Project(last.Latitude, last.Longitude)
+
+		// then
+		planar := hypot(b.X-a.X, b.Y-a.Y)
+		assert.InEpsilon(t, first.DistanceTo(last), planar, 0.001)
+	})
+
+	t.Run("should preserve distances within 0.1 percent at latitude 85", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithOrigin(85, 10).WithLine(20000, 45).WithPointCount(3).Build()
+		plane := domain.NewLocalPlane(domain.Route{Points: points})
+		first, last := points[0], points[len(points)-1]
+
+		// when
+		a := plane.Project(first.Latitude, first.Longitude)
+		b := plane.Project(last.Latitude, last.Longitude)
+
+		// then
+		planar := hypot(b.X-a.X, b.Y-a.Y)
+		assert.InEpsilon(t, first.DistanceTo(last), planar, 0.001)
+	})
 
 	t.Run("should place a point north of the center at positive Y and east at positive X", func(t *testing.T) {
 		// given

@@ -10,38 +10,71 @@ import (
 )
 
 func Test_SyntheticRouteBuilder_Build(t *testing.T) {
-	origins := []struct {
-		name     string
-		lat, lon float64
-	}{
-		{"the equator", 0, 0},
-		{"the antimeridian", 10, 179.95},
-		{"a high latitude", 85, 10},
-	}
+	t.Run("should build a line of the requested length at the equator", func(t *testing.T) {
+		// given
+		builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(0, 0).WithLine(20000, 45)
 
-	for _, origin := range origins {
-		t.Run("should build a line of the requested length at "+origin.name, func(t *testing.T) {
-			// given
-			builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(origin.lat, origin.lon).WithLine(20000, 45)
+		// when
+		points := builder.Build()
 
-			// when
-			points := builder.Build()
+		// then
+		assert.InEpsilon(t, 20000.0, (domain.Route{Points: points}).Length(), 0.001)
+	})
 
-			// then
-			assert.InEpsilon(t, 20000.0, (domain.Route{Points: points}).Length(), 0.001)
-		})
+	t.Run("should build a line of the requested length at the antimeridian", func(t *testing.T) {
+		// given
+		builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(10, 179.95).WithLine(20000, 45)
 
-		t.Run("should build an out-and-back route of twice the requested length at "+origin.name, func(t *testing.T) {
-			// given
-			builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(origin.lat, origin.lon).WithOutAndBack(3000)
+		// when
+		points := builder.Build()
 
-			// when
-			points := builder.Build()
+		// then
+		assert.InEpsilon(t, 20000.0, (domain.Route{Points: points}).Length(), 0.001)
+	})
 
-			// then
-			assert.InEpsilon(t, 6000.0, (domain.Route{Points: points}).Length(), 0.001)
-		})
-	}
+	t.Run("should build a line of the requested length at a high latitude", func(t *testing.T) {
+		// given
+		builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(85, 10).WithLine(20000, 45)
+
+		// when
+		points := builder.Build()
+
+		// then
+		assert.InEpsilon(t, 20000.0, (domain.Route{Points: points}).Length(), 0.001)
+	})
+
+	t.Run("should build an out-and-back route of twice the requested length at the equator", func(t *testing.T) {
+		// given
+		builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(0, 0).WithOutAndBack(3000)
+
+		// when
+		points := builder.Build()
+
+		// then
+		assert.InEpsilon(t, 6000.0, (domain.Route{Points: points}).Length(), 0.001)
+	})
+
+	t.Run("should build an out-and-back route of twice the requested length at the antimeridian", func(t *testing.T) {
+		// given
+		builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(10, 179.95).WithOutAndBack(3000)
+
+		// when
+		points := builder.Build()
+
+		// then
+		assert.InEpsilon(t, 6000.0, (domain.Route{Points: points}).Length(), 0.001)
+	})
+
+	t.Run("should build an out-and-back route of twice the requested length at a high latitude", func(t *testing.T) {
+		// given
+		builder := builddomain.NewSyntheticRouteBuilder().WithOrigin(85, 10).WithOutAndBack(3000)
+
+		// when
+		points := builder.Build()
+
+		// then
+		assert.InEpsilon(t, 6000.0, (domain.Route{Points: points}).Length(), 0.001)
+	})
 
 	t.Run("should build a circle of several laps whose length is the circumference times the laps", func(t *testing.T) {
 		// given

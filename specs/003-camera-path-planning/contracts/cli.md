@@ -22,10 +22,11 @@ sobrevoo plan <arquivo-de-trajeto> [--duration <segundos>] [--fps <n>]
   completo da etapa 1 — parse, reordenação, descarte, simplificação e
   suavização — com o nível padrão (FR-001).
 - `--duration` (opcional): duração do vídeo em segundos; número decimal
-  aceito (ex.: `45.5`). Quando omitida, a duração é **calculada a partir da
+  aceito (ex.: `45.5`). Quando omitida, a duração é **calculada a partir do
   comprimento do trajeto** (de 20 s a 120 s, crescimento sublinear, nunca
   abaixo do mínimo daquele trajeto; FR-003a). Quando informada, é usada
-  exatamente e passa pelas validações de duração.
+  exatamente, deve estar entre 0 s (exclusive) e 3 600 s (uma hora,
+  inclusive) e passa pelas demais validações de duração.
 - `--fps` (padrão `30`, de `Config.PlanDefaults`): quadros por segundo; número decimal aceito
   (ex.: `29.97`), entre 1 e 120.
 - `--distance` (padrão `medium`): afastamento da câmera em relação ao
@@ -80,7 +81,7 @@ alterado no destino da exportação.
 | Formato de trajeto não suportado | `domain.ErrUnsupportedFormat` | `2` |
 | Pontos insuficientes (antes ou depois do tratamento) | `domain.ErrInsufficientPoints[AfterCleaning]` | `3` |
 | Arquivo de trajeto inexistente ou não legível (E/S) | erro genérico | `4` |
-| `--duration` informada e ≤ 0 | `domain.ErrInvalidDuration` | `10` |
+| `--duration` informada e ≤ 0, ou acima de 3 600 s (uma hora) | `domain.ErrInvalidDuration` | `10` |
 | `--fps` ≤ 0 ou fora de 1–120 | `domain.ErrInvalidFrameRate` | `11` |
 | `--duration` informada abaixo do mínimo para o trajeto (nunca ocorre com duração automática) | `domain.ErrDurationTooShort` | `12` |
 | Trajeto curto demais (comprimento < 50 m) | `domain.ErrTrackTooShort` | `13` |
@@ -90,7 +91,8 @@ alterado no destino da exportação.
 | Valor não numérico em `--duration`/`--fps`, nível desconhecido, argumento faltando, `--overwrite` sem `--export` | erro de uso da CLI | `2` |
 
 As mensagens dos erros `10` a `16` sempre nomeiam o parâmetro ou o destino
-problemático (SC-008); a de código `12` traz a duração mínima calculada
+problemático (SC-008); a de código `10` traz o intervalo aceito (maior que
+0 s e no máximo 3 600 s); a de código `12` traz a duração mínima calculada
 para aquele trajeto e taxa de quadros; a de `13`, o comprimento encontrado e o
 mínimo exigido; a de `11`, o intervalo válido; a de `14`, a abrangência
 encontrada e o máximo aceito; a de `15`, o caminho e a dica
