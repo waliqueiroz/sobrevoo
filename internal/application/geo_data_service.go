@@ -43,36 +43,25 @@ type GeoDataService interface {
 }
 
 type geoDataService struct {
-	repository  domain.GeoDataRepository
-	inspector   domain.GeoDataInspector
-	fileChecker domain.FileChecker
-	parser      domain.TrackParser
-
-	// minPoints and maxPlausibleSpeedKmh are the same track-cleaning
-	// thresholds InspectTrackService uses, resolved by an outbound
-	// configuration adapter and injected here by whoever assembles the
-	// service (Constitution Principle VIII).
-	minPoints            int
-	maxPlausibleSpeedKmh float64
+	repository   domain.GeoDataRepository
+	inspector    domain.GeoDataInspector
+	fileChecker  domain.FileChecker
+	trackService TrackService
 }
 
 // NewGeoDataService creates a GeoDataService backed by the given ports and
-// thresholds.
+// by the TrackService that provides the cleaned track for coverage checks.
 func NewGeoDataService(
 	repository domain.GeoDataRepository,
 	inspector domain.GeoDataInspector,
 	fileChecker domain.FileChecker,
-	parser domain.TrackParser,
-	minPoints int,
-	maxPlausibleSpeedKmh float64,
+	trackService TrackService,
 ) GeoDataService {
 	return &geoDataService{
-		repository:           repository,
-		inspector:            inspector,
-		fileChecker:          fileChecker,
-		parser:               parser,
-		minPoints:            minPoints,
-		maxPlausibleSpeedKmh: maxPlausibleSpeedKmh,
+		repository:   repository,
+		inspector:    inspector,
+		fileChecker:  fileChecker,
+		trackService: trackService,
 	}
 }
 
@@ -129,15 +118,10 @@ func (s *geoDataService) Remove(name string) error {
 }
 
 func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport, error) {
-	track, err := s.parser.Parse(reader)
-	if err != nil {
-		return domain.CoverageReport{}, err
-	}
-
 	// The route used for coverage is cleaned but not simplified/smoothed:
 	// those two steps are rendering preparation and could shift points,
 	// masking a real coverage gap (research.md item 9).
-	points, _, err := domain.CleanTrack(track.Points, s.minPoints, s.maxPlausibleSpeedKmh)
+	cleaned, err := s.trackService.Clean(reader)
 	if err != nil {
 		return domain.CoverageReport{}, err
 	}
@@ -149,7 +133,7 @@ func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport,
 
 	baseMaps, elevations := s.partitionAvailableSources(sources)
 
-	return domain.ComputeCoverage(points, baseMaps, elevations), nil
+	return domain.ComputeCoverage(cleaned.Points, baseMaps, elevations), nil
 }
 
 // partitionAvailableSources splits sources into base map and elevation

@@ -93,7 +93,7 @@ func isImplausibleJump(prev, curr TrackPoint, maxPlausibleSpeedKmh float64) bool
 // coordinates, consecutive duplicates and implausible jumps. The minimum
 // point count is checked both before and after, as two distinguishable
 // error cases — shared by every use case that needs a cleaned route from a
-// parsed track (InspectTrackService, GeoDataService.CheckCoverage), so
+// parsed track (TrackService, GeoDataService.CheckCoverage), so
 // this composition itself, not just its parts, lives here instead of being
 // duplicated or reinvented by each service (Constitution Principle III).
 func CleanTrack(points []TrackPoint, minPoints int, maxPlausibleSpeedKmh float64) ([]TrackPoint, DiscardStats, error) {

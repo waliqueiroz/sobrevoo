@@ -36,7 +36,7 @@ func NewGeoDataCheckCommand(geoDataService application.GeoDataService) *cobra.Co
 }
 
 func runGeoDataCheck(cmd *cobra.Command, geoDataService application.GeoDataService, path string) error {
-	// CheckCoverage needs an io.Reader (same as InspectTrackService.Inspect),
+	// CheckCoverage needs an io.Reader (same as TrackService.Inspect),
 	// so — same as inspect.go — this adapter is the one that opens the track
 	// file; a
 	// plain I/O error here (file missing, unreadable) falls through to
