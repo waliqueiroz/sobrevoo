@@ -12,14 +12,81 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
 // registryFileName is the geo data registry's file name inside the
 // directory returned by os.UserHomeDir() (research.md item 5).
 const registryDir = ".sobrevoo"
 const registryFileName = "registry.json"
+
+// Level is a low/medium/high choice, as the configuration expresses it. It
+// belongs to this package, not to the domain: the composition root maps it
+// to domain.Level where it is needed.
+type Level string
+
+const (
+	LevelLow    Level = "low"
+	LevelMedium Level = "medium"
+	LevelHigh   Level = "high"
+)
+
+// LevelValues holds one value per Level.
+type LevelValues struct {
+	Low    float64
+	Medium float64
+	High   float64
+}
+
+// CameraTuning holds the heuristic constants of camera planning (the third
+// stage): smoothness limits, opening/closing, stop compression, the automatic
+// duration and the per-level tables. Initial values, meant to be adjusted once
+// rendering shows how the flight really looks
+// (specs/003-camera-path-planning/research.md, item 12). The composition root
+// maps it to the domain's own CameraTuning.
+type CameraTuning struct {
+	OpeningFraction float64
+	ClosingFraction float64
+
+	StopSpeedMetersPerSecond float64
+	StopMinDuration          time.Duration
+	StopCappedDuration       time.Duration
+	StopMaxShareOfMovingTime float64
+
+	MaxHeadingRateDegPerSecond  float64
+	MaxTiltRateDegPerSecond     float64
+	MaxLogDistanceRatePerSecond float64
+	MaxTargetSpeedInDistances   float64
+	GaussianSigmaSeconds        float64
+
+	OverviewTiltDegrees        float64
+	OverviewVerticalFOVDegrees float64
+	OverviewMargin             float64
+	OverviewMinDistanceFactor  float64
+
+	MinFollowDuration time.Duration
+	MinPhaseDuration  time.Duration
+
+	MinTrackLengthMeters float64
+	MaxTrackSpanMeters   float64
+
+	AutoDurationBase      time.Duration
+	AutoDurationPerSqrtKm time.Duration
+	AutoDurationMin       time.Duration
+	AutoDurationMax       time.Duration
+
+	BaseDistanceMeters LevelValues
+	LookAheadSeconds   LevelValues
+	TiltDegrees        LevelValues
+}
+
+// PlanDefaults are the camera plan parameters used when the user does not
+// choose them: 30 frames per second and medium distance and tilt. There is no
+// default duration: when the user gives none, it is computed from the track.
+type PlanDefaults struct {
+	FrameRate float64
+	Distance  Level
+	Tilt      Level
+}
 
 // Config holds the internal thresholds used by the track treatment pipeline
 // (research.md items 7 and 9), plus the resolved locations Sobrevoo persists
@@ -37,7 +104,7 @@ type Config struct {
 
 	// DefaultLevel is the simplification/smoothing level applied when the
 	// user does not specify one explicitly (FR-016).
-	DefaultLevel domain.Level
+	DefaultLevel Level
 
 	// RegistryPath is where the geo data registry is persisted: a single
 	// JSON file at a fixed path — the same regardless of the current
@@ -46,18 +113,13 @@ type Config struct {
 	// configuration-directory convention (research.md item 5).
 	RegistryPath string
 
-	// CameraTuning holds the heuristic constants of camera planning (the
-	// third stage): smoothness limits, opening/closing, stop compression,
-	// the automatic duration and the per-level tables. Initial values, meant
-	// to be adjusted once rendering shows how the flight really looks
-	// (specs/003-camera-path-planning/research.md, item 12).
-	CameraTuning domain.CameraTuning
+	// CameraTuning holds the constants of camera planning.
+	CameraTuning CameraTuning
 
-	// DefaultPlanParameters are the camera plan parameters used when the user
-	// does not choose them: 30 frames per second and medium distance and
-	// tilt. The duration is left nil, which means "automatic". They are
-	// distinct from DefaultLevel, which is the treatment level of the track.
-	DefaultPlanParameters domain.PlanParameters
+	// PlanDefaults are the camera plan parameters used when the user does not
+	// choose them. They are distinct from DefaultLevel, which is the
+	// treatment level of the track.
+	PlanDefaults PlanDefaults
 }
 
 // Load returns Sobrevoo's configuration. It fails only when the user's home
@@ -72,19 +134,15 @@ func Load() (Config, error) {
 	return Config{
 		MinPoints:            2,
 		MaxPlausibleSpeedKmh: 130,
-		DefaultLevel:         domain.LevelMedium,
+		DefaultLevel:         LevelMedium,
 		RegistryPath:         filepath.Join(home, registryDir, registryFileName),
 		CameraTuning:         cameraTuning(),
-		DefaultPlanParameters: domain.PlanParameters{
-			FrameRate: 30,
-			Distance:  domain.LevelMedium,
-			Tilt:      domain.LevelMedium,
-		},
+		PlanDefaults:         PlanDefaults{FrameRate: 30, Distance: LevelMedium, Tilt: LevelMedium},
 	}, nil
 }
 
-func cameraTuning() domain.CameraTuning {
-	return domain.CameraTuning{
+func cameraTuning() CameraTuning {
+	return CameraTuning{
 		OpeningFraction: 0.10,
 		ClosingFraction: 0.10,
 
@@ -115,8 +173,8 @@ func cameraTuning() domain.CameraTuning {
 		AutoDurationMin:       20 * time.Second,
 		AutoDurationMax:       120 * time.Second,
 
-		BaseDistanceMeters: [3]float64{300, 600, 1200},
-		LookAheadSeconds:   [3]float64{2, 4, 8},
-		TiltDegrees:        [3]float64{25, 45, 65},
+		BaseDistanceMeters: LevelValues{Low: 300, Medium: 600, High: 1200},
+		LookAheadSeconds:   LevelValues{Low: 2, Medium: 4, High: 8},
+		TiltDegrees:        LevelValues{Low: 25, Medium: 45, High: 65},
 	}
 }

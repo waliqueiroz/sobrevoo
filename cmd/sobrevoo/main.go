@@ -36,7 +36,7 @@ func run() int {
 	trackService := application.NewTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
 	cameraPlanExporter := jsonfile.NewCameraPlanExporter()
-	cameraPlanService := application.NewCameraPlanService(trackService, cameraPlanExporter, cfg.DefaultLevel, cfg.CameraTuning)
+	cameraPlanService := application.NewCameraPlanService(trackService, cameraPlanExporter, domainLevel(cfg.DefaultLevel), domainCameraTuning(cfg.CameraTuning))
 
 	geoDataInspector := geodatainspector.New()
 	geoDataRepository := jsonfile.NewGeoDataRepository(cfg.RegistryPath)
@@ -50,8 +50,8 @@ func run() int {
 	geoDataCommand.AddCommand(cli.NewGeoDataRemoveCommand(geoDataService))
 
 	root := cli.NewRootCommand()
-	root.AddCommand(cli.NewInspectCommand(trackService, cfg.DefaultLevel))
-	root.AddCommand(cli.NewPlanCommand(cameraPlanService, cfg.DefaultPlanParameters))
+	root.AddCommand(cli.NewInspectCommand(trackService, domainLevel(cfg.DefaultLevel)))
+	root.AddCommand(cli.NewPlanCommand(cameraPlanService, domainPlanParameters(cfg.PlanDefaults)))
 	root.AddCommand(geoDataCommand)
 
 	if err := root.Execute(); err != nil {
