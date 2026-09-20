@@ -32,6 +32,20 @@ func ExitCode(err error) int {
 		return 8
 	case errors.Is(err, domain.ErrDataSourceNotRegistered):
 		return 9
+	case errors.Is(err, domain.ErrInvalidDuration):
+		return 10
+	case errors.Is(err, domain.ErrInvalidFrameRate):
+		return 11
+	case errors.Is(err, domain.ErrDurationTooShort):
+		return 12
+	case errors.Is(err, domain.ErrTrackTooShort):
+		return 13
+	case errors.Is(err, domain.ErrTrackTooLarge):
+		return 14
+	case errors.Is(err, domain.ErrPlanDestinationExists):
+		return 15
+	case errors.Is(err, domain.ErrPlanDestinationInvalid):
+		return 16
 	default:
 		// Anything else (file-open I/O errors, malformed-but-recognized
 		// content, CLI usage errors not already handled by Cobra itself) is

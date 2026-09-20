@@ -35,6 +35,9 @@ func run() int {
 	catmullRom := smoother.NewCatmullRom()
 	trackService := application.NewTrackService(parser, douglasPeucker, catmullRom, cfg.MinPoints, cfg.MaxPlausibleSpeedKmh)
 
+	cameraPlanExporter := jsonfile.NewCameraPlanExporter()
+	cameraPlanService := application.NewCameraPlanService(trackService, cameraPlanExporter, cfg.DefaultLevel, cfg.CameraTuning)
+
 	geoDataInspector := geodatainspector.New()
 	geoDataRepository := jsonfile.NewGeoDataRepository(cfg.RegistryPath)
 	geoDataFileChecker := filechecker.NewOS()
@@ -48,6 +51,7 @@ func run() int {
 
 	root := cli.NewRootCommand()
 	root.AddCommand(cli.NewInspectCommand(trackService, cfg.DefaultLevel))
+	root.AddCommand(cli.NewPlanCommand(cameraPlanService, cfg.DefaultPlanParameters))
 	root.AddCommand(geoDataCommand)
 
 	if err := root.Execute(); err != nil {
