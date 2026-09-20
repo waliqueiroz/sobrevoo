@@ -511,3 +511,45 @@ sendo erro de uso, código 2.
   configuração inicial coincide com os valores do `CameraTuningBuilder` usado
   pelos testes de domínio. O `DefaultLevel` da etapa 1 (que já usava
   `domain.Level`) foi convertido do mesmo jeito.
+
+## 19. Por que os cálculos são próprios e não de bibliotecas (revisão do PR #2)
+
+- **Pergunta**: os cálculos que entraram no domínio (distância, projeção,
+  suavização, ...) reinventam a roda? Vale trocá-los por bibliotecas da
+  comunidade, acessadas por adapters?
+- **Levantamento** (bibliotecas baixadas e inspecionadas num módulo
+  descartável, fora do repositório; datas de última versão de setembro de 2026):
+
+  | Cálculo | Candidata | Situação |
+  |---|---|---|
+  | Distância (Haversine) | `tidwall/geodesic` (Karney, WGS84), `golang/geo/s2`, `paulmach/orb/geo` | existe |
+  | Projeção azimutal equidistante | nenhuma pronta em Go puro: em `go-spatial/proj` o `Aeqd.go` está todo comentado ("WE NEED TO PORT geodesic.h"); `wroge/wgs84` v2 (alpha) só tem a azimutal de área igual | pode ser montada com `Inverse`/`Direct` da `tidwall/geodesic` |
+  | Destino por rumo e distância (só no builder de testes) | `orb/geo.PointAtBearingAndDistance`, `geodesic.Direct` | existe |
+  | Bounding box com antimeridiano | `s2.Rect` | existe, mas com outra semântica (menor intervalo de longitude, e não o "unwrap" na ordem do trajeto que `CrossesAntimeridian` usa) |
+  | Suavização gaussiana, limitação de taxa, unwrap de ângulos, smoothstep | `gonum` só oferece o kernel (`dsp/window`) | nenhuma faz o filtro 1D com reflexão nas bordas |
+  | Linha do tempo com paradas, janela de tangentes, visão geral, duração mínima | — | regra do nosso problema, não cálculo genérico |
+  | Douglas-Peucker (etapa 1, já é adapter) | `orb/simplify` | única candidata a substituir um adapter existente; **não comparada** com a tolerância do adapter atual |
+
+- **Diferença numérica medida**: a distância esférica atual (R = 6371 km) difere
+  da elipsoidal (WGS84) em −0,11% (20 km leste-oeste no equador) a +0,56%
+  (20 km norte-sul no equador); −0,36% a 60° e −0,44% a 85° de latitude; −0,15% em
+  1000 km na diagonal. A `orb` usa o raio equatorial (6378 km) e erra mais no
+  norte-sul. Trocar a fórmula mudaria as saídas em 0,1% a 0,5%.
+- **Decisão**: **manter os cálculos no domínio**, sem biblioteca e sem adapter.
+  São fórmulas de livro, testadas (inclusive no antimeridiano e a 85° de
+  latitude), sem I/O, e fazem parte da regra de negócio do planejamento de
+  câmera. A precisão elipsoidal não muda o vídeo.
+- **Custo de fazer o contrário** (registrado para quem reabrir a questão):
+  como as entidades têm métodos (item 17), uma porta `Geodesy` teria de
+  entrar como parâmetro em quase toda assinatura que mede distância
+  (`TrackPoint.DistanceTo`, `Route.Length`, `Track.Clean`, `NewLocalPlane`,
+  os serviços e os testes); os planos exportados deixariam de ser idênticos
+  aos atuais (0,1% a 0,5%), e os testes com valores exatos teriam de ser
+  recalculados. A alternativa, importar uma biblioteca de cálculo puro direto
+  no domínio, exigiria emendar a constituição (Princípio II), como foi feito
+  para `time.Now()`.
+- **Gatilho para reabrir**: um requisito de precisão geodésica (medição, não
+  visualização), ou uma biblioteca de projeção azimutal equidistante em Go puro
+  e mantida. Nesse caso, o caminho seria uma porta `Geodesy` só para distância
+  e projeção, com adapter sobre `tidwall/geodesic` (MIT, sem dependências;
+  última versão de setembro de 2024).
