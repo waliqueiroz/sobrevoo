@@ -14,7 +14,7 @@ câmera** determinístico — para cada quadro do futuro vídeo, a posição da
 câmera (latitude, longitude, altitude), a direção, a inclinação e a posição
 do marcador da atividade — e o expõe como resumo no terminal e, opcionalmente,
 como arquivo JSON versionado. A duração do vídeo é calculada a partir da
-extensão do trajeto quando o usuário não a informa (curva sublinear, entre
+comprimento do trajeto quando o usuário não a informa (curva sublinear, entre
 20 s e 120 s, nunca abaixo do mínimo para um voo suave) e respeitada
 exatamente quando informada. Nenhum mapa, quadro ou vídeo é gerado.
 
@@ -34,7 +34,7 @@ entre uma pose de visão geral e a pose de acompanhamento.
 
 A arquitetura hexagonal é preservada: o núcleo ganha entidades e funções
 puras de câmera (`CameraPlan`, `CameraFrame`, `PlanParameters`,
-`CameraTuning`, `PlanCamera`, `MinimumDuration`, `DefaultDuration`), uma única porta nova
+`CameraTuning`, `PlanCamera`, `MinimumDuration`, `DefaultDuration`, além das primitivas geométricas exportadas para teste isolado, `research.md` item 17), uma única porta nova
 (`CameraPlanExporter`), sete erros sentinela e um serviço por recurso,
 `CameraPlanService` (`Generate`, `Export`). Toda escrita de arquivo fica no
 adapter `jsonfile`; a CLI apenas traduz flags e erros.
@@ -87,8 +87,9 @@ operações por quadro no pior caso); a janela é truncada em ±3σ. Sem
 concorrência (também por determinismo, `research.md` item 9).
 
 **Restrições**: 100% offline; núcleo sem I/O; determinismo bit a bit no
-mesmo binário e máquina (valores quantizados, `research.md` item 9); nenhum
-dado de região embutido; extensão do trajeto entre 50 m e 2 000 km;
+mesmo binário e plataforma, e coincidência dentro da precisão documentada entre
+plataformas (valores quantizados, `research.md` item 9; FR-014); nenhum
+dado de região embutido; comprimento do trajeto de no mínimo 50 m e abrangência de no máximo 2 000 km;
 frequência entre 1 e 120 fps; duração automática entre 20 s e 120 s (ou o
 mínimo do trajeto, se maior), quando `--duration` não é informada.
 
@@ -112,7 +113,7 @@ contratos e quickstart); o resultado não mudou.
 | V. Funcionamento Offline | PASSA | Nenhuma rede, chave ou serviço; nenhum uso do registro da etapa 2; sem relógio (o resultado não depende de `time.Now()`). |
 | VI. Testes Automatizados no Núcleo | PASSA | Domínio testado sem I/O; `CameraPlanService` testado com `TrackService` (`mockapplication`) e `CameraPlanExporter` (`mockdomain`) mockados; `TrackService` testado com `TrackParser`, `Simplifier` e `Smoother` mockados (`mockdomain`); nenhum teste do núcleo toca disco. |
 | VII. Erros Sentinela no Domínio | PASSA | `ErrInvalidDuration`, `ErrInvalidFrameRate`, `ErrDurationTooShort`, `ErrTrackTooShort`, `ErrTrackTooLarge`, `ErrPlanDestinationExists`, `ErrPlanDestinationInvalid` declarados em `errors.go`; a CLI os traduz em códigos 10–16 (`contracts/cli.md`). Erros com dados variáveis usam `fmt.Errorf("%w: ...")`, preservando `errors.Is`. O adapter `jsonfile` traduz erros do `os` (`fs.ErrExist`, permissão, diretório inexistente) para os sentinelas; o núcleo nunca vê um erro de `os`. |
-| VIII. Configuração Injetada | PASSA | Todos os valores heurísticos ficam em `domain.CameraTuning` (formato definido pelo núcleo), preenchida por `internal/infra/outbound/config` e injetada em `NewCameraPlanService` por `cmd/sobrevoo`. Duração, fps, distância e inclinação chegam por parâmetro. O núcleo não lê flag, ambiente ou arquivo. |
+| VIII. Configuração Injetada | PASSA | Todos os valores heurísticos ficam em `domain.CameraTuning` (formato definido pelo núcleo), preenchida por `internal/infra/outbound/config` e injetada em `NewCameraPlanService` por `cmd/sobrevoo`. Os padrões de fps, distância e inclinação vêm de `Config.DefaultPlanParameters` (também injetada, e distinta do `DefaultLevel` de tratamento do trajeto da etapa 1); duração, fps, distância e inclinação chegam ao núcleo por parâmetro. O núcleo não lê flag, ambiente ou arquivo. |
 | IX. Organização de Portas, Service Layer e Mocks | PASSA | Sem `ports.go`: `CameraPlanExporter`, ligada à entidade `CameraPlan`, fica no topo de `camera_plan.go` (após `//go:generate` e imports). Nomeada pelo papel (`Exporter`; não é um repositório: não lê nem consulta). Um serviço por recurso: `CameraPlanService`/`cameraPlanService`/`NewCameraPlanService` (`Generate`, `Export`) e `TrackService`/`trackService`/`NewTrackService` (`Clean`, `Treat`, `Inspect`), sem `Execute`; a refatoração elimina o `InspectTrackService`, único serviço de método único que restava, e a duplicação do tratamento do trajeto. Serviços dependendo de serviços (`CameraPlanService` e `GeoDataService` → `TrackService`) é permitido pelo princípio. Toda regra vive em `internal/domain` (`PlanParameters.Validate`, `PlanCamera`, `MinimumDuration`, `NewCameraPlan`, que calcula o resumo); `application` só chama portas na ordem certa. Adapter: `jsonfile.NewCameraPlanExporter()` em `camera_plan_exporter.go` (pacote de tecnologia; construtor nomeado pela porta; sem repetir o nome do pacote). Mocks por `//go:generate` acima de cada interface, em `mockdomain`/`mockapplication`. Receivers: `p` (`PlanParameters`), `c` (`CameraPlan`), `f` (`CameraFrame`), `s` (`cameraPlanService`), `e` (exporter). |
 | X. Testes: Given/When/Then, Builders e Isolamento por Camada | PASSA | Todo teste em `t.Run("should ...")` com `// given`/`// when`/`// then`, sem tabelas; builders em `builddomain`; domínio/serviço com portas mockadas, CLI com `CameraPlanService` mockado (`mockapplication`), adapter com diretório temporário (é o próprio adapter, então tocar disco é o objeto do teste). Sem teste de ponta a ponta automatizado. |
 | Idioma dos Artefatos | PASSA | Artefatos do Spec Kit em português; identificadores, pacotes, arquivos, comentários e mensagens de commit em inglês; I/O em tempo de execução (flags, saída, erros) em inglês, como nas etapas 1 e 2. |
@@ -181,7 +182,7 @@ internal/
     │   ├── plan_test.go                       # NOVO
     │   └── exit_code.go                       # (estendido) códigos 10–16
     └── outbound/
-        ├── config/config.go                   # (estendido) Config.CameraTuning
+        ├── config/config.go                   # (estendido) Config.CameraTuning e Config.DefaultPlanParameters
         └── jsonfile/
             ├── camera_plan_exporter.go        # NOVO: JSON versionado, escrita atômica
             └── camera_plan_exporter_test.go   # NOVO

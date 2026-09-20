@@ -56,9 +56,12 @@ biblioteca padrão e `encoding/json`.
   na etapa 1, agora estendida a duas dimensões. Nenhuma região recebe
   tratamento especial (Princípio IV).
 - **Limite**: a projeção se degrada acima de alguns milhares de
-  quilômetros de extensão. A especificação (Suposições) já autoriza recusar
-  entradas fora de limites razoáveis: extensão máxima de 2 000 km
-  (`MaxTrackExtentMeters`, item 12), recusada com `ErrTrackTooLarge`.
+  quilômetros de abrangência. A **abrangência** do trajeto é o dobro da
+  maior distância do centro da projeção a um ponto do trajeto tratado
+  (aproximadamente o maior afastamento entre dois pontos); o **comprimento**
+  é a distância percorrida (soma dos segmentos). A abrangência máxima é
+  2 000 km (`MaxTrackSpanMeters`, item 12), acima da qual o plano é recusado
+  com `ErrTrackTooLarge` (FR-017b).
 - **Alternativas rejeitadas**: equiretangular local com
   `cos(latitude)` (falha em latitudes altas e exige tratar o antimeridiano
   à parte); trabalhar em ECEF 3D (correto, mas transforma a suavização de
@@ -180,11 +183,20 @@ biblioteca padrão e `encoding/json`.
 
 - **Decisão**: abertura e fechamento ocupam **10% da duração cada**
   (`OpeningFraction`, `ClosingFraction`), o acompanhamento os 80%
-  restantes. A **pose de visão geral** é: alvo no centro do trajeto
-  projetado, rumo 0° (norte para cima), inclinação 60°, e distância
-  `D_geral = margem · R / tan(FOV/2)` com `R` = raio do menor círculo (a
-  partir do centro) que contém o trajeto projetado, margem 1,2 e campo de
-  visão vertical de referência de 45° (`OverviewVerticalFOV` — a etapa de
+  restantes; em quadros, `abertura = round(N × OpeningFraction)`,
+  `fechamento = round(N × ClosingFraction)` e o acompanhamento recebe o
+  restante (`N − abertura − fechamento`). A **pose de visão geral** é: alvo
+  no centro do trajeto projetado, inclinação 60°, **rumo igual ao do
+  primeiro quadro de acompanhamento** na abertura e **ao do último** no
+  fechamento (a câmera não gira durante a abertura nem o fechamento — só
+  se aproxima ou se afasta), e distância
+  `D_geral = max(margem · R / tan(FOV/2), OverviewMinDistanceFactor · D₀)`
+  com `R` = raio do menor círculo (a partir do centro) que contém o
+  trajeto projetado, margem 1,2, fator 2 e `D₀` = distância base do nível
+  escolhido. O piso `2·D₀` garante que a abertura sempre aproxime a câmera
+  (trajetos menores que a distância de acompanhamento também ganham uma
+  visão de conjunto mais afastada que o acompanhamento), e o campo de visão
+  vertical de referência é de 45° (`OverviewVerticalFOV` — a etapa de
   renderização poderá usar outro, mas o plano precisa de um valor para
   garantir que "o trajeto inteiro esteja enquadrado", FR-012).
   Na abertura, `T`, `ψ`, `θ` e `ln D` interpolam da visão geral para a pose
@@ -202,17 +214,25 @@ biblioteca padrão e `encoding/json`.
 - **Decisão**: `MinimumDuration` é função pura do domínio, independente do
   restante do plano (usa cotas conservadoras, sem depender da própria
   duração escolhida, para evitar dependência circular):
-  `abertura_mín = max(2 s, 1,5·180°/45°/s, 1,5·|θ_geral−θ|/30°/s,
-  1,5·ln(D_geral/D₀)/1,5/s)`; `fechamento_mín` idêntico; `acomp_mín = 5 s`.
+  `abertura_mín = max(2 s, 1,5·|θ_geral−θ|/30°/s,
+  1,5·|ln(D_geral/D₀)|/1,5/s)`, com `θ` e `D₀` do nível escolhido (não há
+  termo de rumo: a visão geral já usa o rumo do acompanhamento, item 7);
+  `fechamento_mín` idêntico; `acomp_mín = 5 s`.
   `duração_mín = max(abertura_mín/0,10, fechamento_mín/0,10,
   acomp_mín/0,80)`, arredondada para cima ao próximo quadro. O fator 1,5 é o
   pico de inclinação do smoothstep. A duração `d` é aceita se `d ≥
   duração_mín` (igualdade aceita; FR: "limítrofe").
-- **Trajeto curto**: extensão (distância acumulada pós-tratamento) abaixo
-  de 50 m → `ErrTrackTooShort`, com extensão encontrada e mínimo exigidos
-  na mensagem. Acima disso o plano é gerado (Clarification Q2).
-- **Efeito prático**: para trajetos de ~100 km, `D_geral` chega a ~120 km e
-  o mínimo fica em torno de 60 s. Uma duração **informada** abaixo disso é
+- **Assinatura**: `MinimumDuration(points, frameRate, distance, tilt Level,
+  tuning)` — depende dos níveis escolhidos, pois `θ` e `D₀` entram na fórmula.
+- **Trajeto curto**: comprimento (distância acumulada pós-tratamento)
+  abaixo de 50 m → `ErrTrackTooShort`, com o comprimento encontrado e o
+  mínimo exigidos na mensagem. Acima disso o plano é gerado (Clarification Q2).
+  **Trajeto grande**: abrangência acima de 2 000 km → `ErrTrackTooLarge`
+  (FR-017b), com a abrangência encontrada e o máximo na mensagem.
+- **Efeito prático** (nível médio de distância): mínimo de 20 s (o piso de
+  2 s ÷ 10%) até poucos quilômetros; ≈ 25 s para 5 km; ≈ 39 s para 20 km;
+  ≈ 55 s para 100 km; ≈ 85–92 s no limite de 2 000 km de abrangência
+  (níveis médio e baixo). Uma duração **informada** abaixo do mínimo é
   recusada, e a mensagem indica o mínimo a usar (spec: "duração curta demais
   para o trajeto"). A duração **automática** (item 8.1) nunca é recusada,
   pois sempre parte do mínimo.
@@ -221,22 +241,29 @@ biblioteca padrão e `encoding/json`.
 
 - **Decisão**: sem `--duration`, a duração vem de `DefaultDuration(points,
   frameRate, tuning)`, função pura do domínio:
-  `base = clamp(15 s + 6 s·√(extensão_km), 20 s, 120 s)`, arredondada ao
+  `base = clamp(15 s + 6 s·√(comprimento_km), 20 s, 120 s)`, arredondada ao
   segundo mais próximo, e `duração = max(base, duração_mín)`, onde
   `duração_mín` é a de `MinimumDuration` (item 8, já arredondada ao próximo
-  quadro). Extensão = distância acumulada do trajeto tratado
+  quadro). Comprimento = distância acumulada do trajeto tratado
   (`TotalDistance`). A duração informada pelo usuário nunca passa por esta
   função.
 - **Valores de referência** (piso, teto e coeficientes ficam em
   `CameraTuning`): 1 km → 21 s; 5 km → 28 s; 20 km → 42 s; 50 km → 57 s;
   200 km → 100 s; 400 km ou mais → 120 s (teto). Se o mínimo do item 8 for
   maior que 120 s, o mínimo prevalece sobre o teto (cenário de aceite 10).
+  **Com os valores iniciais isso nunca ocorre** (o mínimo fica abaixo de
+  ≈ 92 s em todo trajeto aceito, item 8); a cláusula é uma salvaguarda para
+  quando os valores de `CameraTuning` mudarem, e é testada com um
+  `CameraTuning` sintético mais restritivo. Com os valores iniciais, o
+  mínimo também fica abaixo da curva base para a maioria dos comprimentos
+  (por exemplo, 20 km: mínimo ≈ 39 s, curva 42 s), então `max(base, mínimo)`
+  raramente altera a curva.
 - **Racional**: `√` é monotônica e sublinear (cenário 9, SC-011): dobrar a
-  extensão nunca dobra o vídeo. `max(base, mínimo)` garante por construção
+  comprimento nunca dobra o vídeo. `max(base, mínimo)` garante por construção
   que uma duração calculada nunca é recusada e que a saída é suave. Usa
   distância, e não tempo real, porque a distância existe em qualquer
   trajeto (inclusive sem horário) e evita que uma pedalada lenta de 3 h
-  gere um vídeo mais longo que uma corrida de mesma extensão.
+  gere um vídeo mais longo que uma corrida de mesmo comprimento.
 - **Determinismo**: função só do trajeto tratado, da taxa de quadros e de
   `CameraTuning`; sem relógio.
 - **Alternativas rejeitadas**: duração fixa de 60 s (recusaria trajetos
@@ -293,6 +320,10 @@ biblioteca padrão e `encoding/json`.
   Windows. Em sistemas de arquivos sem suporte a hard link, o adapter
   recorre a `O_CREATE|O_EXCL` na criação direta, sem atomicidade da
   substituição — que só ocorre no caminho `overwrite`.
+- **Limitação conhecida de teste**: o recurso ao `O_CREATE|O_EXCL` em
+  sistemas de arquivos sem hard link não é exercitado pela suíte automatizada
+  (o ambiente de teste suporta `os.Link`); o trecho fica isolado numa função
+  pequena e comentada, coberto por revisão de código.
 - **Alternativa rejeitada**: checar `os.Stat` antes de gravar (corrida) ou
   pedir confirmação interativa (Clarification Q1: recusar por padrão).
 
@@ -309,6 +340,14 @@ biblioteca padrão e `encoding/json`.
   etapa de renderização mostrar como o voo realmente parece; concentrá-los
   evita "número mágico" espalhado e deixa os testes de domínio construírem
   variações sem tocar em código.
+- **Padrões de parâmetros do usuário**: taxa de quadros 30, distância
+  `medium` e inclinação `medium` (FR-003, FR-005) não são heurísticas do
+  algoritmo e não ficam em `CameraTuning`. Vêm de
+  `Config.DefaultPlanParameters` (um `domain.PlanParameters` com `Duration`
+  `nil`), preenchido por `config.Load()` e injetado no comando `plan`, que o
+  usa como valor padrão das flags (Princípio VIII). O `defaultLevel` da etapa
+  1 continua sendo só o nível de simplificação/suavização do trajeto; os
+  dois conceitos deixam de compartilhar a mesma constante.
 
 ## 13. Reuso do pipeline da etapa 1: extrair `TrackService`
 
@@ -380,7 +419,8 @@ biblioteca padrão e `encoding/json`.
 
 - **Decisão**: `sobrevoo plan <arquivo>` (comando único, sem grupo
   `camera`), com `--duration <segundos>` (opcional; ausente = duração
-  automática, item 8.1), `--fps <n>` (padrão 30), `--distance
+  automática, item 8.1), `--fps <n>` (padrão 30, vindo de
+  `Config.DefaultPlanParameters`), `--distance
   low|medium|high`, `--tilt low|medium|high`, `--export <caminho>` e
   `--overwrite`. Segundos e quadros por segundo são números; valor não
   numérico é erro de uso (código 2, como `parseLevel` na etapa 1); valor
@@ -407,3 +447,28 @@ Sequência a partir de 10 (1–9 já usados nas etapas 1 e 2):
 Erros de leitura/tratamento do trajeto reaproveitam os códigos 1–3 já
 existentes (FR-022). Valor não numérico e níveis desconhecidos continuam
 sendo erro de uso, código 2.
+
+## 17. Funções puras de câmera exportadas para teste isolado
+
+- **Problema**: os testes de `internal/domain` são do pacote externo
+  `domain_test` (necessário porque usam `internal/domain/builddomain`, que
+  importa `domain`; um teste de pacote interno criaria ciclo de importação).
+  Funções não exportadas não seriam testáveis isoladamente.
+- **Decisão**: as primitivas puras de câmera são **exportadas**, seguindo o
+  precedente de `Haversine`, `ComputeBoundingBox` e `ComputeCoverage`:
+  `NewLocalPlane` (com `Project` e `Unproject` em `LocalPlane`),
+  `BuildMarkerTimeline` (devolve `MarkerTimeline`), `DesiredHeading`,
+  `UnwrapAngles`, `FollowDistance`, `ComputeCameraPose` (devolve
+  `CameraPose`), `LimitRate`, `GaussianSmooth`, `DetectSmoothedSpans`,
+  `OverviewPose`, `BlendPose`, `MinimumDuration`, `DefaultDuration` e
+  `PlanCamera`. Cada uma tem comentário de documentação em inglês e nenhuma
+  depende de I/O, relógio ou estado. Só helpers triviais e de escopo
+  estrito (por exemplo a quantização) permanecem não exportados e são
+  cobertos via `PlanCamera`.
+- **Racional**: testar cada regra numérica isoladamente (com entradas
+  pequenas e exatas) é bem mais barato e preciso do que inferi-las de planos
+  completos, e não custa nada de arquitetura: são funções de domínio, não de
+  infraestrutura.
+- **Alternativa rejeitada**: testar tudo apenas por `PlanCamera` (falhas
+  ficariam difíceis de localizar); usar um arquivo `export_test.go` para
+  expor as funções internas (mascara o contrato real do pacote).

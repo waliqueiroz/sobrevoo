@@ -18,9 +18,9 @@ manual/exploratória do resultado.
   `com-parada.gpx` (uma parada de ~10 min), `retorno.gpx` (ida e volta
   pelo mesmo caminho), `voltas.gpx` (várias voltas num mesmo lugar),
   `antimeridiano.gpx` (cruza 180°), `polar.gpx` (latitude acima de 80°),
-  `curto.gpx` (poucos metros), `enorme.gpx` (mais de 2 000 km) e, para a
+  `curto.gpx` (poucos metros), `enorme.gpx` (abrangência acima de 2 000 km) e, para a
   duração automática, `pequena.gpx` (~1 km), `longa.gpx` (~150 km) e
-  `muito-longa.gpx` (~1 500 km).
+  `muito-longa.gpx` (abrangência de ~1 500 km).
 
 ```bash
 go build -o bin/sobrevoo ./cmd/sobrevoo
@@ -76,15 +76,17 @@ jq '.frames[0], .frames[-1]' /tmp/plano.json
 ```
 
 **Esperado**: `phase` `opening` no primeiro e `closing` no último quadro;
-`heading_deg` 0, `tilt_deg` 60 e `camera_to_marker_m` grande (o trajeto
-inteiro enquadrado); marcador em `distance_m` 0 no primeiro e no
-comprimento total no último.
+`tilt_deg` 60 e `camera_to_marker_m` grande (o trajeto inteiro enquadrado);
+`heading_deg` do primeiro quadro igual ao do primeiro quadro `following`, e
+o do último igual ao do último `following` (sem rotação na abertura nem no
+fechamento); marcador em `distance_m` 0 no primeiro e no comprimento total
+no último.
 
 ## Cenário 5 — Parâmetros (História 3)
 
 ```bash
 ./bin/sobrevoo plan amostras/pedalada.gpx --duration 60 --fps 30      # Frames: 1800, "(requested)"
-./bin/sobrevoo plan amostras/pedalada.gpx --duration 20 --fps 24      # Frames: 480
+./bin/sobrevoo plan amostras/pedalada.gpx --duration 48 --fps 24      # Frames: 1152
 ./bin/sobrevoo plan amostras/pedalada.gpx --distance low  --export /tmp/low.json  --overwrite
 ./bin/sobrevoo plan amostras/pedalada.gpx --distance high --export /tmp/high.json --overwrite
 ./bin/sobrevoo plan amostras/pedalada.gpx --tilt low  --export /tmp/tlow.json  --overwrite
@@ -103,7 +105,7 @@ for f in pequena pedalada longa muito-longa; do ./bin/sobrevoo plan amostras/$f.
 
 **Esperado**: em cada trajeto, `(automatic)`; duração entre 20 s e 120 s
 (ou igual ao mínimo, se maior que 120 s), nunca recusada por curta demais;
-duração não decrescente com a extensão, e crescendo menos que a extensão
+duração não decrescente com o comprimento, e crescendo menos que o comprimento
 (um trajeto 10× maior não gera vídeo 10× mais longo). Com `--duration`
 informada, o resumo mostra `(requested)` e o valor exato pedido.
 

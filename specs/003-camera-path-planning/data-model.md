@@ -35,12 +35,16 @@ Constantes de ajuste do algoritmo, injetadas (research.md item 12). Campos:
 `MaxHeadingRateDegPerSecond`, `MaxTiltRateDegPerSecond`,
 `MaxLogDistanceRatePerSecond`, `MaxTargetSpeedInDistances`,
 `GaussianSigmaSeconds`, `OverviewTiltDegrees`, `OverviewVerticalFOVDegrees`,
-`OverviewMargin`, `MinFollowDuration`, `MinPhaseDuration`,
-`MinTrackLengthMeters`, `MaxTrackExtentMeters`, os da duração automática
+`OverviewMargin`, `OverviewMinDistanceFactor`, `MinFollowDuration`,
+`MinPhaseDuration`, `MinTrackLengthMeters`, `MaxTrackSpanMeters`, os da duração automática
 (`AutoDurationBase`, `AutoDurationPerSqrtKm`, `AutoDurationMin`,
 `AutoDurationMax`), mais a tabela de níveis:
 `BaseDistanceMeters`, `LookAheadSeconds` e `TiltDegrees`, cada um indexado
 por `Level`. Valores iniciais em `research.md` itens 3 a 8.
+
+Os padrões dos parâmetros do usuário (taxa 30, distância e inclinação
+`medium`) **não** fazem parte de `CameraTuning`: vêm de
+`Config.DefaultPlanParameters` (`research.md` item 12).
 
 ### `CameraPlan` (`camera_plan.go`)
 
@@ -148,14 +152,18 @@ domínio junto de `Track`:
 | Função | Arquivo | Responsabilidade |
 |---|---|---|
 | `PlanCamera(points, parameters, tuning) (CameraPlan, error)` | `camera_planning.go` | orquestra as funções abaixo; único ponto de entrada da regra |
-| `MinimumDuration(points, frameRate, tuning) time.Duration` | `camera_planning.go` | FR-017 (research.md item 8) |
-| `DefaultDuration(points, frameRate, tuning) time.Duration` | `camera_planning.go` | FR-003a: curva sublinear com piso/teto, nunca abaixo de `MinimumDuration` (research.md item 8.1); chamada por `PlanCamera` quando `Parameters.Duration` é `nil` |
-| `newLocalPlane(points)` / `(l localPlane) Project` / `Unproject` | `camera_projection.go` | projeção azimutal equidistante (item 2) |
-| `buildMarkerTimeline(points, plane, tuning)` | `camera_timeline.go` | referência de tempo, compressão de paradas, `s(t)` (item 3) |
-| `desiredHeading`, `limitRate`, `gaussianSmooth` | `camera_motion.go` | trilhas de `ψ`, `θ`, `ln D`, `T`, limitação de taxa e trechos suavizados (itens 4, 5) |
-| `overviewPose`, `blendPose` | `camera_framing.go` | abertura/fechamento (item 7) |
+| `MinimumDuration(points, frameRate, distance, tilt Level, tuning) time.Duration` | `camera_planning.go` | FR-017 (research.md item 8) |
+| `DefaultDuration(points, frameRate, distance, tilt Level, tuning) time.Duration` | `camera_planning.go` | FR-003a: curva sublinear com piso/teto, nunca abaixo de `MinimumDuration` (research.md item 8.1); chamada por `PlanCamera` quando `Parameters.Duration` é `nil` |
+| `NewLocalPlane(points)` / `(l LocalPlane) Project` / `Unproject` | `camera_projection.go` | projeção azimutal equidistante (item 2) |
+| `BuildMarkerTimeline(points, plane, tuning) MarkerTimeline` | `camera_timeline.go` | referência de tempo, compressão de paradas, `s(t)` (item 3) |
+| `DesiredHeading`, `UnwrapAngles`, `FollowDistance`, `ComputeCameraPose` | `camera_motion.go` | rumo, distância e pose orbital (itens 1, 4, 6) |
+| `LimitRate`, `GaussianSmooth`, `DetectSmoothedSpans` | `camera_motion.go` | limitação de taxa, suavização e trechos suavizados (item 5) |
+| `OverviewPose`, `BlendPose` | `camera_framing.go` | abertura/fechamento (item 7) |
 
-Todas puras: sem I/O, sem relógio, sem aleatoriedade.
+As funções são **exportadas** para permitir teste isolado a partir do pacote
+`domain_test` (`research.md` item 17).
+
+Todas puras: sem I/O, sem relógio, sem aleatoriedade, cada uma com comentário de documentação em inglês.
 
 ## Erros sentinela novos (`errors.go`)
 

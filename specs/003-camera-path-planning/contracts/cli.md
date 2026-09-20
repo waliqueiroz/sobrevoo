@@ -23,10 +23,10 @@ sobrevoo plan <arquivo-de-trajeto> [--duration <segundos>] [--fps <n>]
   suavização — com o nível padrão (FR-001).
 - `--duration` (opcional): duração do vídeo em segundos; número decimal
   aceito (ex.: `45.5`). Quando omitida, a duração é **calculada a partir da
-  extensão do trajeto** (de 20 s a 120 s, crescimento sublinear, nunca
+  comprimento do trajeto** (de 20 s a 120 s, crescimento sublinear, nunca
   abaixo do mínimo daquele trajeto; FR-003a). Quando informada, é usada
   exatamente e passa pelas validações de duração.
-- `--fps` (padrão `30`): quadros por segundo; número decimal aceito
+- `--fps` (padrão `30`, de `Config.DefaultPlanParameters`): quadros por segundo; número decimal aceito
   (ex.: `29.97`), entre 1 e 120.
 - `--distance` (padrão `medium`): afastamento da câmera em relação ao
   trajeto.
@@ -80,18 +80,23 @@ ou alterado no destino da exportação.
 | `--duration` informada e ≤ 0 | `domain.ErrInvalidDuration` | `10` |
 | `--fps` ≤ 0 ou fora de 1–120 | `domain.ErrInvalidFrameRate` | `11` |
 | `--duration` informada abaixo do mínimo para o trajeto (nunca ocorre com duração automática) | `domain.ErrDurationTooShort` | `12` |
-| Trajeto curto demais (extensão < 50 m) | `domain.ErrTrackTooShort` | `13` |
-| Trajeto grande demais (extensão > 2 000 km) | `domain.ErrTrackTooLarge` | `14` |
+| Trajeto curto demais (comprimento < 50 m) | `domain.ErrTrackTooShort` | `13` |
+| Trajeto grande demais (abrangência > 2 000 km) | `domain.ErrTrackTooLarge` | `14` |
 | Destino da exportação já existe (sem `--overwrite`) | `domain.ErrPlanDestinationExists` | `15` |
 | Destino da exportação inválido (diretório inexistente, sem permissão) | `domain.ErrPlanDestinationInvalid` | `16` |
 | Valor não numérico em `--duration`/`--fps`, nível desconhecido, argumento faltando, `--overwrite` sem `--export` | erro de uso da CLI | `2` |
 
 As mensagens dos erros `10` a `16` sempre nomeiam o parâmetro ou o destino
 problemático (SC-008); a de código `12` traz a duração mínima calculada
-para aquele trajeto e taxa de quadros; a de `13`, a extensão encontrada e o
-mínimo exigido; a de `11`, o intervalo válido; a de `14`, a extensão
+para aquele trajeto e taxa de quadros; a de `13`, o comprimento encontrado e o
+mínimo exigido; a de `11`, o intervalo válido; a de `14`, a abrangência
 encontrada e o máximo aceito; a de `15`, o caminho e a dica
 `use --overwrite to replace it`.
+
+O código `2` é compartilhado por três casos herdados/consolidados: formato
+de trajeto não suportado (etapa 1), erro de uso da CLI (valor não numérico,
+nível desconhecido, argumento faltando, `--overwrite` sem `--export`) e o
+que o Cobra já classificava assim. A mensagem distingue cada um (FR-023).
 
 ### Exemplos
 
@@ -100,7 +105,7 @@ encontrada e o máximo aceito; a de `15`, o caminho e a dica
 sobrevoo plan pedalada.gpx
 
 # Vídeo curto, câmera mais afastada e mais vertical, plano exportado
-sobrevoo plan pedalada.gpx --duration 30 --fps 60 --distance high --tilt high --export plano.json
+sobrevoo plan pedalada.gpx --duration 45 --fps 60 --distance high --tilt high --export plano.json
 
 # Regerar sobre o mesmo arquivo
 sobrevoo plan pedalada.gpx --export plano.json --overwrite
