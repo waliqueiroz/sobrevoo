@@ -29,6 +29,20 @@ func Test_Inspector_Inspect_GeoTIFF(t *testing.T) {
 		assert.InDelta(t, 11.0, result.BoundingBox.MaxLongitude, 0.0001)
 	})
 
+	t.Run("should read the size of the raster when the writer stores it as SHORT values", func(t *testing.T) {
+		path := writeFixture(t, "short.tif", helper.GeoTIFFWithShortDimensions())
+		inspector := geodatainspector.New()
+
+		result, err := inspector.Inspect(path)
+
+		require.NoError(t, err)
+		assert.Equal(t, domain.DataTypeElevation, result.Type)
+		assert.InDelta(t, 50.0, result.BoundingBox.MinLatitude, 0.0001)
+		assert.InDelta(t, 51.0, result.BoundingBox.MaxLatitude, 0.0001)
+		assert.InDelta(t, 10.0, result.BoundingBox.MinLongitude, 0.0001)
+		assert.InDelta(t, 11.0, result.BoundingBox.MaxLongitude, 0.0001)
+	})
+
 	t.Run("should compute a wrapped, antimeridian-crossing area for a raster placed near the 180th meridian", func(t *testing.T) {
 		// given
 		path := writeFixture(t, "antimeridian.tif", helper.GeoTIFFCrossingAntimeridian())
