@@ -166,9 +166,10 @@ internal/
 │   ├── camera_plan.go                         # (estendido) porta CameraPlanReader no topo; CameraPlan.Validate, CameraPlan.AreaOfInterest
 │   ├── bounding_box.go                        # (estendido) Intersects, Regions, TileRange
 │   ├── geo_data_coverage.go                   # (estendido) SelectSource exporta a regra de pickCoverageWinner; sem mudança de lógica
-│   ├── geo_slice.go                           # NOVO: porta GeoSliceExporter (no topo), SliceTuning, SliceRegion, GeoSlice, SliceSummary, SliceSourceUse, NewGeoSlice
+│   ├── geo_slice.go                           # NOVO: porta GeoSliceExporter (no topo), SliceTuning (+Estimate, EnsureFits), SliceRegion e SliceRegions (+BaseMaps, TilesFor), GeoSlice, SliceSummary, SliceSourceUse, NewGeoSlice
 │   ├── tile.go                                # NOVO: porta BaseMapReader (no topo), LevelRange, TileID, TileRange, Tile, TileRead, TileSet, DetailLevel, SliceTuning.DetailLevel
-│   ├── elevation_grid.go                      # NOVO: porta ElevationReader (no topo), ElevationGridInfo (+Window, CellAt), GridWindow, ElevationGrid, ElevationWindow, ElevationReading
+│   ├── elevation_grid.go                      # NOVO: porta ElevationReader (no topo), ElevationGridInfo (+Window, CellAt), GridWindow, ElevationGrid, ElevationWindow, ElevationReading, NewElevationReading
+│   ├── coordinate.go                          # NOVO: Coordinate e NewCoordinate (ErrInvalidCoordinate)
 │   ├── errors.go                              # (estendido) dez sentinelas novos + AreaNotCoveredError
 │   ├── *_test.go                              # NOVOS/estendidos: um por arquivo acima (funções puras + propriedades)
 │   ├── builddomain/

@@ -1,6 +1,7 @@
 package application
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
@@ -40,6 +41,13 @@ type GeoDataService interface {
 	// CheckCoverage verifies whether the track read from reader is covered
 	// by the registered sources (FR-013 through FR-018).
 	CheckCoverage(reader io.Reader) (domain.CoverageReport, error)
+
+	// ElevationAt reads the elevation of a coordinate from the registered
+	// elevation data (FR-017, FR-018): the cell that contains it, in the
+	// source that wins there. A cell the file has no value for is a reading
+	// without value, not an error; a coordinate no source covers fails with
+	// ErrElevationNotCovered.
+	ElevationAt(latitude, longitude float64) (domain.ElevationReading, error)
 }
 
 type geoDataService struct {
@@ -47,21 +55,27 @@ type geoDataService struct {
 	inspector    domain.GeoDataInspector
 	fileChecker  domain.FileChecker
 	trackService TrackService
+
+	elevationReader domain.ElevationReader
 }
 
 // NewGeoDataService creates a GeoDataService backed by the given ports and
 // by the TrackService that provides the cleaned track for coverage checks.
+// The ElevationReader reads the elevation of a coordinate.
 func NewGeoDataService(
 	repository domain.GeoDataRepository,
 	inspector domain.GeoDataInspector,
 	fileChecker domain.FileChecker,
 	trackService TrackService,
+	elevationReader domain.ElevationReader,
 ) GeoDataService {
 	return &geoDataService{
 		repository:   repository,
 		inspector:    inspector,
 		fileChecker:  fileChecker,
 		trackService: trackService,
+
+		elevationReader: elevationReader,
 	}
 }
 
@@ -131,18 +145,54 @@ func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport,
 		return domain.CoverageReport{}, err
 	}
 
-	baseMaps, elevations := s.partitionAvailableSources(sources)
+	baseMaps, elevations := partitionAvailableSources(s.fileChecker, sources)
 
 	return cleaned.Route.Coverage(baseMaps, elevations), nil
 }
 
+func (s *geoDataService) ElevationAt(latitude, longitude float64) (domain.ElevationReading, error) {
+	coordinate, err := domain.NewCoordinate(latitude, longitude)
+	if err != nil {
+		return domain.ElevationReading{}, err
+	}
+
+	sources, err := s.repository.List()
+	if err != nil {
+		return domain.ElevationReading{}, err
+	}
+	_, elevations := partitionAvailableSources(s.fileChecker, sources)
+
+	source, found := domain.SelectSource(elevations, coordinate.Latitude, coordinate.Longitude)
+	if !found {
+		return domain.ElevationReading{}, fmt.Errorf("%w: latitude %g, longitude %g (\"geodata list\" shows what is registered)", domain.ErrElevationNotCovered, coordinate.Latitude, coordinate.Longitude)
+	}
+
+	info, err := s.elevationReader.Describe(source.Path)
+	if err != nil {
+		return domain.ElevationReading{}, sourceError(source, err)
+	}
+
+	// the same cell a slice reads for the point (info.CellAt), so the value
+	// of a query and the one in a slice always agree (FR-018)
+	row, col := info.CellAt(coordinate.Latitude, coordinate.Longitude)
+	read, err := s.elevationReader.ReadWindow(source.Path, domain.GridWindow{FirstRow: row, FirstCol: col, Rows: 1, Cols: 1})
+	if err != nil {
+		return domain.ElevationReading{}, sourceError(source, err)
+	}
+	if len(read.Values) != 1 {
+		return domain.ElevationReading{}, sourceError(source, fmt.Errorf("%w: the reader gave %d samples for one cell", domain.ErrGeoDataContentUnreadable, len(read.Values)))
+	}
+
+	return domain.NewElevationReading(coordinate, source, row, col, read.Values[0]), nil
+}
+
 // partitionAvailableSources splits sources into base map and elevation
-// candidates, excluding any whose file is no longer found (FR-017) —
-// needs s.fileChecker, so it stays here rather than in domain.Route.Coverage,
-// which is a pure function.
-func (s *geoDataService) partitionAvailableSources(sources []domain.GeoDataSource) (baseMaps, elevations []domain.GeoDataSource) {
+// candidates, excluding any whose file is no longer found (FR-017) — needs a
+// FileChecker, so it stays here rather than in domain.Route.Coverage, which is
+// a pure function.
+func partitionAvailableSources(fileChecker domain.FileChecker, sources []domain.GeoDataSource) (baseMaps, elevations []domain.GeoDataSource) {
 	for _, source := range sources {
-		if !s.fileChecker.Exists(source.Path) {
+		if !fileChecker.Exists(source.Path) {
 			continue
 		}
 		switch source.Type {

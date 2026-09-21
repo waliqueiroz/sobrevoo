@@ -118,11 +118,18 @@ Cobra, testify, mockgen).
   as peças de mapa da região, do mapa base vencedor. Uma **amostra** pertence
   à região que contém o **centro** da amostra (intervalo semiaberto: limite
   sul/oeste inclusive, norte/leste exclusive, exceto na borda externa da
-  área, que é inclusiva); uma **peça** pertence à região que contém o centro
-  de `peça ∩ área`. Assim toda amostra e toda peça pertence a exatamente uma
-  região e não há duplicidade quando dois registros se sobrepõem.
+  área, que é inclusiva: `ElevationGridInfo.Window(região, área)`); uma
+  **peça** é pedida ao mapa base da **primeira** região (na ordem das regiões)
+  cujas peças a incluem (`SliceRegions.TilesFor`). Assim toda amostra pertence
+  a exatamente uma região e nenhuma peça é pedida duas vezes quando dois
+  registros se sobrepõem; uma peça na fronteira entre dois mapas do mesmo
+  nível vem do primeiro deles (se ele não a tiver, é reportada como ausente,
+  mesmo que o outro a tenha — caso raro, aceito).
 - **Consequência**: com um registro de cada tipo, há uma única região e o
-  recorte tem uma grade de elevação e um conjunto de peças. Com vários, o
+  recorte tem uma grade de elevação e um conjunto de peças. As regiões vêm dos
+  limites de **todos** os registros (mapa base e relevo): um segundo mapa base
+  que divide a área em duas regiões também faz o mesmo relevo ser lido em duas
+  grades. Com vários registros, o
   recorte tem uma grade por (região com amostras) e um conjunto de peças por
   (registro de mapa base, nível).
 - **Mesma regra na consulta isolada** (item 9): a consulta usa

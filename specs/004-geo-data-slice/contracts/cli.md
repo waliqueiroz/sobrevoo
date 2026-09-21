@@ -34,8 +34,8 @@ Resumo legível em inglês, em `stdout`; rótulos e ordem estáveis (FR-012):
 
 ```text
 Area: lat -23.6100 to -23.4800, lon -46.7200 to -46.5300
-Base map detail: level 16 (ideal 19, source offers 0-16; above the source's maximum level)
-  nearest camera distance 300.0 m at latitude 23.48, requiring 0.23 m/px per screen pixel
+Base map detail (sp-osm): level 16 (ideal 19, source offers 0-16; above the source's maximum level)
+  nearest camera distance 300.0 m, area closest to the equator at latitude 23.48, tiles of at most 0.46 m/px
 Map tiles: 1204 present, 3 missing
   missing: sp-osm level 16 x=24122 y=36870
   missing: sp-osm level 16 x=24122 y=36871
@@ -50,12 +50,13 @@ Size: 71.3 MiB
 
 - `Area` são os limites da área de interesse; quando ela cruza o
   antimeridiano, a linha traz `lon 170.0 to -170.0 (crosses the antimeridian)`.
-- `Base map detail` traz, **por registro de mapa base usado**, o nível
-  escolhido, o ideal, o intervalo que o arquivo oferece e o motivo da
+- `Base map detail (<registro>)` traz, **por registro de mapa base usado**, o
+  nível escolhido, o ideal, o intervalo que o arquivo oferece e o motivo da
   limitação (`within the source's range`, `above the source's maximum level`
   ou `below the source's minimum level`); a linha seguinte explica o cálculo
-  (distância mínima da câmera, latitude de referência, resolução exigida). Com
-  mais de um registro, uma dupla de linhas por registro.
+  (distância mínima da câmera, latitude de referência — a mais próxima do
+  equador dentro da área —, resolução máxima que a peça pode ter, em metros
+  por pixel). Com mais de um registro, uma dupla de linhas por registro.
 - `Map tiles`: `<n> present, <m> missing`. Com peças ausentes, cada uma é
   listada (`missing: <registro> level <z> x=<x> y=<y>`); acima de 20 peças
   ausentes, as 20 primeiras (em ordem) e uma linha `... and <k> more (all
@@ -94,7 +95,7 @@ alterado no destino.
 | Destino da exportação inválido (diretório inexistente, sem permissão) | `domain.ErrSliceDestinationInvalid` | `24` |
 
 Mensagens (SC-010): a de `17` diz o que há de errado (campo ausente, ou a
-incoerência: `frame_count is 1260 but duration × frame rate is 1230`); a de
+incoerência: `summary.frame_count is 7 but the file lists 1260 frames` ou `the plan has 1230 frames but duration × frame rate is 1260`); a de
 `18`, a versão encontrada e as aceitas (`found 2, accepted: 1`); a de `19`,
 um subtrecho por linha no mesmo formato de `geodata check`, com o tipo que
 falta (`missing base map`, `missing elevation`, `missing base map and

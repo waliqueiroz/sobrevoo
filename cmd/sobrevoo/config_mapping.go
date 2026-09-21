@@ -73,3 +73,13 @@ func domainCameraTuning(t config.CameraTuning) domain.CameraTuning {
 		TiltDegrees:        domainLevelValues(t.TiltDegrees),
 	}
 }
+
+func domainSliceTuning(t config.SliceTuning) domain.SliceTuning {
+	return domain.SliceTuning{
+		MarginFactor:          t.MarginFactor,
+		ReferenceHeightPixels: t.ReferenceHeightPixels,
+		TexelScreenRatio:      t.TexelScreenRatio,
+		EstimatedTileBytes:    t.EstimatedTileBytes,
+		MaxSizeBytes:          t.MaxSizeBytes,
+	}
+}

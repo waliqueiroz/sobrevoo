@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -85,5 +86,155 @@ func Test_NewCameraPlan(t *testing.T) {
 		// then
 		assert.Zero(t, plan.Summary.MaxCameraAltitude)
 		assert.Zero(t, plan.Summary.FrameCount)
+	})
+}
+
+func Test_CameraPlan_Validate(t *testing.T) {
+	// a plan of three frames: 0.1 s at 30 frames per second
+	validPlan := func() *builddomain.CameraPlanBuilder {
+		return builddomain.NewCameraPlanBuilder()
+	}
+
+	t.Run("should accept a coherent plan", func(t *testing.T) {
+		// given
+		plan := validPlan().Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.NoError(t, err)
+	})
+
+	t.Run("should refuse a plan without frames", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames().Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+	})
+
+	t.Run("should refuse a plan whose frame count does not match the duration times the frame rate", func(t *testing.T) {
+		// given
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(41 * time.Second).WithFrameRate(30).Build()
+		plan := validPlan().WithParameters(parameters).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "3 frames but duration × frame rate is 1230")
+	})
+
+	t.Run("should refuse a plan without a duration", func(t *testing.T) {
+		// given
+		parameters := builddomain.NewPlanParametersBuilder().WithoutDuration().Build()
+		plan := validPlan().WithParameters(parameters).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+	})
+
+	t.Run("should refuse a frame whose index is not its position", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(5).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].index")
+	})
+
+	t.Run("should refuse a frame with an unknown phase", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).WithPhase("hovering").Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].phase")
+	})
+
+	t.Run("should refuse a camera latitude outside -90 to 90", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).WithCameraPosition(90.5, 0).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].camera.lat")
+	})
+
+	t.Run("should refuse a marker longitude outside -180 to 180", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).WithMarkerPosition(0, -181).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[2].marker.lon")
+	})
+
+	t.Run("should refuse a negative camera-to-marker distance", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).WithCameraToMarkerDistance(-1).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[0].camera_to_marker_m")
+	})
+
+	t.Run("should refuse a camera-to-marker distance that is not a finite number", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).WithCameraToMarkerDistance(math.NaN()).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).WithCameraToMarkerDistance(math.Inf(1)).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].camera_to_marker_m")
 	})
 }

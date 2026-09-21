@@ -18,7 +18,7 @@ registros.
 - Ordem das entradas fixa: `manifest.json`, depois `elevation/*` em ordem
   numérica, depois `tiles/*` em ordem `(registro, z, x, y)`.
 - Data de modificação de todas as entradas fixa em `1980-01-01T00:00:00Z`;
-  nenhum campo extra, nenhum comentário.
+  nenhum comentário no arquivo.
 
 ```text
 recorte.zip

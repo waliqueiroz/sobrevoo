@@ -1,8 +1,10 @@
 package domain
 
 //go:generate go run go.uber.org/mock/mockgen -destination mockdomain/camera_plan_exporter.go -package mockdomain . CameraPlanExporter
+//go:generate go run go.uber.org/mock/mockgen -destination mockdomain/camera_plan_reader.go -package mockdomain . CameraPlanReader
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -15,6 +17,17 @@ type CameraPlanExporter interface {
 	// path that already holds a file (ErrPlanDestinationExists), and it must
 	// never leave a partial file behind on failure.
 	Export(plan CameraPlan, path string, overwrite bool) error
+}
+
+// CameraPlanReader reads back a camera plan a CameraPlanExporter wrote.
+// Concrete implementations live in internal/infra/outbound.
+type CameraPlanReader interface {
+	// Read reads the plan file at path. It fails with ErrPlanFileInvalid
+	// when the file is not a plan or is malformed, and with
+	// ErrPlanFormatVersionUnsupported for a format version it does not
+	// know; an I/O error opening or reading the file is returned wrapped,
+	// with no sentinel.
+	Read(path string) (CameraPlan, error)
 }
 
 // Phase tells which part of the video a frame belongs to.
@@ -161,4 +174,121 @@ func NewCameraPlan(
 		Frames:             frames,
 		Summary:            summary,
 	}
+}
+
+// Validate checks that a plan is coherent with itself, so a plan read from a
+// file can be trusted: it has frames, their number is the duration times the
+// frame rate, and every frame is in order, in a known phase, at valid
+// coordinates and at a finite, non-negative distance from the camera to the
+// marker. The error is ErrPlanFileInvalid and always names the field.
+func (c CameraPlan) Validate() error {
+	invalid := func(format string, args ...any) error {
+		return fmt.Errorf("%w: %s", ErrPlanFileInvalid, fmt.Sprintf(format, args...))
+	}
+
+	if len(c.Frames) == 0 {
+		return invalid("the plan has no frames")
+	}
+	if c.Parameters.Duration == nil {
+		return invalid("the duration is missing")
+	}
+	if math.IsNaN(c.Parameters.FrameRate) || math.IsInf(c.Parameters.FrameRate, 0) || c.Parameters.FrameRate <= 0 {
+		return invalid("frame rate is %g, must be a positive number", c.Parameters.FrameRate)
+	}
+	if expected := c.Parameters.FrameCount(*c.Parameters.Duration); expected != len(c.Frames) {
+		return invalid("the plan has %d frames but duration × frame rate is %d", len(c.Frames), expected)
+	}
+
+	for i, f := range c.Frames {
+		switch {
+		case f.Index != i:
+			return invalid("frames[%d].index is %d, must be %d", i, f.Index, i)
+		case f.Phase != PhaseOpening && f.Phase != PhaseFollowing && f.Phase != PhaseClosing:
+			return invalid("frames[%d].phase is %q, must be opening, following or closing", i, f.Phase)
+		case !validLatitude(f.CameraLatitude):
+			return invalid("frames[%d].camera.lat is %g, must be between -90 and 90", i, f.CameraLatitude)
+		case !validLongitude(f.CameraLongitude):
+			return invalid("frames[%d].camera.lon is %g, must be between -180 and 180", i, f.CameraLongitude)
+		case !validLatitude(f.MarkerLatitude):
+			return invalid("frames[%d].marker.lat is %g, must be between -90 and 90", i, f.MarkerLatitude)
+		case !validLongitude(f.MarkerLongitude):
+			return invalid("frames[%d].marker.lon is %g, must be between -180 and 180", i, f.MarkerLongitude)
+		case math.IsNaN(f.CameraToMarkerDistance) || math.IsInf(f.CameraToMarkerDistance, 0) || f.CameraToMarkerDistance < 0:
+			return invalid("frames[%d].camera_to_marker_m is %g, must be a finite number of at least 0", i, f.CameraToMarkerDistance)
+		}
+	}
+
+	return nil
+}
+
+func validLatitude(degrees float64) bool {
+	return !math.IsNaN(degrees) && degrees >= -90 && degrees <= 90
+}
+
+func validLongitude(degrees float64) bool {
+	return !math.IsNaN(degrees) && degrees >= -180 && degrees <= 180
+}
+
+// minimumCosLatitude keeps the width of an area, in degrees of longitude,
+// finite at the poles, where a meter spans ever more degrees.
+const minimumCosLatitude = 1e-6
+
+// AreaOfInterest is the geographic area the flight needs to see: for each
+// frame, the square of half-side MarginFactor × the camera-to-marker
+// distance around the marker (the camera is always inside it), and the box
+// that holds all of them. Longitudes are unwrapped along the plan, as
+// Route.BoundingBox does, so a plan crossing the antimeridian gives a small
+// area that CrossesAntimeridian, never one spanning the planet; the width is
+// capped at one turn. Coordinates are rounded to 1e-7°, so the area — and
+// everything derived from it — is the same on every platform.
+func (c CameraPlan) AreaOfInterest(tuning SliceTuning) BoundingBox {
+	if len(c.Frames) == 0 {
+		return BoundingBox{}
+	}
+
+	minLat, maxLat := math.Inf(1), math.Inf(-1)
+	minLon, maxLon := math.Inf(1), math.Inf(-1)
+	unwrapped := c.Frames[0].MarkerLongitude
+	previous := unwrapped
+
+	for i, f := range c.Frames {
+		if i > 0 {
+			delta := f.MarkerLongitude - previous
+			switch {
+			case delta > 180:
+				delta -= 360
+			case delta < -180:
+				delta += 360
+			}
+			unwrapped += delta
+			previous = f.MarkerLongitude
+		}
+
+		meters := tuning.MarginFactor * f.CameraToMarkerDistance
+		halfLat := meters / MetersPerDegree
+		cosLat := math.Max(math.Cos(f.MarkerLatitude*math.Pi/180), minimumCosLatitude)
+		halfLon := meters / (MetersPerDegree * cosLat)
+
+		minLat = math.Min(minLat, f.MarkerLatitude-halfLat)
+		maxLat = math.Max(maxLat, f.MarkerLatitude+halfLat)
+		minLon = math.Min(minLon, unwrapped-halfLon)
+		maxLon = math.Max(maxLon, unwrapped+halfLon)
+	}
+
+	area := BoundingBox{
+		MinLatitude: math.Max(minLat, -90),
+		MaxLatitude: math.Min(maxLat, 90),
+	}
+
+	switch {
+	case maxLon-minLon >= 360:
+		area.MinLongitude, area.MaxLongitude = -180, 180
+	case minLon < -180 || maxLon > 180:
+		area.MinLongitude, area.MaxLongitude = normalizeLongitude(minLon), normalizeLongitude(maxLon)
+		area.CrossesAntimeridian = true
+	default:
+		area.MinLongitude, area.MaxLongitude = minLon, maxLon
+	}
+
+	return area.rounded()
 }

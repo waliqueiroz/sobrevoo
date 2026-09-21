@@ -43,6 +43,16 @@ func (b *CameraFrameBuilder) WithPhase(phase domain.Phase) *CameraFrameBuilder {
 	return b
 }
 
+func (b *CameraFrameBuilder) WithCameraPosition(latitude, longitude float64) *CameraFrameBuilder {
+	b.frame.CameraLatitude, b.frame.CameraLongitude = latitude, longitude
+	return b
+}
+
+func (b *CameraFrameBuilder) WithMarkerPosition(latitude, longitude float64) *CameraFrameBuilder {
+	b.frame.MarkerLatitude, b.frame.MarkerLongitude = latitude, longitude
+	return b
+}
+
 func (b *CameraFrameBuilder) WithCameraAltitude(altitude float64) *CameraFrameBuilder {
 	b.frame.CameraAltitude = altitude
 	return b

@@ -5,7 +5,7 @@ de sobrevoo de trajetos a partir de arquivos de GPS.
 
 ## Status atual
 
-Três etapas estão implementadas:
+Quatro etapas estão implementadas:
 
 1. Leitura e tratamento de um trajeto GPX, exposta pelo comando `inspect`.
 2. Registro local de dados geográficos (mapas base e relevo que você já
@@ -13,6 +13,9 @@ Três etapas estão implementadas:
    comandos `geodata`.
 3. Planejamento do movimento de câmera do vídeo de sobrevoo, exposto pelo
    comando `plan`.
+4. Leitura do conteúdo dos dados geográficos registrados: o recorte de mapa
+   base e relevo que um plano de câmera precisa, exposto por `geodata slice`,
+   e a consulta de elevação de uma coordenada, por `geodata elevation`.
 
 Ainda não há desenho de mapa, renderização de quadros nem geração de vídeo.
 
@@ -157,6 +160,59 @@ exportado nunca sobrescreve outro sem `--overwrite`. Os erros têm código de
 saída próprio (`10` a `16`: duração ou taxa inválida, duração curta demais para
 o trajeto, trajeto curto ou grande demais, destino da exportação já existente
 ou inválido), documentados em `specs/003-camera-path-planning/contracts/cli.md`.
+
+### `geodata slice` e `geodata elevation`: ler o conteúdo dos dados registrados
+
+```sh
+sobrevoo geodata slice <plano.json> [--export <recorte.zip>] [--overwrite]
+sobrevoo geodata elevation --lat <graus> --lon <graus>
+```
+
+`slice` parte de um plano exportado por `plan --export` e reúne, dos arquivos
+que você registrou com `geodata register`, o que aquele voo precisa: as
+amostras de elevação do terreno e as peças do mapa base sob a área que a
+câmera percorre, no nível de detalhe adequado à distância em que ela voa (o
+resumo diz qual nível foi escolhido e por quê). Recusa, dizendo o que falta, se
+a área do plano não estiver totalmente coberta por mapa base e relevo, e
+recusa um recorte maior que 256 MiB. Peças que faltam num mapa registrado são
+listadas e não interrompem o recorte; amostras que o arquivo de relevo não
+informa ficam marcadas como sem valor, nunca como zero. Tudo é lido só dos
+seus arquivos registrados (MBTiles e GeoTIFF), sem rede e sem alterá-los, e o
+mesmo plano com os mesmos registros dá sempre o mesmo recorte, em qualquer
+lugar do planeta.
+
+```console
+$ sobrevoo plan atividade.gpx --export plano.json
+$ sobrevoo geodata slice plano.json --export recorte.zip
+Area: lat -23.7390 to -23.4359, lon -46.7584 to -46.4233
+Base map detail (mapa): level 16 (ideal 16, source offers 10-16; within the source's range)
+  nearest camera distance 2780.9 m, area closest to the equator at latitude 23.44, tiles of at most 4.27 m/px
+Map tiles: 3779 present, 3 missing
+  missing: mapa level 16 x=24278 y=37181
+  ...
+Elevation samples: 101505 (100 without value)
+Elevation range: 700.0 m - 1099.0 m
+Sources:
+  mapa (base map, MBTiles)
+  relevo (elevation, GeoTIFF)
+Size: 466.6 KiB
+Slice written to recorte.zip
+```
+
+O recorte exportado é um único arquivo ZIP (formato em
+`specs/004-geo-data-slice/contracts/slice-file.md`), que nunca sobrescreve
+outro sem `--overwrite`.
+
+`elevation` informa a elevação, em metros, da célula do relevo registrado que
+contém a coordenada (`Elevation: 1000.0 m`), ou diz que o arquivo não tem
+valor para aquele ponto, para você conferir contra outra fonte. Passe as
+coordenadas por `--lat` e `--lon` (aceitam valores negativos).
+
+Os erros têm código de saída próprio (`17` a `26`: plano inválido ou de versão
+desconhecida, área não coberta, recorte grande demais, dado ilegível ou em
+unidade não suportada, destino da exportação já existente ou inválido,
+coordenada sem cobertura ou inválida), documentados em
+`specs/004-geo-data-slice/contracts/cli.md`.
 
 ## Desenvolvimento
 

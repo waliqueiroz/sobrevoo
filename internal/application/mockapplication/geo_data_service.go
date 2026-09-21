@@ -56,6 +56,21 @@ func (mr *MockGeoDataServiceMockRecorder) CheckCoverage(reader any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckCoverage", reflect.TypeOf((*MockGeoDataService)(nil).CheckCoverage), reader)
 }
 
+// ElevationAt mocks base method.
+func (m *MockGeoDataService) ElevationAt(latitude, longitude float64) (domain.ElevationReading, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ElevationAt", latitude, longitude)
+	ret0, _ := ret[0].(domain.ElevationReading)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ElevationAt indicates an expected call of ElevationAt.
+func (mr *MockGeoDataServiceMockRecorder) ElevationAt(latitude, longitude any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ElevationAt", reflect.TypeOf((*MockGeoDataService)(nil).ElevationAt), latitude, longitude)
+}
+
 // List mocks base method.
 func (m *MockGeoDataService) List() ([]domain.GeoDataSummary, error) {
 	m.ctrl.T.Helper()
