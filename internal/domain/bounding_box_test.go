@@ -347,3 +347,49 @@ func Test_BoundingBox_Extent(t *testing.T) {
 		assert.InDelta(t, 111.32, width, 0.05)
 	})
 }
+
+func Test_BoundingBox_ClippedTo(t *testing.T) {
+	t.Run("should keep the part of the box that is inside the limits", func(t *testing.T) {
+		// when
+		clipped := box(-13.661, 0, -40.036, 0).ClippedTo(box(-13.66, -12.56, -40.04, -38.08))
+
+		// then
+		assert.Equal(t, box(-13.66, -12.56, -40.036, -38.08).MinLatitude, clipped.MinLatitude)
+		assert.Equal(t, -12.56, clipped.MaxLatitude)
+		assert.Equal(t, -40.036, clipped.MinLongitude)
+		assert.Equal(t, -38.08, clipped.MaxLongitude)
+	})
+
+	t.Run("should leave a box that is inside the limits as it is", func(t *testing.T) {
+		// given
+		inner := box(1, 2, 3, 4)
+
+		// when
+		clipped := inner.ClippedTo(box(0, 10, 0, 10))
+
+		// then
+		assert.Equal(t, inner, clipped)
+	})
+
+	t.Run("should leave the box as it is when the limits do not overlap it", func(t *testing.T) {
+		// given
+		original := box(1, 2, 3, 4)
+
+		// when
+		clipped := original.ClippedTo(box(50, 60, 50, 60))
+
+		// then
+		assert.Equal(t, original, clipped)
+	})
+
+	t.Run("should leave a box that crosses the antimeridian as it is", func(t *testing.T) {
+		// given
+		crossing := box(0, 1, 170, -170)
+
+		// when
+		clipped := crossing.ClippedTo(box(0, 1, 100, 179))
+
+		// then
+		assert.Equal(t, crossing, clipped)
+	})
+}

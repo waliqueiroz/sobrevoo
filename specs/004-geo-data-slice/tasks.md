@@ -473,7 +473,8 @@ Cada história agrega valor sem quebrar as anteriores.
   real; o item 10 usou os dados reais de `resources/` (passeio GPX, MBTiles
   vetorial do BBBike, DEM Copernicus). Ele revelou um bug da etapa 2, corrigido
   em `geodatainspector` (largura e altura do TIFF como `SHORT`, com fixture e
-  teste), e o `bounds` quebrado do MBTiles do BBBike (pendente). Não há
+  teste), e o `bounds` quebrado do MBTiles do BBBike, corrigido depois (o inspetor recorta
+  os `bounds` declarados pela área das peças do nível mais detalhado). Não há
   ferramenta independente (GDAL) no ambiente: a elevação de 594,5 m foi
   conferida contra o `.f32` do recorte, não contra uma fonte externa.
   Desempenho medido: recorte de um voo típico

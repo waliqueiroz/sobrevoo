@@ -54,6 +54,23 @@ type TileRange struct {
 	MinX, MaxX, MinY, MaxY int
 }
 
+// Bounds is the geographic area the tiles of the range cover, in the Web
+// Mercator projection: columns split the longitudes evenly and rows the
+// projected latitudes. A range never crosses the antimeridian.
+func (r TileRange) Bounds() BoundingBox {
+	size := math.Ldexp(1, r.Level)
+	latitude := func(row float64) float64 {
+		return math.Atan(math.Sinh(math.Pi*(1-2*row/size))) * 180 / math.Pi
+	}
+
+	return BoundingBox{
+		MinLatitude:  latitude(float64(r.MaxY + 1)),
+		MaxLatitude:  latitude(float64(r.MinY)),
+		MinLongitude: float64(r.MinX)/size*360 - 180,
+		MaxLongitude: float64(r.MaxX+1)/size*360 - 180,
+	}
+}
+
 // Tile is one image tile, exactly as the file stores it (it is never
 // decoded or reprocessed).
 type Tile struct {

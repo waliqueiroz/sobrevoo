@@ -171,3 +171,54 @@ func Test_SliceTuning_DetailLevel_Reason(t *testing.T) {
 		}
 	})
 }
+
+func Test_TileRange_Bounds(t *testing.T) {
+	t.Run("should cover the whole Web Mercator world with the only tile of level 0", func(t *testing.T) {
+		// when
+		bounds := domain.TileRange{Level: 0, MinX: 0, MaxX: 0, MinY: 0, MaxY: 0}.Bounds()
+
+		// then
+		assert.InDelta(t, -180.0, bounds.MinLongitude, 1e-9)
+		assert.InDelta(t, 180.0, bounds.MaxLongitude, 1e-9)
+		assert.InDelta(t, -domain.MaxMercatorLatitude, bounds.MinLatitude, 1e-6)
+		assert.InDelta(t, domain.MaxMercatorLatitude, bounds.MaxLatitude, 1e-6)
+		assert.False(t, bounds.CrossesAntimeridian)
+	})
+
+	t.Run("should give the south-east quadrant for tile 1,1 of level 1", func(t *testing.T) {
+		// when
+		bounds := domain.TileRange{Level: 1, MinX: 1, MaxX: 1, MinY: 1, MaxY: 1}.Bounds()
+
+		// then
+		assert.InDelta(t, 0.0, bounds.MinLongitude, 1e-9)
+		assert.InDelta(t, 180.0, bounds.MaxLongitude, 1e-9)
+		assert.InDelta(t, -domain.MaxMercatorLatitude, bounds.MinLatitude, 1e-6)
+		assert.InDelta(t, 0.0, bounds.MaxLatitude, 1e-9)
+	})
+
+	t.Run("should contain the point a tile was computed from", func(t *testing.T) {
+		// given
+		ranges := box(-23.55, -23.55, -46.63, -46.63).TileRange(14)
+
+		// when
+		bounds := ranges[0].Bounds()
+
+		// then
+		assert.True(t, bounds.Contains(-23.55, -46.63))
+		assert.Less(t, bounds.MaxLongitude-bounds.MinLongitude, 0.03)
+	})
+
+	t.Run("should join a rectangle of tiles into one box", func(t *testing.T) {
+		// given
+		single := domain.TileRange{Level: 10, MinX: 379, MaxX: 379, MinY: 580, MaxY: 580}.Bounds()
+
+		// when
+		joined := domain.TileRange{Level: 10, MinX: 379, MaxX: 380, MinY: 580, MaxY: 581}.Bounds()
+
+		// then
+		assert.Equal(t, single.MinLongitude, joined.MinLongitude)
+		assert.Equal(t, single.MaxLatitude, joined.MaxLatitude)
+		assert.Greater(t, joined.MaxLongitude, single.MaxLongitude)
+		assert.Less(t, joined.MinLatitude, single.MinLatitude)
+	})
+}

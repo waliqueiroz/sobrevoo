@@ -216,5 +216,7 @@ dado alterado (`shasum` antes e depois).
 
 Achados que só os dados reais mostraram: o Copernicus grava a largura e a
 altura do raster como `SHORT` (o inspetor da etapa 2 exigia `LONG`; corrigido);
-e o `bounds` do BBBike vem quebrado (`-40.036,-13.661,0,0`), o que faz o
-registro declarar uma área maior que a real.
+e o `bounds` do BBBike vem quebrado (`-40.036,-13.661,0,0`); o inspetor agora
+recorta os `bounds` declarados pela área onde há peças no nível mais detalhado,
+e o registro passa a declarar lat [-13.661, -12.469], lon [-40.036, -38.057]
+(a área real, no grão de uma peça).

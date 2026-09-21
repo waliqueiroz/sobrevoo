@@ -297,3 +297,21 @@ func (b BoundingBox) Extent() (widthKm, heightKm float64) {
 
 	return width * MetersPerDegree * math.Cos(middle*math.Pi/180) / 1000, (b.MaxLatitude - b.MinLatitude) * MetersPerDegree / 1000
 }
+
+// ClippedTo is the part of b that is inside limits, for when the limits are
+// more trustworthy than b on a side — a file whose declared bounds run past
+// where its data is. If either box crosses the antimeridian, or they do not
+// overlap, b is returned as it is: there is no reliable way to tell what to
+// keep.
+func (b BoundingBox) ClippedTo(limits BoundingBox) BoundingBox {
+	if b.CrossesAntimeridian || limits.CrossesAntimeridian || !b.Intersects(limits) {
+		return b
+	}
+
+	return BoundingBox{
+		MinLatitude:  math.Max(b.MinLatitude, limits.MinLatitude),
+		MaxLatitude:  math.Min(b.MaxLatitude, limits.MaxLatitude),
+		MinLongitude: math.Max(b.MinLongitude, limits.MinLongitude),
+		MaxLongitude: math.Min(b.MaxLongitude, limits.MaxLongitude),
+	}
+}
