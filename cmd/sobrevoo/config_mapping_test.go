@@ -67,3 +67,17 @@ func Test_domainPlanParameters(t *testing.T) {
 		assert.Equal(t, domain.LevelLow, parameters.Tilt)
 	})
 }
+
+func Test_domainSliceTuning(t *testing.T) {
+	t.Run("should map the configuration's slice tuning to the values the domain tests are built on", func(t *testing.T) {
+		// given
+		cfg, err := config.Load()
+		require.NoError(t, err)
+
+		// when
+		tuning := domainSliceTuning(cfg.SliceTuning)
+
+		// then
+		assert.Equal(t, builddomain.NewSliceTuningBuilder().Build(), tuning)
+	})
+}

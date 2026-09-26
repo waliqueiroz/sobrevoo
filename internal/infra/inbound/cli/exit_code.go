@@ -46,6 +46,26 @@ func ExitCode(err error) int {
 		return 15
 	case errors.Is(err, domain.ErrPlanDestinationInvalid):
 		return 16
+	case errors.Is(err, domain.ErrPlanFileInvalid):
+		return 17
+	case errors.Is(err, domain.ErrPlanFormatVersionUnsupported):
+		return 18
+	case errors.Is(err, domain.ErrAreaNotCovered):
+		return 19
+	case errors.Is(err, domain.ErrSliceTooLarge):
+		return 20
+	case errors.Is(err, domain.ErrGeoDataContentUnreadable):
+		return 21
+	case errors.Is(err, domain.ErrElevationUnitUnsupported):
+		return 22
+	case errors.Is(err, domain.ErrSliceDestinationExists):
+		return 23
+	case errors.Is(err, domain.ErrSliceDestinationInvalid):
+		return 24
+	case errors.Is(err, domain.ErrElevationNotCovered):
+		return 25
+	case errors.Is(err, domain.ErrInvalidCoordinate):
+		return 26
 	default:
 		// Anything else (file-open I/O errors, malformed-but-recognized
 		// content, CLI usage errors not already handled by Cobra itself) is

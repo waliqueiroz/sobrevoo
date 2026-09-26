@@ -69,3 +69,18 @@ func (mr *MockCameraPlanServiceMockRecorder) Generate(reader, parameters any) *g
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockCameraPlanService)(nil).Generate), reader, parameters)
 }
+
+// Load mocks base method.
+func (m *MockCameraPlanService) Load(path string) (domain.CameraPlan, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Load", path)
+	ret0, _ := ret[0].(domain.CameraPlan)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Load indicates an expected call of Load.
+func (mr *MockCameraPlanServiceMockRecorder) Load(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockCameraPlanService)(nil).Load), path)
+}

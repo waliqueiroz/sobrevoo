@@ -79,6 +79,20 @@ type CameraTuning struct {
 	TiltDegrees        LevelValues
 }
 
+// SliceTuning holds the heuristic constants of the geo data slice (the fourth
+// stage): how much terrain around the camera matters, the reference for
+// choosing a level of detail and the size limit. Initial values, meant to be
+// adjusted once rendering shows what the flight needs
+// (specs/004-geo-data-slice/research.md, item 15). The composition root maps
+// it to the domain's own SliceTuning.
+type SliceTuning struct {
+	MarginFactor          float64
+	ReferenceHeightPixels float64
+	TexelScreenRatio      float64
+	EstimatedTileBytes    int64
+	MaxSizeBytes          int64
+}
+
 // PlanDefaults are the camera plan parameters used when the user does not
 // choose them: 30 frames per second and medium distance and tilt. There is no
 // default duration: when the user gives none, it is computed from the track.
@@ -116,6 +130,9 @@ type Config struct {
 	// CameraTuning holds the constants of camera planning.
 	CameraTuning CameraTuning
 
+	// SliceTuning holds the constants of the geo data slice.
+	SliceTuning SliceTuning
+
 	// PlanDefaults are the camera plan parameters used when the user does not
 	// choose them. They are distinct from DefaultLevel, which is the
 	// treatment level of the track.
@@ -137,6 +154,7 @@ func Load() (Config, error) {
 		DefaultLevel:         LevelMedium,
 		RegistryPath:         filepath.Join(home, registryDir, registryFileName),
 		CameraTuning:         cameraTuning(),
+		SliceTuning:          sliceTuning(),
 		PlanDefaults:         PlanDefaults{FrameRate: 30, Distance: LevelMedium, Tilt: LevelMedium},
 	}, nil
 }
@@ -176,5 +194,15 @@ func cameraTuning() CameraTuning {
 		BaseDistanceMeters: LevelValues{Low: 300, Medium: 600, High: 1200},
 		LookAheadSeconds:   LevelValues{Low: 2, Medium: 4, High: 8},
 		TiltDegrees:        LevelValues{Low: 25, Medium: 45, High: 65},
+	}
+}
+
+func sliceTuning() SliceTuning {
+	return SliceTuning{
+		MarginFactor:          1.0,
+		ReferenceHeightPixels: 1080,
+		TexelScreenRatio:      2.0,
+		EstimatedTileBytes:    64 * 1024,
+		MaxSizeBytes:          256 * 1024 * 1024,
 	}
 }

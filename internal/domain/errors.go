@@ -1,6 +1,10 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
 
 // Sentinel errors for the domain's business failures (Constitution
 // Principle VII). Each inbound/outbound adapter is responsible for
@@ -71,4 +75,73 @@ var (
 	// ErrPlanDestinationInvalid reports an export destination that cannot be
 	// written (missing directory, no permission, ...).
 	ErrPlanDestinationInvalid = errors.New("plan destination is not writable")
+
+	// ErrPlanFileInvalid reports a camera plan file that cannot be used: not
+	// a plan at all, missing required fields, truncated, or incoherent with
+	// itself.
+	ErrPlanFileInvalid = errors.New("camera plan file is invalid")
+
+	// ErrPlanFormatVersionUnsupported reports a camera plan file whose
+	// format version this tool does not recognize.
+	ErrPlanFormatVersionUnsupported = errors.New("camera plan file format version is not supported")
+
+	// ErrAreaNotCovered reports that the area of a plan is not fully covered
+	// by the registered base maps and elevation data. It is carried by
+	// AreaNotCoveredError, which also holds the coverage report.
+	ErrAreaNotCovered = errors.New("area is not fully covered by the registered geo data")
+
+	// ErrSliceTooLarge reports a slice bigger than the documented maximum.
+	ErrSliceTooLarge = errors.New("geo data slice is too large")
+
+	// ErrGeoDataContentUnreadable reports a registered file whose content
+	// cannot be read: corrupted, truncated, or using an encoding this tool
+	// does not support.
+	ErrGeoDataContentUnreadable = errors.New("geo data content cannot be read")
+
+	// ErrElevationUnitUnsupported reports an elevation file whose vertical
+	// unit cannot be converted to meters.
+	ErrElevationUnitUnsupported = errors.New("elevation unit is not supported")
+
+	// ErrSliceDestinationExists reports an export destination that already
+	// exists, when overwriting was not requested.
+	ErrSliceDestinationExists = errors.New("slice destination already exists")
+
+	// ErrSliceDestinationInvalid reports an export destination that cannot
+	// be written (missing directory, no permission, ...).
+	ErrSliceDestinationInvalid = errors.New("slice destination is not writable")
+
+	// ErrElevationNotCovered reports a coordinate that no registered
+	// elevation source covers. It differs from an elevation reading without
+	// a value: there, a source covers the point but the file has no data.
+	ErrElevationNotCovered = errors.New("no registered elevation data covers this point")
+
+	// ErrInvalidCoordinate reports a latitude or longitude that is not a
+	// finite number within the valid range.
+	ErrInvalidCoordinate = errors.New("invalid coordinate")
 )
+
+// AreaNotCoveredError is the error for an area that the registered geo data
+// does not fully cover (ErrAreaNotCovered). It carries the coverage report so
+// an adapter can tell the user exactly what is missing.
+type AreaNotCoveredError struct {
+	Report CoverageReport
+}
+
+// Error lists every uncovered stretch, one per line, the way "geodata
+// check" shows them.
+func (e *AreaNotCoveredError) Error() string {
+	var b strings.Builder
+	b.WriteString(ErrAreaNotCovered.Error())
+	for _, segment := range e.Report.UncoveredSegments {
+		fmt.Fprintf(&b, "\n  missing %s from (%.6f, %.6f) to (%.6f, %.6f)",
+			segment.Missing,
+			segment.StartLatitude, segment.StartLongitude,
+			segment.EndLatitude, segment.EndLongitude)
+	}
+	return b.String()
+}
+
+// Is makes errors.Is(err, ErrAreaNotCovered) true for this error.
+func (e *AreaNotCoveredError) Is(target error) bool {
+	return target == ErrAreaNotCovered
+}

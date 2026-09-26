@@ -67,8 +67,8 @@ func (r Route) Coverage(baseMaps, elevations []GeoDataSource) CoverageReport {
 	segmentOpen := false
 
 	for _, point := range r.Points {
-		baseMap, hasBaseMap := pickCoverageWinner(baseMaps, point.Latitude, point.Longitude)
-		elevation, hasElevation := pickCoverageWinner(elevations, point.Latitude, point.Longitude)
+		baseMap, hasBaseMap := SelectSource(baseMaps, point.Latitude, point.Longitude)
+		elevation, hasElevation := SelectSource(elevations, point.Latitude, point.Longitude)
 
 		if hasBaseMap {
 			baseMapUsed[baseMap.Name] = baseMap
@@ -134,11 +134,11 @@ func missingDataType(hasBaseMap, hasElevation bool) (missing MissingDataType, fu
 	}
 }
 
-// pickCoverageWinner returns the candidate covering (lat, lon) that wins
+// SelectSource returns the candidate covering (lat, lon) that wins
 // the determinism rule (FR-016, Clarification — spec.md): the smallest
 // BoundingBox.AreaDegrees (most specific); ties broken by the oldest
 // RegisteredAt.
-func pickCoverageWinner(candidates []GeoDataSource, lat, lon float64) (GeoDataSource, bool) {
+func SelectSource(candidates []GeoDataSource, lat, lon float64) (GeoDataSource, bool) {
 	var winner GeoDataSource
 	found := false
 

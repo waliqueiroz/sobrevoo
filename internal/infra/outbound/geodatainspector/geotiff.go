@@ -76,11 +76,11 @@ func readGeoTIFFBoundingBox(path string) (domain.BoundingBox, error) {
 	}
 
 	width, ok := entries[tiffTagImageWidth]
-	if !ok || width.Type != tiffTypeLong {
+	if !ok || !isInteger(width) {
 		return domain.BoundingBox{}, domain.ErrUnsupportedDataFormat
 	}
 	height, ok := entries[tiffTagImageLength]
-	if !ok || height.Type != tiffTypeLong {
+	if !ok || !isInteger(height) {
 		return domain.BoundingBox{}, domain.ErrUnsupportedDataFormat
 	}
 	pixelScale, ok := entries[tiffTagModelPixelScale]
@@ -164,7 +164,7 @@ func readIFD(f *os.File, order binary.ByteOrder, offset uint32) (map[uint16]tiff
 		entries[tag] = tiffIFDEntry{
 			Type:          order.Uint16(raw[2:4]),
 			Count:         order.Uint32(raw[4:8]),
-			ValueOrOffset: order.Uint32(raw[8:12]),
+			ValueOrOffset: inlineValue(order, raw),
 		}
 	}
 
@@ -251,4 +251,22 @@ func readDoubles(f *os.File, order binary.ByteOrder, offset uint32, count int) (
 		values[i] = math.Float64frombits(order.Uint64(raw[i*8 : i*8+8]))
 	}
 	return values, nil
+}
+
+// isInteger reports whether an entry holds a single SHORT or LONG value — the
+// image dimensions are either, depending on the writer (Copernicus DEMs use
+// SHORT).
+func isInteger(e tiffIFDEntry) bool {
+	return e.Count == 1 && (e.Type == tiffTypeShort || e.Type == tiffTypeLong)
+}
+
+// inlineValue is the value field of an IFD entry. A single SHORT sits in the
+// first two bytes of the four the field has, whatever the byte order, so it is
+// read as a 16-bit number; anything else is read as a 32-bit one, an offset or
+// a LONG.
+func inlineValue(order binary.ByteOrder, raw [12]byte) uint32 {
+	if order.Uint16(raw[2:4]) == tiffTypeShort && order.Uint32(raw[4:8]) == 1 {
+		return uint32(order.Uint16(raw[8:10]))
+	}
+	return order.Uint32(raw[8:12])
 }

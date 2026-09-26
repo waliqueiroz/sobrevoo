@@ -55,6 +55,19 @@ func Test_Load(t *testing.T) {
 		assert.Equal(t, config.LevelValues{Low: 25, Medium: 45, High: 65}, cfg.CameraTuning.TiltDegrees)
 	})
 
+	t.Run("should provide the initial slice tuning of research.md", func(t *testing.T) {
+		// when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, cfg.SliceTuning.MarginFactor)
+		assert.Equal(t, 1080.0, cfg.SliceTuning.ReferenceHeightPixels)
+		assert.Equal(t, 2.0, cfg.SliceTuning.TexelScreenRatio)
+		assert.Equal(t, int64(65_536), cfg.SliceTuning.EstimatedTileBytes)
+		assert.Equal(t, int64(268_435_456), cfg.SliceTuning.MaxSizeBytes)
+	})
+
 	t.Run("should default the plan to 30 fps, medium distance and medium tilt", func(t *testing.T) {
 		// when
 		cfg, err := config.Load()

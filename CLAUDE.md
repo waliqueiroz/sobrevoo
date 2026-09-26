@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Três features estão implementadas até agora:
+Relive/Strava). Quatro features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -15,7 +15,11 @@ verifica se um trajeto está coberto por eles (comandos `geodata
 register|list|remove|check`); `specs/003-camera-path-planning/` calcula o
 plano de câmera do vídeo de sobrevoo — para cada quadro, onde a câmera está,
 para onde aponta e onde está o marcador da atividade —, imprime um resumo e
-o exporta em JSON (comando `plan`). Ainda não há desenho de mapa, renderização
+o exporta em JSON (comando `plan`); `specs/004-geo-data-slice/` lê o
+conteúdo dos dados registrados e reúne o recorte de mapa base e relevo que um
+plano de câmera exportado precisa, com resumo e exportação em ZIP
+(`geodata slice <plano.json>`), e consulta a elevação de uma coordenada
+(`geodata elevation --lat --lon`). Ainda não há desenho de mapa, renderização
 de quadros nem geração de vídeo.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
@@ -37,6 +41,11 @@ go test ./internal/infra/inbound/cli/... -run 'Test_InspectCommand_Execute/shoul
 # Rodar a CLI direto, sem compilar um binário:
 go run ./cmd/sobrevoo inspect path/to/track.gpx --simplification=low --smoothing=high
 go run ./cmd/sobrevoo plan path/to/track.gpx --duration 45 --distance high --export plan.json
+go run ./cmd/sobrevoo geodata slice plan.json --export slice.zip
+go run ./cmd/sobrevoo geodata elevation --lat -23.5505 --lon -46.6333
+
+# Gerar os dados de exemplo sintéticos do quickstart da etapa 4:
+go run ./test/samples --out specs/004-geo-data-slice/amostras
 ```
 
 ## Arquitetura
@@ -50,9 +59,13 @@ adapter.
 - **`internal/domain`** — entidades (`TrackPoint`, `Track`, `Route`,
   `BoundingBox`, `Level`, `DiscardStats`, `GeoDataSource`, `GeoDataSummary`,
   `CoverageReport`, `TrackSummary`, `CleanedTrack`, `TreatedTrack`,
-  `PlanParameters`, `CameraTuning`, `CameraPlan`, `CameraFrame`), construtores
+  `PlanParameters`, `CameraTuning`, `CameraPlan`, `CameraFrame`, e os do recorte
+  de dados: `SliceTuning`, `SliceRegion(s)`, `DetailLevel`, `Tile`, `TileSet`,
+  `ElevationGrid`, `ElevationReading`, `Coordinate`, `GeoSlice`,
+  `SliceSummary`), construtores
   que carregam regra de negócio (`NewGeoDataSource`, `NewTrackSummary`,
-  `NewCameraPlan`, que calcula o resumo a partir dos quadros), e métodos de
+  `NewCameraPlan`, que calcula o resumo a partir dos quadros, `NewGeoSlice`,
+  que calcula o resumo do recorte e o põe em ordem, `NewCoordinate`), e métodos de
   entidade que carregam o comportamento de cada uma: `TrackPoint.DistanceTo`
   (Haversine, com o "wrap" do antimeridiano), `Route` (`Length`, `Duration`,
   `BoundingBox`, `ElevationGain`, `Coverage`, `ReorderByTime` e os `Discard*`),
@@ -60,7 +73,14 @@ adapter.
   (`MinimumDuration`, `DefaultDuration`), `CameraTuning.FollowDistance`,
   `LocalPlane`, `PlanarRoute` (`HeadingAt`, `OverviewView`, ...), `CameraView`
   (`Pose`, `Blend`) e `Signal` (`Unwrap`, `LimitRate`, `Smooth`,
-  `SmoothedSpans`) — ver `specs/003-camera-path-planning/research.md` item 17;
+  `SmoothedSpans`) — ver `specs/003-camera-path-planning/research.md` item 17 —,
+  e, na etapa 4, `CameraPlan` (`Validate`, `AreaOfInterest`), `BoundingBox`
+  (`Intersects`, `TileRange`, `Regions`, `Extent`), `SliceTuning`
+  (`DetailLevel`, `Estimate`, `EnsureFits`, `EnsurePlanFits`, `NewSizeGuard`),
+  `SlicePlan` (`TileCount`, `SampleCount`, `Level`) e `SizeGuard` (o que conta
+  para o limite de tamanho e qual nível é reportado), `SliceRegions` (`BaseMaps`,
+  `TilesFor`), `ElevationGridInfo` (`CellAt`, `Window`) e `ElevationGrid` (`At`,
+  `NoValueCount`, `Range`) — ver `specs/004-geo-data-slice/research.md`;
   o que sobra como função livre é matemática sem dono (`clamp`, `quantize`,
   `frameTime`, `normalizeDegrees`). Distância
   de Haversine, ganho de elevação, duração, cálculo de bounding box —
@@ -70,9 +90,17 @@ adapter.
   `ErrUnsupportedFormat`, `ErrInsufficientPoints[AfterCleaning]`, e os do
   planejamento de câmera: `ErrInvalidDuration`, `ErrInvalidFrameRate`,
   `ErrDurationTooShort`, `ErrTrackTooShort`, `ErrTrackTooLarge`,
-  `ErrPlanDestinationExists`, `ErrPlanDestinationInvalid`), e as portas
+  `ErrPlanDestinationExists`, `ErrPlanDestinationInvalid`; e os do recorte:
+  `ErrPlanFileInvalid`, `ErrPlanFormatVersionUnsupported`, `ErrAreaNotCovered`
+  — carregado por `AreaNotCoveredError`, que leva o `CoverageReport` —,
+  `ErrSliceTooLarge`, `ErrGeoDataContentUnreadable`,
+  `ErrElevationUnitUnsupported`, `ErrSliceDestinationExists`,
+  `ErrSliceDestinationInvalid`, `ErrElevationNotCovered`,
+  `ErrInvalidCoordinate`), e as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
-  `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`. Qualquer DTO de saída que não seja um
+  `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`,
+  `CameraPlanReader`, `BaseMapReader`, `ElevationReader`, `GeoSliceExporter`.
+  Qualquer DTO de saída que não seja um
   valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
   também é um tipo de domínio comum — não um DTO de `internal/application`
   — e qualquer lógica não trivial (construir uma entidade, calcular algo a
@@ -85,26 +113,36 @@ adapter.
   — só decide qual porta/função de domínio chamar, e em qual ordem. Há um
   serviço por recurso: `TrackService` (`Clean`, `Treat`, `Inspect` — o único
   lugar que sabe transformar um trajeto bruto em limpo ou tratado),
-  `GeoDataService` e `CameraPlanService` (`Generate`, `Export`); os dois
-  últimos dependem de `TrackService` em vez de repetir parse/limpeza/
-  simplificação/suavização.
+  `GeoDataService` (`Register`, `List`, `Remove`, `CheckCoverage`,
+  `ElevationAt`), `CameraPlanService` (`Generate`, `Export`, `Load`) e
+  `GeoSliceService` (`Generate`, `Export`); `GeoDataService` e
+  `CameraPlanService` dependem de `TrackService` em vez de repetir parse/
+  limpeza/simplificação/suavização.
 - **`internal/infra/outbound/*`** — adapters que implementam as portas do
   domínio: `trackparser` (GPX via `tkrajina/gpxgo`),
   `simplifier` (Douglas-Peucker), `smoother` (Catmull-Rom), `jsonfile`
   (registro de dados geográficos e exportação do plano de câmera em JSON,
-  atômica e sem sobrescrita por padrão), `config` (limiares internos fixos:
+  atômica e sem sobrescrita por padrão; e a leitura do plano exportado,
+  `jsonfile.NewCameraPlanReader()`), `atomicfile` (a publicação atômica de
+  arquivo, compartilhada por `jsonfile` e `zipfile`), `basemapreader`
+  (`NewMBTiles()`: níveis e peças de um MBTiles, somente leitura),
+  `elevationreader` (`NewGeoTIFF()`: GeoTIFF em Go puro — faixas ou peças, sem
+  compressão/Deflate/LZW, predictors 1, 2 e 3 — que lê só o que uma janela
+  precisa), `zipfile` (`NewGeoSliceExporter()`: o recorte num ZIP
+  determinístico), `config` (limiares internos fixos:
   mínimo de pontos, velocidade máxima plausível, nível padrão, os
   `CameraTuning` do planejamento de câmera e os parâmetros padrão do plano —
   ainda sem fonte de configuração externa, mas o ponto de extensão já
   existe, conforme o Princípio VIII da constituição). O pacote `config`
   tem tipos próprios (`config.Level`, `config.CameraTuning`,
-  `config.PlanDefaults`) e **não importa o domínio**; quem os mapeia para os
+  `config.PlanDefaults`, `config.SliceTuning`) e **não importa o domínio**; quem os mapeia para os
   tipos de domínio é o composition root (`cmd/sobrevoo/config_mapping.go`).
 - **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
   traduz erros sentinela do domínio em códigos de saída de processo
   (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
   `specs/002-geo-data-registry/contracts/cli.md` e
-  `specs/003-camera-path-planning/contracts/cli.md` para o mapeamento exato.
+  `specs/003-camera-path-planning/contracts/cli.md` e
+  `specs/004-geo-data-slice/contracts/cli.md` para o mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso

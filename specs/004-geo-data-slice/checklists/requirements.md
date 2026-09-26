@@ -33,6 +33,6 @@
 
 - Decisões tomadas como suposição (sem marcador de clarificação), a rever em `/speckit-clarify` se o usuário discordar:
   1. (Resolvida em /speckit-clarify, 2026-09-20) A entrada do recorte é o arquivo de plano exportado pela etapa 3, e não o trajeto com parâmetros.
-  2. Limite inicial de tamanho do recorte de 256 MiB, a ser fixado no planejamento.
-  3. A forma do destino da exportação (arquivo único ou diretório) fica para o planejamento técnico.
+  2. (Resolvida no planejamento) Limite de tamanho do recorte: 256 MiB, em `SliceTuning`.
+  3. (Resolvida no planejamento) Destino da exportação: um único arquivo ZIP.
 - Os itens de completude e de prontidão foram validados na primeira iteração; nenhuma correção adicional foi necessária.

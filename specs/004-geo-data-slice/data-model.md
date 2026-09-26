@@ -24,9 +24,9 @@ Constantes de ajuste, injetadas (Princípio VIII; `research.md` item 15).
 | `EstimatedTileBytes` | `int64` | 65 536 |
 | `MaxSizeBytes` | `int64` | 268 435 456 |
 
-Constantes de domínio (fatos da grade, não ajuste): `TilePixels = 256`,
-`BytesPerElevationSample = 4`, `MaxMercatorLatitude = 85.0511287798`,
-`MetersPerDegree = 111 320`, `EquatorResolution = 156 543.03392`.
+Constantes de domínio (fatos da grade, não ajuste): `BytesPerElevationSample = 4`, `MaxMercatorLatitude = 85.0511287798`,
+`MetersPerDegree = 111 320`, `EquatorResolution = 156 543.03392` (resolução, em metros por pixel, de uma peça
+de 256 px de nível 0 no equador — é aí que a suposição de 256 px vive).
 
 ### `CameraPlan` (existente) — acréscimos
 
@@ -39,7 +39,7 @@ Constantes de domínio (fatos da grade, não ajuste): `TilePixels = 256`,
 
 | Método | Regra |
 |---|---|
-| `Regions(baseMaps, elevations []GeoDataSource) ([]SliceRegion, Route)` | decomposição por compressão de coordenadas + `Route` com os centros (item 3) |
+| `Regions(baseMaps, elevations []GeoDataSource) (SliceRegions, Route)` | decomposição por compressão de coordenadas + `Route` com os centros (item 3) |
 | `TileRange(level int) []TileRange` | peças XYZ que cobrem a caixa no nível; dois intervalos de `x` quando cruza o antimeridiano (item 6) |
 | `Intersects(other BoundingBox) bool` | usado para escolher os candidatos de `Regions`; mesmo tratamento de antimeridiano de `Contains` |
 
@@ -55,6 +55,12 @@ Retângulo da área em que o vencedor de cada tipo é uniforme.
 
 Quando `Route.Coverage` acusa área não coberta, o serviço **não** chega a
 usar as regiões para ler: devolve `AreaNotCoveredError` (abaixo).
+
+`SliceRegions` (`[]SliceRegion`, em `geo_slice.go`) tem os métodos
+`BaseMaps() []GeoDataSource` (cada mapa base uma vez, na ordem da primeira
+região) e `TilesFor(levels map[string]int) map[string][]TileID` (as peças a
+pedir a cada mapa base, sem repetição: uma peça que cobre duas regiões é
+pedida ao mapa base da primeira; ordenadas por coluna e linha).
 
 ### `DetailLevel` (`tile.go`)
 
@@ -93,9 +99,8 @@ Porta `BaseMapReader` no topo do arquivo (item 7); depois:
 | `Tiles` | `[]Tile` | ordenadas por `(Level, X, Y)` |
 | `Missing` | `[]TileID` | peças requeridas que o registro não contém; ordenadas |
 
-Regra de pertencimento (item 4): uma peça requerida pertence à região que
-contém o centro de `peça ∩ área`; `TileSet.Source` é o vencedor de mapa
-base dessa região.
+Regra de pertencimento (item 4): uma peça é pedida ao mapa base da primeira
+região que a inclui (`SliceRegions.TilesFor`); `TileSet.Source` é esse mapa.
 
 ### `ElevationGridInfo`, `GridWindow`, `ElevationGrid` (`elevation_grid.go`)
 
@@ -110,9 +115,11 @@ Porta `ElevationReader` no topo do arquivo (item 8); depois:
 | `CellLatitude`, `CellLongitude` | `float64` | tamanho da célula em graus (positivos) |
 | `UnitToMeters` | `float64` | 1 (metro), 0,3048 (pé), 1200/3937 (pé US survey) |
 
-Métodos: `Window(box BoundingBox) GridWindow` (as células cujo **centro** cai
-em `box`, com a regra do intervalo semiaberto do item 4; janela vazia é
-válida), `CellAt(lat, lon float64) (row, col int)` (regra do item 9).
+Métodos: `Window(box, area BoundingBox) []GridWindow` (as células cujo
+**centro** cai em `box`, com a regra do intervalo semiaberto do item 4 — a
+borda norte/leste de `box` só é inclusiva quando coincide com a borda de
+`area`, a área total do recorte; janela vazia é válida; duas janelas quando
+grade e caixa cruzam o antimeridiano), `CellAt(lat, lon float64) (row, col int)` (regra do item 9).
 
 `GridWindow`: `FirstRow, FirstCol, Rows, Cols int` — sempre retangular, em
 linhas de norte a sul e colunas de oeste a leste; nunca cruza o
@@ -137,9 +144,17 @@ já marcado.
 `ElevationWindow` (retorno de `ReadWindow`): `Values []float32` (mesma
 convenção) — o construtor de `ElevationGrid` o consome.
 
+### `Coordinate` (`coordinate.go`)
+
+Posição válida: `NewCoordinate(latitude, longitude)` recusa, com
+`ErrInvalidCoordinate` e o valor e o intervalo na mensagem, latitude fora de
+-90 a 90 e longitude fora de -180 a 180 (NaN e infinito também); longitude
+`180` vira `-180`, faixa `[-180, 180)`.
+
 ### `ElevationReading` (`elevation_grid.go`)
 
-Resposta da consulta isolada (FR-017):
+Resposta da consulta isolada (FR-017), montada por `NewElevationReading(
+coordinate, source, row, col, sample)` (amostra NaN = sem valor):
 
 | Campo | Tipo | Observação |
 |---|---|---|
@@ -168,7 +183,26 @@ Geográficos"):
 
 `NewGeoSlice(area, tileSets, grids) GeoSlice` calcula o resumo a partir do
 conteúdo, para que ele nunca discorde do recorte (mesmo padrão de
-`NewCameraPlan`).
+`NewCameraPlan`), e põe em ordem os conjuntos de peças (nome do mapa, nível) e
+as peças e ausências de cada um (nível, coluna, linha) sem alterar o que
+recebeu; as grades de elevação mantêm a ordem das regiões.
+
+`SlicePlan` (`geo_slice.go`) é o que o recorte vai ler, calculado só a partir
+dos metadados, antes de ler conteúdo: `Area`, `Tiles []TileRequest` (registro,
+`DetailLevel` e `TileID`s a pedir) e `Samples []SampleRequest` (registro,
+geometria da grade e janela). É dele que vêm as decisões sobre o tamanho:
+`TileCount()`, `SampleCount()` e `Level()` (o nível **efetivo** reportado, o
+mais detalhado escolhido para qualquer mapa base). `SliceTuning.EnsurePlanFits`
+recusa o plano pela estimativa e `SliceTuning.NewSizeGuard(plano)` devolve um
+`SizeGuard`, que acumula o tamanho real (`AddTileSet`, `AddGrid`) enquanto o
+conteúdo é lido e recusa ao passar do limite. O `GeoSliceService` só monta o
+plano e chama esses métodos.
+
+`SliceTuning` tem `Estimate(tileCount, sampleCount int64) int64` (peças ×
+`EstimatedTileBytes` + amostras × 4) e `EnsureFits(size int64, area
+BoundingBox, level int) error` (`ErrSliceTooLarge` se `size` > `MaxSizeBytes`,
+comparação estrita; a mensagem traz tamanho, limite, nível, extensão da área e
+a dica) — `BoundingBox.Extent()` dá a largura e a altura em km.
 
 `SliceSummary`:
 

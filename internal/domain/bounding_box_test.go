@@ -204,3 +204,192 @@ func Test_BoundingBox_AreaDegrees(t *testing.T) {
 		assert.Less(t, narrowArea, wideArea)
 	})
 }
+
+func Test_BoundingBox_Intersects(t *testing.T) {
+	t.Run("should report boxes that overlap", func(t *testing.T) {
+		// when / then
+		assert.True(t, box(0, 2, 0, 2).Intersects(box(1, 3, 1, 3)))
+	})
+
+	t.Run("should report a box that contains another", func(t *testing.T) {
+		// when / then
+		assert.True(t, box(0, 10, 0, 10).Intersects(box(4, 5, 4, 5)))
+		assert.True(t, box(4, 5, 4, 5).Intersects(box(0, 10, 0, 10)))
+	})
+
+	t.Run("should report boxes that only touch at an edge", func(t *testing.T) {
+		// when / then
+		assert.True(t, box(0, 1, 0, 1).Intersects(box(1, 2, 1, 2)))
+	})
+
+	t.Run("should not report disjoint boxes", func(t *testing.T) {
+		// when / then
+		assert.False(t, box(0, 1, 0, 1).Intersects(box(2, 3, 0, 1)))
+		assert.False(t, box(0, 1, 0, 1).Intersects(box(0, 1, 2, 3)))
+	})
+
+	t.Run("should intersect a box crossing the antimeridian with one that does not, when they share longitudes", func(t *testing.T) {
+		// given
+		crossing := box(0, 1, 170, -170)
+
+		// when / then
+		assert.True(t, crossing.Intersects(box(0, 1, 175, 179)))
+		assert.True(t, crossing.Intersects(box(0, 1, -179, -175)))
+		assert.False(t, crossing.Intersects(box(0, 1, -100, 100)))
+	})
+
+	t.Run("should intersect two boxes that both cross the antimeridian", func(t *testing.T) {
+		// when / then
+		assert.True(t, box(0, 1, 170, -170).Intersects(box(0, 1, 175, -175)))
+		assert.True(t, box(0, 1, 170, -175).Intersects(box(0, 1, 178, -160)))
+	})
+}
+
+func Test_BoundingBox_TileRange(t *testing.T) {
+	t.Run("should cover the whole world with a single tile at level 0", func(t *testing.T) {
+		// when
+		ranges := box(-50, 50, -100, 100).TileRange(0)
+
+		// then
+		assert.Equal(t, []domain.TileRange{{Level: 0, MinX: 0, MaxX: 0, MinY: 0, MaxY: 0}}, ranges)
+	})
+
+	t.Run("should find the tile that contains a point", func(t *testing.T) {
+		// when
+		equator := box(0, 0, 0, 0).TileRange(1)
+		saoPaulo := box(-23.55, -23.55, -46.63, -46.63).TileRange(10)
+
+		// then
+		assert.Equal(t, []domain.TileRange{{Level: 1, MinX: 1, MaxX: 1, MinY: 1, MaxY: 1}}, equator)
+		assert.Equal(t, []domain.TileRange{{Level: 10, MinX: 379, MaxX: 379, MinY: 580, MaxY: 580}}, saoPaulo)
+	})
+
+	t.Run("should number rows from the north", func(t *testing.T) {
+		// when
+		ranges := box(-23.6, -23.5, -46.7, -46.5).TileRange(12)
+
+		// then
+		assert.Equal(t, []domain.TileRange{{Level: 12, MinX: 1516, MaxX: 1518, MinY: 2323, MaxY: 2324}}, ranges)
+	})
+
+	t.Run("should limit the latitudes to the ones Web Mercator covers", func(t *testing.T) {
+		// when
+		north := box(89, 90, 0, 0).TileRange(3)
+		south := box(-90, -89, 0, 0).TileRange(3)
+
+		// then
+		assert.Equal(t, []domain.TileRange{{Level: 3, MinX: 4, MaxX: 4, MinY: 0, MaxY: 0}}, north)
+		assert.Equal(t, []domain.TileRange{{Level: 3, MinX: 4, MaxX: 4, MinY: 7, MaxY: 7}}, south)
+	})
+
+	t.Run("should give two ranges of columns for a box crossing the antimeridian", func(t *testing.T) {
+		// when
+		ranges := box(0, 1, 175, -175).TileRange(4)
+
+		// then
+		assert.Equal(t, []domain.TileRange{
+			{Level: 4, MinX: 15, MaxX: 15, MinY: 7, MaxY: 8},
+			{Level: 4, MinX: 0, MaxX: 0, MinY: 7, MaxY: 8},
+		}, ranges)
+	})
+
+	t.Run("should keep the last column for a longitude of exactly 180", func(t *testing.T) {
+		// when
+		ranges := box(0, 0, 180, 180).TileRange(2)
+
+		// then
+		assert.Equal(t, []domain.TileRange{{Level: 2, MinX: 3, MaxX: 3, MinY: 2, MaxY: 2}}, ranges)
+	})
+
+	t.Run("should need four times as many tiles for each level", func(t *testing.T) {
+		// given
+		count := func(ranges []domain.TileRange) int {
+			total := 0
+			for _, r := range ranges {
+				total += (r.MaxX - r.MinX + 1) * (r.MaxY - r.MinY + 1)
+			}
+			return total
+		}
+		area := box(-10, 10, -20, 20)
+
+		// when
+		lower := count(area.TileRange(8))
+		higher := count(area.TileRange(9))
+
+		// then
+		assert.InDelta(t, 4*float64(lower), float64(higher), 0.15*float64(higher))
+	})
+}
+
+func Test_BoundingBox_Extent(t *testing.T) {
+	t.Run("should measure the height by the latitude span and the width by the longitude span at the middle latitude", func(t *testing.T) {
+		// when
+		width, height := box(-0.5, 0.5, 10, 11).Extent()
+
+		// then
+		assert.InDelta(t, 111.32, height, 0.01)
+		assert.InDelta(t, 111.32, width, 0.05)
+	})
+
+	t.Run("should shrink the width with the latitude", func(t *testing.T) {
+		// when
+		width, _ := box(59.5, 60.5, 10, 11).Extent()
+
+		// then
+		assert.InDelta(t, 111.32*0.5, width, 0.3)
+	})
+
+	t.Run("should measure an area that crosses the antimeridian by its real width", func(t *testing.T) {
+		// when
+		width, _ := box(-0.5, 0.5, 179.5, -179.5).Extent()
+
+		// then
+		assert.InDelta(t, 111.32, width, 0.05)
+	})
+}
+
+func Test_BoundingBox_ClippedTo(t *testing.T) {
+	t.Run("should keep the part of the box that is inside the limits", func(t *testing.T) {
+		// when
+		clipped := box(-13.661, 0, -40.036, 0).ClippedTo(box(-13.66, -12.56, -40.04, -38.08))
+
+		// then
+		assert.Equal(t, box(-13.66, -12.56, -40.036, -38.08).MinLatitude, clipped.MinLatitude)
+		assert.Equal(t, -12.56, clipped.MaxLatitude)
+		assert.Equal(t, -40.036, clipped.MinLongitude)
+		assert.Equal(t, -38.08, clipped.MaxLongitude)
+	})
+
+	t.Run("should leave a box that is inside the limits as it is", func(t *testing.T) {
+		// given
+		inner := box(1, 2, 3, 4)
+
+		// when
+		clipped := inner.ClippedTo(box(0, 10, 0, 10))
+
+		// then
+		assert.Equal(t, inner, clipped)
+	})
+
+	t.Run("should leave the box as it is when the limits do not overlap it", func(t *testing.T) {
+		// given
+		original := box(1, 2, 3, 4)
+
+		// when
+		clipped := original.ClippedTo(box(50, 60, 50, 60))
+
+		// then
+		assert.Equal(t, original, clipped)
+	})
+
+	t.Run("should leave a box that crosses the antimeridian as it is", func(t *testing.T) {
+		// given
+		crossing := box(0, 1, 170, -170)
+
+		// when
+		clipped := crossing.ClippedTo(box(0, 1, 100, 179))
+
+		// then
+		assert.Equal(t, crossing, clipped)
+	})
+}

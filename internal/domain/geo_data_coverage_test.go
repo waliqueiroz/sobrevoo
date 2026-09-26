@@ -184,3 +184,70 @@ func Test_Route_Coverage(t *testing.T) {
 		assert.Equal(t, "b-mapa", report.BaseMapSourcesUsed[1].Name)
 	})
 }
+
+func Test_SelectSource(t *testing.T) {
+	t.Run("should pick the source with the smallest area", func(t *testing.T) {
+		// given
+		big := elevation("big", box(0, 10, 0, 10))
+		small := elevation("small", box(4, 6, 4, 6))
+
+		// when
+		winner, found := domain.SelectSource([]domain.GeoDataSource{big, small}, 5, 5)
+
+		// then
+		assert.True(t, found)
+		assert.Equal(t, "small", winner.Name)
+	})
+
+	t.Run("should break a tie by the oldest registration", func(t *testing.T) {
+		// given
+		older := builddomain.NewGeoDataSourceBuilder().WithName("older").
+			WithBoundingBox(box(0, 10, 0, 10)).WithRegisteredAt(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)).Build()
+		newer := builddomain.NewGeoDataSourceBuilder().WithName("newer").
+			WithBoundingBox(box(0, 10, 0, 10)).WithRegisteredAt(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)).Build()
+
+		// when
+		winner, _ := domain.SelectSource([]domain.GeoDataSource{newer, older}, 5, 5)
+
+		// then
+		assert.Equal(t, "older", winner.Name)
+	})
+
+	t.Run("should report no winner when no source covers the point", func(t *testing.T) {
+		// when
+		_, found := domain.SelectSource([]domain.GeoDataSource{elevation("dem", box(0, 1, 0, 1))}, 5, 5)
+
+		// then
+		assert.False(t, found)
+	})
+
+	t.Run("should find a source that crosses the antimeridian from both sides", func(t *testing.T) {
+		// given
+		crossing := elevation("crossing", box(0, 1, 170, -170))
+
+		// when
+		east, foundEast := domain.SelectSource([]domain.GeoDataSource{crossing}, 0.5, 180)
+		west, foundWest := domain.SelectSource([]domain.GeoDataSource{crossing}, 0.5, -180)
+
+		// then
+		assert.True(t, foundEast)
+		assert.True(t, foundWest)
+		assert.Equal(t, east, west)
+	})
+
+	t.Run("should choose the same source as route coverage does", func(t *testing.T) {
+		// given
+		big := elevation("big", box(0, 10, 0, 10))
+		small := elevation("small", box(4, 6, 4, 6))
+		maps := []domain.GeoDataSource{baseMap("map", box(0, 10, 0, 10))}
+		route := domain.Route{Points: []domain.TrackPoint{{Latitude: 5, Longitude: 5}}}
+
+		// when
+		winner, _ := domain.SelectSource([]domain.GeoDataSource{big, small}, 5, 5)
+		report := route.Coverage(maps, []domain.GeoDataSource{big, small})
+
+		// then
+		require.Len(t, report.ElevationSourcesUsed, 1)
+		assert.Equal(t, winner.Name, report.ElevationSourcesUsed[0].Name)
+	})
+}
