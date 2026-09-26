@@ -19,9 +19,6 @@ type GeoSliceExporter interface {
 }
 
 const (
-	// TilePixels is the width and height of a map tile, in pixels.
-	TilePixels = 256
-
 	// BytesPerElevationSample is the size of an elevation sample in a slice.
 	BytesPerElevationSample = 4
 
@@ -33,7 +30,8 @@ const (
 	MetersPerDegree = 111320.0
 
 	// EquatorResolution is the ground resolution of a zoom-0 tile pixel at
-	// the equator, in meters.
+	// the equator, in meters. It assumes tiles of 256 × 256 pixels, the size
+	// of MBTiles and XYZ grids; that is where the assumption lives.
 	EquatorResolution = 156543.03392
 )
 

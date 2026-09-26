@@ -707,3 +707,96 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 		assert.Equal(t, domain.GeoSlice{}, slice)
 	})
 }
+
+// eastwardsPlan is a plan whose marker moves 2 km east from (lat, lon), with
+// the camera 800 m from it, in ten frames.
+func eastwardsPlan(lat, lon float64) domain.CameraPlan {
+	const frames = 10
+	metersPerDegree := domain.MetersPerDegree * math.Cos(lat*math.Pi/180)
+
+	list := make([]domain.CameraFrame, frames)
+	for i := range list {
+		markerLon := lon + 2000*float64(i)/(frames-1)/metersPerDegree
+		if markerLon >= 180 {
+			markerLon -= 360
+		}
+		list[i] = builddomain.NewCameraFrameBuilder().
+			WithIndex(i).
+			WithMarkerPosition(lat, markerLon).
+			WithCameraPosition(lat-0.003, markerLon).
+			WithCameraToMarkerDistance(800).
+			Build()
+	}
+	parameters := builddomain.NewPlanParametersBuilder().WithDuration(time.Second * frames / 30).WithFrameRate(30).Build()
+	return builddomain.NewCameraPlanBuilder().WithParameters(parameters).WithFrames(list...).Build()
+}
+
+// sliceOver gives the slice of plan over one base map and one relief that
+// cover `covered`, with a relief grid of 0.001° cells starting at (north, west)
+// and spanning `cols` columns.
+func sliceOver(t *testing.T, plan domain.CameraPlan, covered domain.BoundingBox, north, west float64, cols int) domain.GeoSlice {
+	t.Helper()
+
+	m := newSliceMocks(t)
+	m.allFilesExist()
+	baseMap := baseMapSource("map", covered)
+	relief := reliefSource("dem", covered)
+	m.repository.EXPECT().List().Return([]domain.GeoDataSource{baseMap, relief}, nil)
+	m.baseMapReader.EXPECT().Levels(gomock.Any()).Return(domain.LevelRange{Min: 0, Max: 22}, nil)
+	m.baseMapReader.EXPECT().ReadTiles(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ string, _ int, ids []domain.TileID) (domain.TileRead, error) { return tilesFor(ids), nil })
+	m.elevationReader.EXPECT().Describe(gomock.Any()).Return(domain.ElevationGridInfo{
+		Rows: 2000, Cols: cols,
+		NorthLatitude: north, WestLongitude: west,
+		CellLatitude: 0.001, CellLongitude: 0.001,
+		UnitToMeters: 1,
+	}, nil)
+	m.elevationReader.EXPECT().ReadWindow(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil }).AnyTimes()
+
+	slice, err := m.service.Generate(plan)
+	require.NoError(t, err)
+	return slice
+}
+
+func Test_geoSliceService_Generate_AnywhereOnTheGlobe(t *testing.T) {
+	t.Run("should give the same properties to the slice of a flight across the antimeridian as to the same flight elsewhere at that latitude", func(t *testing.T) {
+		// given: the same flight at latitude 60, once at longitude 20 and once across 180°
+		elsewhere := sliceOver(t, eastwardsPlan(60, 20), sliceBox(59, 61, 10, 30), 61, 10, 20000)
+		across := sliceOver(t, eastwardsPlan(60, 179.98), domain.BoundingBox{MinLatitude: 59, MaxLatitude: 61, MinLongitude: 170, MaxLongitude: -170, CrossesAntimeridian: true}, 61, 170, 20000)
+
+		// then: the same level of detail, complete coverage, no missing tile, and about the same amount of data
+		require.Len(t, elsewhere.TileSets, 1)
+		require.Len(t, across.TileSets, 1)
+		assert.Equal(t, elsewhere.TileSets[0].Detail.Chosen, across.TileSets[0].Detail.Chosen)
+		assert.Empty(t, across.TileSets[0].Missing)
+		assert.False(t, elsewhere.Area.CrossesAntimeridian)
+		assert.True(t, across.Area.CrossesAntimeridian)
+		assert.InEpsilon(t, float64(elsewhere.Summary.SampleCount), float64(across.Summary.SampleCount), 0.05)
+		assert.InEpsilon(t, float64(elsewhere.Summary.TileCount), float64(across.Summary.TileCount), 0.35)
+		assert.Len(t, across.Elevation, 1, "the samples across the seam are one contiguous window, not two")
+	})
+
+	t.Run("should ask for less detailed tiles as the latitude grows, since a tile covers less ground per pixel", func(t *testing.T) {
+		// given: the same flight at the equator and at latitude 60
+		equator := sliceOver(t, eastwardsPlan(0, 20), sliceBox(-1, 1, 10, 30), 1, 10, 20000)
+		north := sliceOver(t, eastwardsPlan(60, 20), sliceBox(59, 61, 10, 30), 61, 10, 20000)
+
+		// then: one level fewer at 60° (cos 60° = 1/2), never more
+		assert.Equal(t, equator.TileSets[0].Detail.Chosen-1, north.TileSets[0].Detail.Chosen)
+	})
+
+	t.Run("should cover the same ground, in meters, whatever the latitude", func(t *testing.T) {
+		// given
+		equator := sliceOver(t, eastwardsPlan(0, 20), sliceBox(-1, 1, 10, 30), 1, 10, 20000)
+		north := sliceOver(t, eastwardsPlan(60, 20), sliceBox(59, 61, 10, 30), 61, 10, 20000)
+
+		// when
+		equatorWidth, equatorHeight := equator.Area.Extent()
+		northWidth, northHeight := north.Area.Extent()
+
+		// then
+		assert.InEpsilon(t, equatorWidth, northWidth, 0.02)
+		assert.InEpsilon(t, equatorHeight, northHeight, 0.02)
+	})
+}

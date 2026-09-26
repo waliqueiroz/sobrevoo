@@ -20,7 +20,12 @@ sobrevoo geodata register <arquivo> --name <nome>
   local de mapa base (MBTiles) ou de relevo (GeoTIFF em CRS geográfico). O
   tipo e a área geográfica cobertos são determinados automaticamente a
   partir do conteúdo do arquivo (FR-002, FR-003) — a extensão do arquivo é
-  ignorada para essa decisão.
+  ignorada para essa decisão. Duas correções vieram da etapa 4, ao usar
+  dados reais (`specs/004-geo-data-slice/`): a largura e a altura do
+  GeoTIFF podem ser gravadas como `SHORT` ou `LONG`, e o `bounds` de um
+  MBTiles é recortado pela área onde há peças no nível mais detalhado quando
+  o arquivo o declara maior que isso (alguns geradores deixam um canto em
+  `0,0`); um MBTiles sem peças para conferir mantém o `bounds` declarado.
 - `--name` (obrigatório): nome escolhido pelo usuário para este registro;
   deve ser único entre todos os registros existentes (FR-007).
 

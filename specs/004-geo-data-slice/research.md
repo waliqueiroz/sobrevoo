@@ -145,6 +145,8 @@ Cobra, testify, mockgen).
   d_min     = summary.camera_distance_m.min      (do plano)
   footprint = TexelScreenRatio · 2 · d_min · tan(FOV/2) / ReferenceHeightPixels
   res(z, φ) = 156543.03392 · cos φ / 2^z         (metros por pixel, peça de 256 px)
+  (o recorte não interpreta a peça: vale igual para peças vetoriais, em que o nível
+  é só uma aproximação; um mapa de peças de 512 px pediria um nível a menos)
   φ_ref     = latitude com o menor |φ| dentro da área (0 se a área cruza o equador)
   z*        = min { z ∈ ℕ : res(z, φ_ref) ≤ footprint }
   ```

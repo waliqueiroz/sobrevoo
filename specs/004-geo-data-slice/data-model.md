@@ -24,9 +24,9 @@ Constantes de ajuste, injetadas (Princípio VIII; `research.md` item 15).
 | `EstimatedTileBytes` | `int64` | 65 536 |
 | `MaxSizeBytes` | `int64` | 268 435 456 |
 
-Constantes de domínio (fatos da grade, não ajuste): `TilePixels = 256`,
-`BytesPerElevationSample = 4`, `MaxMercatorLatitude = 85.0511287798`,
-`MetersPerDegree = 111 320`, `EquatorResolution = 156 543.03392`.
+Constantes de domínio (fatos da grade, não ajuste): `BytesPerElevationSample = 4`, `MaxMercatorLatitude = 85.0511287798`,
+`MetersPerDegree = 111 320`, `EquatorResolution = 156 543.03392` (resolução, em metros por pixel, de uma peça
+de 256 px de nível 0 no equador — é aí que a suposição de 256 px vive).
 
 ### `CameraPlan` (existente) — acréscimos
 

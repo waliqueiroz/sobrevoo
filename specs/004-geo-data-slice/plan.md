@@ -101,7 +101,7 @@ menos de 5 s, sem ler conteúdo (só contas e metadados). O custo é dominado
 por E/S: uma consulta SQLite por peça e a decodificação apenas das
 faixas/peças TIFF que intersectam a janela. Sem concorrência (determinismo).
 
-**Restrições**: 100% offline; núcleo sem I/O; determinismo bit a bit no mesmo
+**Restrições**: 100% offline; peças de mapa de 256 px (suposição da fórmula do nível de detalhe); núcleo sem I/O; determinismo bit a bit no mesmo
 binário e plataforma (área quantizada a 1e-7°, resto em inteiros ou cópia de
 valores — `research.md` item 12); nenhum dado de região embutido; recorte de
 no máximo 256 MiB (estimado e real); elevação sempre em metros; nenhuma
