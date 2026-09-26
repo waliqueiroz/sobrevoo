@@ -277,3 +277,150 @@ func Test_SliceTuning_EnsureFits(t *testing.T) {
 		assert.ErrorContains(t, err, "3.0 GiB")
 	})
 }
+
+func planWith(tileCounts []int, levels []int, windows []domain.GridWindow) domain.SlicePlan {
+	plan := domain.SlicePlan{Area: domain.BoundingBox{MinLatitude: -1, MaxLatitude: 1, MinLongitude: -1, MaxLongitude: 1}}
+	for i, count := range tileCounts {
+		plan.Tiles = append(plan.Tiles, domain.TileRequest{
+			Detail: domain.DetailLevel{Chosen: levels[i]},
+			IDs:    make([]domain.TileID, count),
+		})
+	}
+	for _, window := range windows {
+		plan.Samples = append(plan.Samples, domain.SampleRequest{Window: window})
+	}
+	return plan
+}
+
+func Test_SlicePlan(t *testing.T) {
+	t.Run("should count the tiles asked of every base map", func(t *testing.T) {
+		// given
+		plan := planWith([]int{10, 5}, []int{14, 16}, nil)
+
+		// when
+		count := plan.TileCount()
+
+		// then
+		assert.Equal(t, int64(15), count)
+	})
+
+	t.Run("should count the samples of every window", func(t *testing.T) {
+		// given
+		plan := planWith(nil, nil, []domain.GridWindow{{Rows: 10, Cols: 20}, {Rows: 3, Cols: 3}})
+
+		// when
+		count := plan.SampleCount()
+
+		// then
+		assert.Equal(t, int64(209), count)
+	})
+
+	t.Run("should report the most detailed level chosen for any base map as the level of the slice", func(t *testing.T) {
+		// given
+		plan := planWith([]int{1, 1, 1}, []int{12, 16, 14}, nil)
+
+		// when
+		level := plan.Level()
+
+		// then
+		assert.Equal(t, 16, level)
+	})
+
+	t.Run("should report level zero for a plan without base maps", func(t *testing.T) {
+		// when
+		level := planWith(nil, nil, nil).Level()
+
+		// then
+		assert.Equal(t, 0, level)
+	})
+}
+
+func Test_SliceTuning_EnsurePlanFits(t *testing.T) {
+	tuning := builddomain.NewSliceTuningBuilder().WithEstimatedTileBytes(100).WithMaxSizeBytes(1000 + 4*50).Build()
+
+	t.Run("should accept a plan whose estimate is exactly the limit", func(t *testing.T) {
+		// given: 10 tiles at 100 bytes and 50 samples at 4 bytes
+		plan := planWith([]int{10}, []int{16}, []domain.GridWindow{{Rows: 5, Cols: 10}})
+
+		// when
+		err := tuning.EnsurePlanFits(plan)
+
+		// then
+		assert.NoError(t, err)
+	})
+
+	t.Run("should refuse a plan whose estimate is one tile over the limit, saying its level", func(t *testing.T) {
+		// given
+		plan := planWith([]int{11}, []int{17}, []domain.GridWindow{{Rows: 5, Cols: 10}})
+
+		// when
+		err := tuning.EnsurePlanFits(plan)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrSliceTooLarge)
+		assert.ErrorContains(t, err, "level 17")
+	})
+}
+
+func Test_SizeGuard(t *testing.T) {
+	area := domain.BoundingBox{MinLatitude: -1, MaxLatitude: 1, MinLongitude: -1, MaxLongitude: 1}
+	tuning := builddomain.NewSliceTuningBuilder().WithMaxSizeBytes(100).Build()
+	plan := domain.SlicePlan{Area: area, Tiles: []domain.TileRequest{{Detail: domain.DetailLevel{Chosen: 16}}}}
+	bytesTile := func(size int) domain.TileSet {
+		return builddomain.NewTileSetBuilder().WithTiles(domain.Tile{Data: make([]byte, size)}).Build()
+	}
+
+	t.Run("should add up the real bytes of the tiles read", func(t *testing.T) {
+		// given
+		guard := tuning.NewSizeGuard(plan)
+
+		// when
+		first := guard.AddTileSet(bytesTile(60))
+		second := guard.AddTileSet(bytesTile(40))
+
+		// then
+		assert.NoError(t, first)
+		assert.NoError(t, second, "exactly the limit is accepted")
+	})
+
+	t.Run("should refuse the tile set that takes the total past the limit, saying the level", func(t *testing.T) {
+		// given
+		guard := tuning.NewSizeGuard(plan)
+		require.NoError(t, guard.AddTileSet(bytesTile(60)))
+
+		// when
+		err := guard.AddTileSet(bytesTile(41))
+
+		// then
+		require.ErrorIs(t, err, domain.ErrSliceTooLarge)
+		assert.ErrorContains(t, err, "level 16")
+	})
+
+	t.Run("should count four bytes for each sample of a grid", func(t *testing.T) {
+		// given: a grid of 9 samples is 36 bytes
+		guard := tuning.NewSizeGuard(plan)
+		grid := builddomain.NewElevationGridBuilder().Build()
+
+		// when
+		first := guard.AddGrid(grid)
+		second := guard.AddGrid(grid)
+		third := guard.AddGrid(grid)
+
+		// then: 36, 72, then 108 is past 100
+		assert.NoError(t, first)
+		assert.NoError(t, second)
+		assert.ErrorIs(t, third, domain.ErrSliceTooLarge)
+	})
+
+	t.Run("should count tiles and samples together", func(t *testing.T) {
+		// given
+		guard := tuning.NewSizeGuard(plan)
+		require.NoError(t, guard.AddTileSet(bytesTile(70)))
+
+		// when
+		err := guard.AddGrid(builddomain.NewElevationGridBuilder().Build())
+
+		// then: 70 + 36 = 106
+		assert.ErrorIs(t, err, domain.ErrSliceTooLarge)
+	})
+}

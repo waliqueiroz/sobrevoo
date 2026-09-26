@@ -187,6 +187,17 @@ conteúdo, para que ele nunca discorde do recorte (mesmo padrão de
 as peças e ausências de cada um (nível, coluna, linha) sem alterar o que
 recebeu; as grades de elevação mantêm a ordem das regiões.
 
+`SlicePlan` (`geo_slice.go`) é o que o recorte vai ler, calculado só a partir
+dos metadados, antes de ler conteúdo: `Area`, `Tiles []TileRequest` (registro,
+`DetailLevel` e `TileID`s a pedir) e `Samples []SampleRequest` (registro,
+geometria da grade e janela). É dele que vêm as decisões sobre o tamanho:
+`TileCount()`, `SampleCount()` e `Level()` (o nível **efetivo** reportado, o
+mais detalhado escolhido para qualquer mapa base). `SliceTuning.EnsurePlanFits`
+recusa o plano pela estimativa e `SliceTuning.NewSizeGuard(plano)` devolve um
+`SizeGuard`, que acumula o tamanho real (`AddTileSet`, `AddGrid`) enquanto o
+conteúdo é lido e recusa ao passar do limite. O `GeoSliceService` só monta o
+plano e chama esses métodos.
+
 `SliceTuning` tem `Estimate(tileCount, sampleCount int64) int64` (peças ×
 `EstimatedTileBytes` + amostras × 4) e `EnsureFits(size int64, area
 BoundingBox, level int) error` (`ErrSliceTooLarge` se `size` > `MaxSizeBytes`,

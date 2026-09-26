@@ -495,3 +495,9 @@ Cada história agrega valor sem quebrar as anteriores.
   (mesmo nível, sem peça ausente, quantidades parecidas e uma janela contígua
   na junção do antimeridiano, um nível a menos a 60° que no equador, mesma área
   em metros).
+- **Regra do tamanho do recorte movida para o domínio** (observação de revisão,
+  achado C1 do `/speckit-analyze` que tinha sido aceito cedo demais): a contagem
+  de peças e amostras, o nível efetivo (`Level()`) e o acúmulo do tamanho real
+  durante a leitura eram decididos dentro de `GeoSliceService.Generate`; agora
+  são `SlicePlan` e `SizeGuard` em `internal/domain/geo_slice.go`, e o serviço só
+  monta o plano e chama `EnsurePlanFits` e o guarda.

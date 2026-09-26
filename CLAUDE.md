@@ -76,7 +76,9 @@ adapter.
   `SmoothedSpans`) — ver `specs/003-camera-path-planning/research.md` item 17 —,
   e, na etapa 4, `CameraPlan` (`Validate`, `AreaOfInterest`), `BoundingBox`
   (`Intersects`, `TileRange`, `Regions`, `Extent`), `SliceTuning`
-  (`DetailLevel`, `Estimate`, `EnsureFits`), `SliceRegions` (`BaseMaps`,
+  (`DetailLevel`, `Estimate`, `EnsureFits`, `EnsurePlanFits`, `NewSizeGuard`),
+  `SlicePlan` (`TileCount`, `SampleCount`, `Level`) e `SizeGuard` (o que conta
+  para o limite de tamanho e qual nível é reportado), `SliceRegions` (`BaseMaps`,
   `TilesFor`), `ElevationGridInfo` (`CellAt`, `Window`) e `ElevationGrid` (`At`,
   `NoValueCount`, `Range`) — ver `specs/004-geo-data-slice/research.md`;
   o que sobra como função livre é matemática sem dono (`clamp`, `quantize`,

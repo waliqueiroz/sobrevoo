@@ -93,6 +93,97 @@ func formatSize(size int64) string {
 	}
 }
 
+// TileRequest is what to ask one base map for: the tiles, at the level of
+// detail chosen for that map.
+type TileRequest struct {
+	Source GeoDataSource
+	Detail DetailLevel
+	IDs    []TileID
+}
+
+// SampleRequest is what to read from one elevation source: a window of its
+// grid, with the grid's geometry.
+type SampleRequest struct {
+	Source GeoDataSource
+	Info   ElevationGridInfo
+	Window GridWindow
+}
+
+// SlicePlan is everything a slice will read, worked out from the metadata of
+// the registered files alone, before any content is read: it is what says how
+// big the slice will be.
+type SlicePlan struct {
+	Area    BoundingBox
+	Tiles   []TileRequest
+	Samples []SampleRequest
+}
+
+// TileCount is how many tiles the plan asks the base maps for.
+func (p SlicePlan) TileCount() int64 {
+	var count int64
+	for _, request := range p.Tiles {
+		count += int64(len(request.IDs))
+	}
+	return count
+}
+
+// SampleCount is how many elevation samples the plan reads.
+func (p SlicePlan) SampleCount() int64 {
+	var count int64
+	for _, request := range p.Samples {
+		count += int64(request.Window.Rows) * int64(request.Window.Cols)
+	}
+	return count
+}
+
+// Level is the level of detail the slice is reported at: the most detailed one
+// chosen for any of its base maps. It is what makes a slice big, and so what a
+// refusal for size names.
+func (p SlicePlan) Level() int {
+	level := 0
+	for _, request := range p.Tiles {
+		level = max(level, request.Detail.Chosen)
+	}
+	return level
+}
+
+// EnsurePlanFits refuses, before any content is read, a plan whose estimated
+// size (Estimate of its tiles and samples) goes past the limit.
+func (t SliceTuning) EnsurePlanFits(plan SlicePlan) error {
+	return t.EnsureFits(t.Estimate(plan.TileCount(), plan.SampleCount()), plan.Area, plan.Level())
+}
+
+// SizeGuard keeps the real size of a slice as its content is read and refuses
+// it once it goes past the limit: the estimate can be off, since the size of a
+// tile is only known when it is read.
+type SizeGuard struct {
+	tuning SliceTuning
+	area   BoundingBox
+	level  int
+	size   int64
+}
+
+// NewSizeGuard starts a guard for reading plan.
+func (t SliceTuning) NewSizeGuard(plan SlicePlan) *SizeGuard {
+	return &SizeGuard{tuning: t, area: plan.Area, level: plan.Level()}
+}
+
+// AddTileSet counts the bytes of the tiles of tileSet, failing with
+// ErrSliceTooLarge if the slice is now past the limit.
+func (g *SizeGuard) AddTileSet(tileSet TileSet) error {
+	for _, tile := range tileSet.Tiles {
+		g.size += int64(len(tile.Data))
+	}
+	return g.tuning.EnsureFits(g.size, g.area, g.level)
+}
+
+// AddGrid counts the samples of grid, failing with ErrSliceTooLarge if the
+// slice is now past the limit.
+func (g *SizeGuard) AddGrid(grid ElevationGrid) error {
+	g.size += int64(grid.Rows()) * int64(grid.Cols()) * BytesPerElevationSample
+	return g.tuning.EnsureFits(g.size, g.area, g.level)
+}
+
 // SliceRegions are the regions of a slice's area, in order (see
 // BoundingBox.Regions).
 type SliceRegions []SliceRegion

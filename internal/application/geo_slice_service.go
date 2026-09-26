@@ -79,52 +79,40 @@ func (s *geoSliceService) Generate(plan domain.CameraPlan) (domain.GeoSlice, err
 
 	// What is needed is worked out from the metadata of the files alone, so a
 	// slice that is too big is refused before any content is read.
-	tilesToRead, err := s.planTiles(plan, area, regions)
+	tiles, err := s.planTiles(plan, area, regions)
 	if err != nil {
 		return domain.GeoSlice{}, err
 	}
-	windowsToRead, err := s.planElevation(area, regions)
+	samples, err := s.planElevation(area, regions)
 	if err != nil {
 		return domain.GeoSlice{}, err
 	}
-
-	var tileCount, sampleCount int64
-	level := 0
-	for _, read := range tilesToRead {
-		tileCount += int64(len(read.ids))
-		level = max(level, read.detail.Chosen)
-	}
-	for _, read := range windowsToRead {
-		sampleCount += int64(read.window.Rows * read.window.Cols)
-	}
-	if err := s.sliceTuning.EnsureFits(s.sliceTuning.Estimate(tileCount, sampleCount), area, level); err != nil {
+	slicePlan := domain.SlicePlan{Area: area, Tiles: tiles, Samples: samples}
+	if err := s.sliceTuning.EnsurePlanFits(slicePlan); err != nil {
 		return domain.GeoSlice{}, err
 	}
 
-	var size int64
-	tileSets := make([]domain.TileSet, 0, len(tilesToRead))
-	for _, read := range tilesToRead {
-		tileSet, err := s.readTileSet(read)
+	guard := s.sliceTuning.NewSizeGuard(slicePlan)
+
+	tileSets := make([]domain.TileSet, 0, len(tiles))
+	for _, request := range tiles {
+		tileSet, err := s.readTileSet(request)
 		if err != nil {
 			return domain.GeoSlice{}, err
 		}
-		for _, tile := range tileSet.Tiles {
-			size += int64(len(tile.Data))
-		}
-		if err := s.sliceTuning.EnsureFits(size, area, level); err != nil {
+		if err := guard.AddTileSet(tileSet); err != nil {
 			return domain.GeoSlice{}, err
 		}
 		tileSets = append(tileSets, tileSet)
 	}
 
-	grids := make([]domain.ElevationGrid, 0, len(windowsToRead))
-	for _, read := range windowsToRead {
-		grid, err := s.readGrid(read)
+	grids := make([]domain.ElevationGrid, 0, len(samples))
+	for _, request := range samples {
+		grid, err := s.readGrid(request)
 		if err != nil {
 			return domain.GeoSlice{}, err
 		}
-		size += int64(read.window.Rows*read.window.Cols) * domain.BytesPerElevationSample
-		if err := s.sliceTuning.EnsureFits(size, area, level); err != nil {
+		if err := guard.AddGrid(grid); err != nil {
 			return domain.GeoSlice{}, err
 		}
 		grids = append(grids, grid)
@@ -133,23 +121,9 @@ func (s *geoSliceService) Generate(plan domain.CameraPlan) (domain.GeoSlice, err
 	return domain.NewGeoSlice(area, tileSets, grids), nil
 }
 
-// tileRead is what to ask one base map for.
-type tileRead struct {
-	source domain.GeoDataSource
-	detail domain.DetailLevel
-	ids    []domain.TileID
-}
-
-// windowRead is what to read from one elevation source.
-type windowRead struct {
-	source domain.GeoDataSource
-	info   domain.ElevationGridInfo
-	window domain.GridWindow
-}
-
 // planTiles chooses the level of detail of each base map that wins in some
 // region and works out the tiles to ask it for.
-func (s *geoSliceService) planTiles(plan domain.CameraPlan, area domain.BoundingBox, regions domain.SliceRegions) ([]tileRead, error) {
+func (s *geoSliceService) planTiles(plan domain.CameraPlan, area domain.BoundingBox, regions domain.SliceRegions) ([]domain.TileRequest, error) {
 	baseMaps := regions.BaseMaps()
 
 	details := make(map[string]domain.DetailLevel, len(baseMaps))
@@ -166,19 +140,19 @@ func (s *geoSliceService) planTiles(plan domain.CameraPlan, area domain.Bounding
 
 	wanted := regions.TilesFor(levels)
 
-	reads := make([]tileRead, len(baseMaps))
+	requests := make([]domain.TileRequest, len(baseMaps))
 	for i, baseMap := range baseMaps {
-		reads[i] = tileRead{source: baseMap, detail: details[baseMap.Name], ids: wanted[baseMap.Name]}
+		requests[i] = domain.TileRequest{Source: baseMap, Detail: details[baseMap.Name], IDs: wanted[baseMap.Name]}
 	}
-	return reads, nil
+	return requests, nil
 }
 
 // planElevation works out, for each region, the window of samples to read from
 // the elevation source that wins there.
-func (s *geoSliceService) planElevation(area domain.BoundingBox, regions domain.SliceRegions) ([]windowRead, error) {
+func (s *geoSliceService) planElevation(area domain.BoundingBox, regions domain.SliceRegions) ([]domain.SampleRequest, error) {
 	infos := map[string]domain.ElevationGridInfo{}
 
-	var reads []windowRead
+	var requests []domain.SampleRequest
 	for _, region := range regions {
 		source := region.Elevation
 
@@ -192,34 +166,34 @@ func (s *geoSliceService) planElevation(area domain.BoundingBox, regions domain.
 		}
 
 		for _, window := range info.Window(region.Box, area) {
-			reads = append(reads, windowRead{source: source, info: info, window: window})
+			requests = append(requests, domain.SampleRequest{Source: source, Info: info, Window: window})
 		}
 	}
-	return reads, nil
+	return requests, nil
 }
 
-func (s *geoSliceService) readTileSet(read tileRead) (domain.TileSet, error) {
-	tiles, err := s.baseMapReader.ReadTiles(read.source.Path, read.detail.Chosen, read.ids)
+func (s *geoSliceService) readTileSet(request domain.TileRequest) (domain.TileSet, error) {
+	tiles, err := s.baseMapReader.ReadTiles(request.Source.Path, request.Detail.Chosen, request.IDs)
 	if err != nil {
-		return domain.TileSet{}, sourceError(read.source, err)
+		return domain.TileSet{}, sourceError(request.Source, err)
 	}
 
 	return domain.TileSet{
-		Source:  read.source,
-		Detail:  read.detail,
+		Source:  request.Source,
+		Detail:  request.Detail,
 		Format:  tiles.Format,
 		Tiles:   tiles.Tiles,
 		Missing: tiles.Missing,
 	}, nil
 }
 
-func (s *geoSliceService) readGrid(read windowRead) (domain.ElevationGrid, error) {
-	samples, err := s.elevationReader.ReadWindow(read.source.Path, read.window)
+func (s *geoSliceService) readGrid(request domain.SampleRequest) (domain.ElevationGrid, error) {
+	samples, err := s.elevationReader.ReadWindow(request.Source.Path, request.Window)
 	if err != nil {
-		return domain.ElevationGrid{}, sourceError(read.source, err)
+		return domain.ElevationGrid{}, sourceError(request.Source, err)
 	}
 
-	return domain.NewElevationGrid(read.source, read.window, read.info, samples.Values), nil
+	return domain.NewElevationGrid(request.Source, request.Window, request.Info, samples.Values), nil
 }
 
 // sourceError says which registered source an error comes from, keeping the
