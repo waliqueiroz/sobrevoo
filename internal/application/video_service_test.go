@@ -600,6 +600,87 @@ func Test_videoService_Assemble_Destination(t *testing.T) {
 	})
 }
 
+func Test_videoService_CheckEncoder(t *testing.T) {
+	t.Run("should probe the encoder and return what it found", func(t *testing.T) {
+		// given
+		m := newVideoMocks(t)
+		m.encoder.EXPECT().Probe(gomock.Any()).Return(anEncoder, nil)
+
+		// when
+		info, err := m.service.CheckEncoder(context.Background())
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, anEncoder, info)
+	})
+
+	t.Run("should return the error of the probe as it is", func(t *testing.T) {
+		// given
+		m := newVideoMocks(t)
+		m.encoder.EXPECT().Probe(gomock.Any()).Return(domain.EncoderInfo{}, domain.ErrEncoderUnavailable)
+
+		// when
+		_, err := m.service.CheckEncoder(context.Background())
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrEncoderUnavailable)
+	})
+
+	t.Run("should say it was interrupted when the probe stops as the context is done", func(t *testing.T) {
+		// given
+		m := newVideoMocks(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		m.encoder.EXPECT().Probe(gomock.Any()).DoAndReturn(func(context.Context) (domain.EncoderInfo, error) {
+			cancel()
+			return domain.EncoderInfo{}, fmt.Errorf("could not be run: %w", context.Canceled)
+		})
+
+		// when
+		_, err := m.service.CheckEncoder(ctx)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrVideoInterrupted)
+	})
+}
+
+func Test_videoService_CheckDestination(t *testing.T) {
+	t.Run("should check the destination and return nil when it can be used", func(t *testing.T) {
+		// given
+		m := newVideoMocks(t)
+		m.exporter.EXPECT().Check("/tmp/flight.mp4", false).Return(nil)
+
+		// when
+		err := m.service.CheckDestination("/tmp/flight.mp4", false)
+
+		// then
+		assert.NoError(t, err)
+	})
+
+	t.Run("should return the error of the check as it is", func(t *testing.T) {
+		// given
+		m := newVideoMocks(t)
+		m.exporter.EXPECT().Check("/tmp/flight.mp4", false).Return(domain.ErrVideoDestinationExists)
+
+		// when
+		err := m.service.CheckDestination("/tmp/flight.mp4", false)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrVideoDestinationExists)
+	})
+
+	t.Run("should ask to overwrite when the caller does", func(t *testing.T) {
+		// given
+		m := newVideoMocks(t)
+		m.exporter.EXPECT().Check("/tmp/flight.mp4", true).Return(nil)
+
+		// when
+		err := m.service.CheckDestination("/tmp/flight.mp4", true)
+
+		// then
+		assert.NoError(t, err)
+	})
+}
+
 func Test_videoService_Assemble_Interruption(t *testing.T) {
 	plan := framesPlan(20)
 

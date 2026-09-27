@@ -23,6 +23,14 @@ type VideoService interface {
 	// may be nil). The summary says what was done even when the run stopped early,
 	// with ErrVideoInterrupted or another error.
 	Assemble(ctx context.Context, plan domain.CameraPlan, request domain.VideoRequest, progress func(domain.VideoProgress)) (domain.VideoSummary, error)
+
+	// CheckEncoder probes the video encoder the same way Assemble does before
+	// encoding, and returns what it found.
+	CheckEncoder(ctx context.Context) (domain.EncoderInfo, error)
+
+	// CheckDestination checks the video destination the same way Assemble does
+	// before encoding: refuses an existing file unless overwrite.
+	CheckDestination(output string, overwrite bool) error
 }
 
 type videoService struct {
@@ -53,6 +61,7 @@ func (s *videoService) Assemble(ctx context.Context, plan domain.CameraPlan, req
 	}
 	finish := func(err error) (domain.VideoSummary, error) {
 		summary.Elapsed = time.Since(started)
+		summary.Interrupted = errors.Is(err, domain.ErrVideoInterrupted)
 		return summary, err
 	}
 
@@ -66,13 +75,13 @@ func (s *videoService) Assemble(ctx context.Context, plan domain.CameraPlan, req
 	}
 	summary.Resolution = resolution
 
-	if err := s.exporter.Check(request.Output, request.Overwrite); err != nil {
+	if err := s.CheckDestination(request.Output, request.Overwrite); err != nil {
 		return finish(err)
 	}
 
-	info, err := s.encoder.Probe(ctx)
+	info, err := s.CheckEncoder(ctx)
 	if err != nil {
-		return finish(videoInterruption(ctx, &summary, err))
+		return finish(err)
 	}
 	summary.Encoder = info
 
@@ -93,7 +102,7 @@ func (s *videoService) Assemble(ctx context.Context, plan domain.CameraPlan, req
 		}, report)
 	})
 	if err != nil {
-		return finish(videoInterruption(ctx, &summary, err))
+		return finish(videoInterruption(ctx, err))
 	}
 	summary.SizeBytes = size
 
@@ -102,12 +111,22 @@ func (s *videoService) Assemble(ctx context.Context, plan domain.CameraPlan, req
 	return finish(nil)
 }
 
-// videoInterruption turns the error of an assembly that stopped because the
-// context is done into ErrVideoInterrupted, and marks the summary; any other
-// error is left as it is.
-func videoInterruption(ctx context.Context, summary *domain.VideoSummary, err error) error {
+func (s *videoService) CheckEncoder(ctx context.Context) (domain.EncoderInfo, error) {
+	info, err := s.encoder.Probe(ctx)
+	if err != nil {
+		return domain.EncoderInfo{}, videoInterruption(ctx, err)
+	}
+	return info, nil
+}
+
+func (s *videoService) CheckDestination(output string, overwrite bool) error {
+	return s.exporter.Check(output, overwrite)
+}
+
+// videoInterruption turns the error of an operation that stopped because the
+// context is done into ErrVideoInterrupted; any other error is left as it is.
+func videoInterruption(ctx context.Context, err error) error {
 	if ctx.Err() != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
-		summary.Interrupted = true
 		return domain.ErrVideoInterrupted
 	}
 	return err

@@ -217,6 +217,13 @@ var (
 
 	// ErrVideoEncodingFailed reports a video encoder that failed while encoding.
 	ErrVideoEncodingFailed = errors.New("video encoding failed")
+
+	// ErrFlightInterrupted reports a single-command run the user interrupted, in
+	// place of whichever stage-specific interruption error the stage that was
+	// running would have returned on its own (FR-011 of the seventh stage): the
+	// single command always exits with its own code for an interruption, never
+	// the stage's.
+	ErrFlightInterrupted = errors.New("flight interrupted")
 )
 
 // AreaNotCoveredError is the error for an area that the registered geo data

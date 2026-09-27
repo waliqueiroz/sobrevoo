@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Seis features estão implementadas até agora:
+Relive/Strava). Sete features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -23,10 +23,15 @@ plano de câmera exportado precisa, com resumo e exportação em ZIP
 quadros do voo como imagens PNG — o relevo em perspectiva, vestido com as peças
 do mapa base, o traçado até o marcador e o marcador — a partir do plano e do
 recorte exportados, com progresso, retomada e resumo (`render frame` e
-`render all`); e `specs/006-video-assembly/` junta esses quadros num único
+`render all`); `specs/006-video-assembly/` junta esses quadros num único
 vídeo MP4, na ordem e na taxa de quadros do plano, com a qualidade escolhida
 por nível nomeado, progresso e resumo (`video`), usando o `ffmpeg` que o usuário
-instala. Ainda não há sobreposição de texto ou estatísticas, nem áudio.
+instala; e `specs/007-full-flight-pipeline/` encadeia as seis etapas
+anteriores atrás de um único comando (`fly`), do arquivo de trajeto direto ao
+vídeo, com os mesmos parâmetros, recusa cedo (destino e codificador antes de
+qualquer etapa, cobertura logo após o plano) e, opcionalmente, um diretório
+onde guardar e reaproveitar o plano, o recorte e os quadros entre execuções.
+Ainda não há sobreposição de texto ou estatísticas, nem áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -52,6 +57,7 @@ go run ./cmd/sobrevoo geodata elevation --lat -23.5505 --lon -46.6333
 go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png
 go run ./cmd/sobrevoo render all plan.json slice.zip --output frames/ --resolution 1280x720
 go run ./cmd/sobrevoo video plan.json frames/ --output flight.mp4 --quality medium   # precisa do ffmpeg instalado
+go run ./cmd/sobrevoo fly path/to/track.gpx --output flight.mp4 --duration 45 --keep intermediarios/   # as seis etapas num só comando
 
 # Gerar os dados de exemplo sintéticos dos quickstarts das etapas 4 e 5:
 go run ./test/samples --out specs/005-frame-rendering/amostras
@@ -75,8 +81,9 @@ adapter.
   `SliceSummary`, e os do desenho dos quadros: `Scene`, `Resolution`,
   `RenderTuning`, `FrameImage`, `FrameStats`, `FrameSetID`, `FrameDirectory`,
   `RenderSummary`, e os da montagem do vídeo: `FrameMark`, `VideoQuality`,
-  `VideoRequest`, `VideoProgress`, `EncodeJob`, `EncoderInfo`, `VideoSummary`),
-  construtores
+  `VideoRequest`, `VideoProgress`, `EncodeJob`, `EncoderInfo`, `VideoSummary`,
+  e os do comando único: `FlightRequest`, `FlightStage`, `FlightProgress`,
+  `FlightSummary`), construtores
   que carregam regra de negócio (`NewGeoDataSource`, `NewTrackSummary`,
   `NewCameraPlan`, que calcula o resumo a partir dos quadros, `NewGeoSlice`,
   que calcula o resumo do recorte e o põe em ordem, `NewCoordinate`), e métodos de
@@ -120,12 +127,14 @@ adapter.
   `ErrFramesDoNotMatchPlan`, `ErrFramesWithoutPlanID`, `ErrFrameFileInvalid`,
   `ErrEncoderUnavailable`, `ErrVideoDestinationExists`,
   `ErrVideoDestinationInvalid`, `ErrVideoInterrupted`,
-  `ErrVideoEncodingFailed`), e as portas
+  `ErrVideoEncodingFailed`; e o do comando único: `ErrFlightInterrupted`), e
+  as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
   `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`,
   `CameraPlanReader`, `BaseMapReader`, `ElevationReader`, `GeoSliceExporter`,
   `GeoSliceReader`, `TileDecoder`, `FrameRepository`, `FrameExporter`,
-  `VideoEncoder`, `VideoExporter`.
+  `VideoEncoder`, `VideoExporter`, `Workspace` (o diretório de quadros de
+  uma execução do comando único sem `--keep`).
   Qualquer DTO de saída que não seja um
   valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
   também é um tipo de domínio comum — não um DTO de `internal/application`
@@ -142,9 +151,12 @@ adapter.
   `GeoDataService` (`Register`, `List`, `Remove`, `CheckCoverage`,
   `ElevationAt`), `CameraPlanService` (`Generate`, `Export`, `Load`) e
   `GeoSliceService` (`Generate`, `Export`, `Load`), `FrameService`
-  (`DrawFrame`, `DrawFrames`) e `VideoService` (`Assemble`); `GeoDataService` e
-  `CameraPlanService` dependem de `TrackService` em vez de repetir parse/
-  limpeza/simplificação/suavização.
+  (`DrawFrame`, `DrawFrames`), `VideoService` (`Assemble`, e as operações que
+  `Assemble` já fazia por dentro e passam a existir também sozinhas,
+  `CheckEncoder` e `CheckDestination`) e `FlightService` (`Fly`, o comando
+  único); `GeoDataService` e `CameraPlanService` dependem de `TrackService`,
+  e `FlightService` de `CameraPlanService`, `GeoSliceService`, `FrameService`
+  e `VideoService`, em vez de repetir a orquestração que cada um já faz.
 - **`internal/infra/outbound/*`** — adapters que implementam as portas do
   domínio: `trackparser` (GPX via `tkrajina/gpxgo`),
   `simplifier` (Douglas-Peucker), `smoother` (Catmull-Rom), `jsonfile`
@@ -165,6 +177,8 @@ adapter.
   `videofile` (`NewVideoExporter()`: o vídeo como um arquivo publicado por
   inteiro), `videoencoder` (`NewFFmpeg(binary)`: o processo externo `ffmpeg`, com
   `libx264`, que o usuário instala — a ferramenta não o traz nem o baixa),
+  `workingdir` (`NewOS()`: o diretório de quadros temporário de uma execução
+  do comando único sem `--keep`, e o `--keep` criado se ainda não existir),
   `config` (limiares internos fixos:
   mínimo de pontos, velocidade máxima plausível, nível padrão, os
   `CameraTuning` do planejamento de câmera e os parâmetros padrão do plano —
@@ -181,7 +195,8 @@ adapter.
   `specs/003-camera-path-planning/contracts/cli.md` e
   `specs/004-geo-data-slice/contracts/cli.md` e
   `specs/005-frame-rendering/contracts/cli.md` e
-  `specs/006-video-assembly/contracts/cli.md` para o mapeamento exato.
+  `specs/006-video-assembly/contracts/cli.md` e
+  `specs/007-full-flight-pipeline/contracts/cli.md` para o mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso
@@ -240,6 +255,40 @@ fixam por inteiro: mudá-la muda os bytes de todos os vídeos e pede uma nota de
 versão em `specs/006-video-assembly/contracts/video-file.md`. Os testes do
 adapter usam um `ffmpeg` de mentira (script de shell); o `ffmpeg` real só entra
 na validação manual (`specs/006-video-assembly/quickstart.md`).
+
+### O comando único (etapa 7)
+
+`sobrevoo fly <trajeto> --output voo.mp4` encadeia as seis etapas anteriores
+(`specs/007-full-flight-pipeline/`) atrás de `FlightService.Fly`, que só
+**orquestra** `CameraPlanService`, `GeoSliceService`, `FrameService` e
+`VideoService` — nenhuma regra de negócio nova nasce nele; o resultado é
+garantido idêntico ao de rodar os seis comandos na mão porque é, literalmente,
+a mesma chamada de serviço. O codificador e o destino do vídeo (`VideoService
+.CheckEncoder`/`CheckDestination`, extraídos de dentro de `Assemble`) são
+conferidos antes de qualquer etapa; a cobertura dos dados registrados já é a
+primeira coisa que `GeoSliceService.Generate` confere, então chamá-lo logo
+após o plano já recusa cedo, sem checagem nova. Sem `--keep`, o plano e o
+recorte **nunca tocam disco** — os serviços recebem os valores diretamente,
+em memória —, e só os quadros precisam de um diretório real (a porta nova
+`Workspace`, temporário e sempre removido ao final). Com `--keep
+<diretório>`, três arquivos previsíveis (`plan.json`, `slice.zip`, `frames/`,
+`specs/007-full-flight-pipeline/contracts/intermediates-directory.md`) são
+guardados e, numa execução seguinte, reaproveitados sempre que ainda valem
+para o trajeto e os valores informados — pelas identidades que o domínio já
+tinha (`CameraPlan.ID()`, `GeoSlice.EnsureMatches`) e pela mesma regra de
+conjunto que o desenho dos quadros já usa (`FrameService.DrawFrames`, chamado
+sem nenhuma lógica própria de reaproveitamento). Dois detalhes só a validação
+manual revelou: o `--keep` de uma execução nova precisa ser criado
+(`Workspace.EnsureDirectory`, como `render all --output` já faz com o
+próprio); e um recorte recém-gerado não tem `GeoSlice.ContentID` (só a
+leitura de um recorte já gravado o preenche) — do qual a identidade dos
+quadros depende —, então `FlightService` **relê** um recorte recém-exportado
+antes de desenhar, para os quadros carregarem a mesma identidade que uma
+execução futura, reaproveitando o recorte pelo arquivo, vai calcular; sem
+isso, os quadros da primeira execução nunca bateriam com os de uma segunda.
+Interrupção (`Ctrl+C`/`SIGTERM`) sempre sai com o código próprio do comando
+único (`ErrFlightInterrupted`), nunca o de uma etapa — a única exceção
+deliberada à regra geral de "mesmo erro que o comando individual".
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 
@@ -347,8 +396,8 @@ uso) que a redação anterior da constituição permitia.
   testes de `internal/infra/inbound/cli` mockam
   `application.TrackService`, `application.GeoDataService`,
   `application.CameraPlanService`, `application.GeoSliceService`,
-  `application.FrameService` e `application.VideoService` (`mockapplication`) e
-  nunca conectam
+  `application.FrameService`, `application.VideoService` e
+  `application.FlightService` (`mockapplication`) e nunca conectam
   um serviço ou adapter de saída real. Não existe teste automatizado de
   ponta a ponta — `specs/<feature>/quickstart.md` é o checklist manual, com
   o binário real, pra isso.

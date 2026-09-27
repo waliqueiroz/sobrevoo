@@ -23,6 +23,7 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/trackparser"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/videoencoder"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/videofile"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/workingdir"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/zipfile"
 )
 
@@ -71,6 +72,9 @@ func run() int {
 	videoExporter := videofile.NewVideoExporter()
 	videoService := application.NewVideoService(frameRepository, videoEncoder, videoExporter)
 
+	workspace := workingdir.NewOS()
+	flightService := application.NewFlightService(cameraPlanService, geoSliceService, frameService, videoService, workspace)
+
 	geoDataCommand := cli.NewGeoDataCommand()
 	geoDataCommand.AddCommand(cli.NewGeoDataRegisterCommand(geoDataService))
 	geoDataCommand.AddCommand(cli.NewGeoDataCheckCommand(geoDataService))
@@ -89,6 +93,7 @@ func run() int {
 	root.AddCommand(geoDataCommand)
 	root.AddCommand(renderCommand)
 	root.AddCommand(cli.NewVideoCommand(cameraPlanService, videoService, domainVideoQuality(cfg.VideoDefaults.Quality)))
+	root.AddCommand(cli.NewFlightCommand(flightService, domainPlanParameters(cfg.PlanDefaults), defaultResolution, domainVideoQuality(cfg.VideoDefaults.Quality)))
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -235,6 +235,16 @@ func Test_ExitCode(t *testing.T) {
 		assert.Equal(t, 50, cli.ExitCode(domain.ErrVideoEncodingFailed))
 	})
 
+	t.Run("should map ErrFlightInterrupted to 51", func(t *testing.T) {
+		assert.Equal(t, 51, cli.ExitCode(domain.ErrFlightInterrupted))
+	})
+
+	t.Run("should not take the interruption of a single-command run for that of a stage", func(t *testing.T) {
+		// given / when / then
+		assert.NotEqual(t, cli.ExitCode(domain.ErrFlightInterrupted), cli.ExitCode(domain.ErrRenderInterrupted))
+		assert.NotEqual(t, cli.ExitCode(domain.ErrFlightInterrupted), cli.ExitCode(domain.ErrVideoInterrupted))
+	})
+
 	t.Run("should map a wrapped sixth-stage error to its code", func(t *testing.T) {
 		// given
 		err := fmt.Errorf("%w: 4 missing (12-15)", domain.ErrFrameSequenceInvalid)
