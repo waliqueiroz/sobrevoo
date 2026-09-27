@@ -12,9 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
+	"github.com/waliqueiroz/sobrevoo/test/helper"
 )
 
-const anID = domain.FrameSetID("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+const (
+	anID     = domain.FrameSetID("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+	aPlanID  = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+	textHead = 33 // where the first chunk after the header starts
+)
+
+// aMark is what a frame of this tool says about itself.
+var aMark = domain.FrameMark{SetID: anID, PlanID: aPlanID}
 
 // patternFrame is a frame of 6 × 4 pixels, each of a color of its own.
 func patternFrame() domain.FrameImage {
@@ -45,7 +53,7 @@ func Test_encodeFrame(t *testing.T) {
 		frame := patternFrame()
 
 		// when
-		data, err := encodeFrame(frame, anID)
+		data, err := encodeFrame(frame, aMark)
 
 		// then
 		require.NoError(t, err)
@@ -63,7 +71,7 @@ func Test_encodeFrame(t *testing.T) {
 
 	t.Run("should have a header of 8 bits per channel, RGB with no alpha, not interlaced", func(t *testing.T) {
 		// given / when
-		data, err := encodeFrame(patternFrame(), anID)
+		data, err := encodeFrame(patternFrame(), aMark)
 
 		// then
 		require.NoError(t, err)
@@ -76,40 +84,54 @@ func Test_encodeFrame(t *testing.T) {
 		assert.Equal(t, byte(0), data[28], "interlace")
 	})
 
-	t.Run("should have a single text chunk right after the header, and no other auxiliary chunk", func(t *testing.T) {
+	t.Run("should have two text chunks right after the header, the set and then the plan, and no other auxiliary chunk", func(t *testing.T) {
 		// given / when
-		data, err := encodeFrame(patternFrame(), anID)
+		data, err := encodeFrame(patternFrame(), aMark)
 
 		// then
 		require.NoError(t, err)
 		types := chunks(t, data)
 		assert.Equal(t, "IHDR", types[0])
 		assert.Equal(t, "tEXt", types[1])
+		assert.Equal(t, "tEXt", types[2])
 		assert.Equal(t, "IEND", types[len(types)-1])
-		for _, kind := range types[2:] {
+		for _, kind := range types[3:] {
 			assert.Contains(t, []string{"IDAT", "IEND"}, kind)
 		}
 
-		text := data[33:]
-		length := int(binary.BigEndian.Uint32(text))
-		payload := text[8 : 8+length]
-		assert.Equal(t, "Sobrevoo\x00frame-set="+string(anID), string(payload))
-		assert.Equal(t, crc32.ChecksumIEEE(text[4:8+length]), binary.BigEndian.Uint32(text[8+length:]), "the checksum of the chunk")
+		first := data[textHead:]
+		firstLength := int(binary.BigEndian.Uint32(first))
+		assert.Equal(t, "Sobrevoo\x00frame-set="+string(anID), string(first[8:8+firstLength]))
+		assert.Equal(t, crc32.ChecksumIEEE(first[4:8+firstLength]), binary.BigEndian.Uint32(first[8+firstLength:]), "the checksum of the set chunk")
+
+		second := first[12+firstLength:]
+		secondLength := int(binary.BigEndian.Uint32(second))
+		assert.Equal(t, "Sobrevoo\x00plan="+aPlanID, string(second[8:8+secondLength]))
+		assert.Equal(t, crc32.ChecksumIEEE(second[4:8+secondLength]), binary.BigEndian.Uint32(second[8+secondLength:]), "the checksum of the plan chunk")
 	})
 
 	t.Run("should give the same bytes for the same frame and set", func(t *testing.T) {
 		// given / when
-		first, _ := encodeFrame(patternFrame(), anID)
-		second, _ := encodeFrame(patternFrame(), anID)
+		first, _ := encodeFrame(patternFrame(), aMark)
+		second, _ := encodeFrame(patternFrame(), aMark)
 
 		// then
 		assert.Equal(t, first, second)
 	})
 
+	t.Run("should give other bytes for another plan", func(t *testing.T) {
+		// given / when
+		first, _ := encodeFrame(patternFrame(), aMark)
+		second, _ := encodeFrame(patternFrame(), domain.FrameMark{SetID: anID, PlanID: "ff" + aPlanID[2:]})
+
+		// then
+		assert.NotEqual(t, first, second)
+	})
+
 	t.Run("should give other bytes for another set", func(t *testing.T) {
 		// given / when
-		first, _ := encodeFrame(patternFrame(), anID)
-		second, _ := encodeFrame(patternFrame(), domain.FrameSetID("ff"+string(anID)[2:]))
+		first, _ := encodeFrame(patternFrame(), aMark)
+		second, _ := encodeFrame(patternFrame(), domain.FrameMark{SetID: domain.FrameSetID("ff" + string(anID)[2:]), PlanID: aPlanID})
 
 		// then
 		assert.NotEqual(t, first, second)
@@ -117,30 +139,43 @@ func Test_encodeFrame(t *testing.T) {
 }
 
 func Test_readMark(t *testing.T) {
-	t.Run("should give the set a frame of this tool says it belongs to", func(t *testing.T) {
+	t.Run("should give the set and the plan a frame of this tool says it belongs to and came from", func(t *testing.T) {
 		// given
-		data, err := encodeFrame(patternFrame(), anID)
+		data, err := encodeFrame(patternFrame(), aMark)
 		require.NoError(t, err)
 
 		// when
-		id, ok := readMark(data)
+		mark, ok := readMark(data)
 
 		// then
 		assert.True(t, ok)
-		assert.Equal(t, anID, id)
+		assert.Equal(t, aMark, mark)
 	})
 
-	t.Run("should find it in the head of the file alone", func(t *testing.T) {
+	t.Run("should find both in the head of the file alone", func(t *testing.T) {
 		// given
-		data, err := encodeFrame(patternFrame(), anID)
+		data, err := encodeFrame(patternFrame(), aMark)
 		require.NoError(t, err)
 
 		// when
-		id, ok := readMark(data[:min(len(data), headBytes)])
+		mark, ok := readMark(data[:min(len(data), headBytes)])
 
 		// then
 		assert.True(t, ok)
-		assert.Equal(t, anID, id)
+		assert.Equal(t, aMark, mark)
+	})
+
+	t.Run("should say a frame drawn before the plan was written is this tool's, with no plan", func(t *testing.T) {
+		// given
+		data, err := encodeFrame(patternFrame(), aMark)
+		require.NoError(t, err)
+
+		// when
+		mark, ok := readMark(helper.WithoutPlanMark(data))
+
+		// then
+		assert.True(t, ok)
+		assert.Equal(t, domain.FrameMark{SetID: anID}, mark)
 	})
 
 	t.Run("should not find one in a PNG of another tool", func(t *testing.T) {
@@ -157,7 +192,7 @@ func Test_readMark(t *testing.T) {
 
 	t.Run("should not find one in what is not a PNG, or in a header cut short", func(t *testing.T) {
 		// given
-		data, err := encodeFrame(patternFrame(), anID)
+		data, err := encodeFrame(patternFrame(), aMark)
 		require.NoError(t, err)
 
 		// when / then
@@ -167,9 +202,9 @@ func Test_readMark(t *testing.T) {
 		}
 	})
 
-	t.Run("should not trust a text chunk whose checksum is wrong", func(t *testing.T) {
+	t.Run("should not trust a set chunk whose checksum is wrong", func(t *testing.T) {
 		// given
-		data, err := encodeFrame(patternFrame(), anID)
+		data, err := encodeFrame(patternFrame(), aMark)
 		require.NoError(t, err)
 		data[45] ^= 0xFF
 
@@ -179,10 +214,56 @@ func Test_readMark(t *testing.T) {
 		// then
 		assert.False(t, ok)
 	})
+
+	t.Run("should ignore a plan chunk whose checksum is wrong, keeping the set", func(t *testing.T) {
+		// given
+		data, err := encodeFrame(patternFrame(), aMark)
+		require.NoError(t, err)
+		setLength := int(binary.BigEndian.Uint32(data[textHead:]))
+		planStart := textHead + 12 + setLength
+		data[planStart+8+len("Sobrevoo\x00plan=")] ^= 0xFF
+
+		// when
+		mark, ok := readMark(data)
+
+		// then
+		assert.True(t, ok)
+		assert.Equal(t, domain.FrameMark{SetID: anID}, mark)
+	})
+
+	t.Run("should ignore a plan chunk that comes after the image data", func(t *testing.T) {
+		// given
+		data, err := encodeFrame(patternFrame(), aMark)
+		require.NoError(t, err)
+		withoutPlan := helper.WithoutPlanMark(data)
+		end := len(withoutPlan) - len(iendChunk)
+		late := append(append(append([]byte(nil), withoutPlan[:end]...), textChunk("Sobrevoo\x00plan="+aPlanID)...), iendChunk...)
+
+		// when
+		mark, ok := readMark(late)
+
+		// then
+		assert.True(t, ok)
+		assert.Equal(t, domain.FrameMark{SetID: anID}, mark)
+	})
+
+	t.Run("should not find one when only the plan chunk is there", func(t *testing.T) {
+		// given
+		data, err := encodeFrame(patternFrame(), aMark)
+		require.NoError(t, err)
+		setLength := int(binary.BigEndian.Uint32(data[textHead:]))
+		onlyPlan := append(append([]byte(nil), data[:textHead]...), data[textHead+12+setLength:]...)
+
+		// when
+		_, ok := readMark(onlyPlan)
+
+		// then
+		assert.False(t, ok)
+	})
 }
 
 func Test_readInfo(t *testing.T) {
-	data, err := encodeFrame(patternFrame(), anID)
+	data, err := encodeFrame(patternFrame(), aMark)
 	require.NoError(t, err)
 	tail := data[len(data)-min(len(data), tailBytes):]
 

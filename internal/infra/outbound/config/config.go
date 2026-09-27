@@ -116,6 +116,13 @@ type RenderDefaults struct {
 	Width, Height int
 }
 
+// VideoDefaults is what the video is made with when the user does not choose:
+// the quality, medium, for publishing. It has the type of the levels the rest of
+// the tool uses; the composition root maps it to the domain's own.
+type VideoDefaults struct {
+	Quality Level
+}
+
 // verticalFOVDegrees is the vertical field of view of the camera: the camera
 // plan frames its overview with it, the slice chooses its level of detail by it
 // and drawing projects with it.
@@ -173,6 +180,13 @@ type Config struct {
 	// the resolution used when the user chooses none.
 	RenderTuning   RenderTuning
 	RenderDefaults RenderDefaults
+
+	// VideoDefaults are what the video is made with when the user chooses
+	// nothing, and FFmpegBinary is the name of the video encoder program, looked
+	// for on the PATH. There is no external source for it yet, but this is where
+	// one would plug in (Constitution Principle VIII).
+	VideoDefaults VideoDefaults
+	FFmpegBinary  string
 }
 
 // Load returns Sobrevoo's configuration. It fails only when the user's home
@@ -194,6 +208,8 @@ func Load() (Config, error) {
 		PlanDefaults:         PlanDefaults{FrameRate: 30, Distance: LevelMedium, Tilt: LevelMedium, AspectWidth: 9, AspectHeight: 16},
 		RenderTuning:         renderTuning(),
 		RenderDefaults:       RenderDefaults{Width: 1080, Height: 1920},
+		VideoDefaults:        VideoDefaults{Quality: LevelMedium},
+		FFmpegBinary:         "ffmpeg",
 	}, nil
 }
 

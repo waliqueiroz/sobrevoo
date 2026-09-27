@@ -3,6 +3,7 @@ package helper
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -119,4 +120,41 @@ func WebPTile() []byte {
 // NotAnImage is bytes that no image decoder reads.
 func NotAnImage() []byte {
 	return []byte("this is not an image at all")
+}
+
+// planMarkPrefix starts the text of the chunk in which a frame of this tool says
+// which plan it was drawn from.
+const planMarkPrefix = "Sobrevoo\x00plan="
+
+// WithoutPlanMark is the bytes of a PNG frame of this tool without the text
+// chunk that says which plan it was drawn from — what a frame drawn before that
+// chunk existed looks like. Every other chunk stays as it was, checksums
+// included.
+func WithoutPlanMark(data []byte) []byte {
+	if len(data) < 8 {
+		return data
+	}
+
+	out := append([]byte(nil), data[:8]...)
+	for position := 8; position+12 <= len(data); {
+		length := int(binary.BigEndian.Uint32(data[position:]))
+		end := position + 12 + length
+		if end > len(data) {
+			out = append(out, data[position:]...)
+			break
+		}
+
+		chunk := data[position:end]
+		isPlanMark := string(chunk[4:8]) == "tEXt" && bytes.HasPrefix(chunk[8:8+length], []byte(planMarkPrefix))
+		if !isPlanMark {
+			out = append(out, chunk...)
+		}
+		position = end
+	}
+	return out
+}
+
+// TruncatedAt is the first size bytes of data: a file cut short.
+func TruncatedAt(data []byte, size int) []byte {
+	return append([]byte(nil), data[:min(size, len(data))]...)
 }

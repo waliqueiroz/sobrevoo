@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Cinco features estão implementadas até agora:
+Relive/Strava). Seis features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -23,7 +23,10 @@ plano de câmera exportado precisa, com resumo e exportação em ZIP
 quadros do voo como imagens PNG — o relevo em perspectiva, vestido com as peças
 do mapa base, o traçado até o marcador e o marcador — a partir do plano e do
 recorte exportados, com progresso, retomada e resumo (`render frame` e
-`render all`). Ainda não há geração de vídeo.
+`render all`); e `specs/006-video-assembly/` junta esses quadros num único
+vídeo MP4, na ordem e na taxa de quadros do plano, com a qualidade escolhida
+por nível nomeado, progresso e resumo (`video`), usando o `ffmpeg` que o usuário
+instala. Ainda não há sobreposição de texto ou estatísticas, nem áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -48,6 +51,7 @@ go run ./cmd/sobrevoo geodata slice plan.json --export slice.zip
 go run ./cmd/sobrevoo geodata elevation --lat -23.5505 --lon -46.6333
 go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png
 go run ./cmd/sobrevoo render all plan.json slice.zip --output frames/ --resolution 1280x720
+go run ./cmd/sobrevoo video plan.json frames/ --output flight.mp4 --quality medium   # precisa do ffmpeg instalado
 
 # Gerar os dados de exemplo sintéticos dos quickstarts das etapas 4 e 5:
 go run ./test/samples --out specs/005-frame-rendering/amostras
@@ -70,7 +74,9 @@ adapter.
   `ElevationGrid`, `ElevationReading`, `Coordinate`, `GeoSlice`,
   `SliceSummary`, e os do desenho dos quadros: `Scene`, `Resolution`,
   `RenderTuning`, `FrameImage`, `FrameStats`, `FrameSetID`, `FrameDirectory`,
-  `RenderSummary`), construtores
+  `RenderSummary`, e os da montagem do vídeo: `FrameMark`, `VideoQuality`,
+  `VideoRequest`, `VideoProgress`, `EncodeJob`, `EncoderInfo`, `VideoSummary`),
+  construtores
   que carregam regra de negócio (`NewGeoDataSource`, `NewTrackSummary`,
   `NewCameraPlan`, que calcula o resumo a partir dos quadros, `NewGeoSlice`,
   que calcula o resumo do recorte e o põe em ordem, `NewCoordinate`), e métodos de
@@ -109,11 +115,17 @@ adapter.
   `ErrSliceDoesNotCoverPlan`, `ErrTileFormatUnsupported`, `ErrNoElevationData`,
   `ErrFrameOutOfRange`, `ErrInvalidResolution`, `ErrFrameDestinationInvalid`,
   `ErrFrameDestinationExists`, `ErrFrameSetConflict`,
-  `ErrRenderInterrupted`), e as portas
+  `ErrRenderInterrupted`; e os da montagem do vídeo: `ErrFrameDirectoryInvalid`,
+  `ErrFrameSequenceInvalid`, `ErrFrameResolutionInvalid`,
+  `ErrFramesDoNotMatchPlan`, `ErrFramesWithoutPlanID`, `ErrFrameFileInvalid`,
+  `ErrEncoderUnavailable`, `ErrVideoDestinationExists`,
+  `ErrVideoDestinationInvalid`, `ErrVideoInterrupted`,
+  `ErrVideoEncodingFailed`), e as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
   `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`,
   `CameraPlanReader`, `BaseMapReader`, `ElevationReader`, `GeoSliceExporter`,
-  `GeoSliceReader`, `TileDecoder`, `FrameRepository`, `FrameExporter`.
+  `GeoSliceReader`, `TileDecoder`, `FrameRepository`, `FrameExporter`,
+  `VideoEncoder`, `VideoExporter`.
   Qualquer DTO de saída que não seja um
   valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
   também é um tipo de domínio comum — não um DTO de `internal/application`
@@ -129,8 +141,8 @@ adapter.
   lugar que sabe transformar um trajeto bruto em limpo ou tratado),
   `GeoDataService` (`Register`, `List`, `Remove`, `CheckCoverage`,
   `ElevationAt`), `CameraPlanService` (`Generate`, `Export`, `Load`) e
-  `GeoSliceService` (`Generate`, `Export`, `Load`) e `FrameService`
-  (`DrawFrame`, `DrawFrames`); `GeoDataService` e
+  `GeoSliceService` (`Generate`, `Export`, `Load`), `FrameService`
+  (`DrawFrame`, `DrawFrames`) e `VideoService` (`Assemble`); `GeoDataService` e
   `CameraPlanService` dependem de `TrackService` em vez de repetir parse/
   limpeza/simplificação/suavização.
 - **`internal/infra/outbound/*`** — adapters que implementam as portas do
@@ -139,7 +151,9 @@ adapter.
   (registro de dados geográficos e exportação do plano de câmera em JSON,
   atômica e sem sobrescrita por padrão; e a leitura do plano exportado,
   `jsonfile.NewCameraPlanReader()`), `atomicfile` (a publicação atômica de
-  arquivo, compartilhada por `jsonfile` e `zipfile`), `basemapreader`
+  arquivo, compartilhada por `jsonfile`, `zipfile`, `pngfile` e `videofile`;
+  `PublishPath` entrega ao codificador o caminho de um temporário),
+  `basemapreader`
   (`NewMBTiles()`: níveis e peças de um MBTiles, somente leitura),
   `elevationreader` (`NewGeoTIFF()`: GeoTIFF em Go puro — faixas ou peças, sem
   compressão/Deflate/LZW, predictors 1, 2 e 3 — que lê só o que uma janela
@@ -147,14 +161,18 @@ adapter.
   determinístico; `NewGeoSliceReader()`: lê e valida o recorte por inteiro),
   `tiledecoder` (`NewRaster()`: PNG/JPEG/WebP → pixels), `pngfile`
   (`NewFrameRepository()` e `NewFrameExporter()`: os quadros como PNG atômicos,
-  com a identificação do conjunto dentro de cada imagem), `config` (limiares internos fixos:
+  com a identificação do conjunto e a do plano dentro de cada imagem),
+  `videofile` (`NewVideoExporter()`: o vídeo como um arquivo publicado por
+  inteiro), `videoencoder` (`NewFFmpeg(binary)`: o processo externo `ffmpeg`, com
+  `libx264`, que o usuário instala — a ferramenta não o traz nem o baixa),
+  `config` (limiares internos fixos:
   mínimo de pontos, velocidade máxima plausível, nível padrão, os
   `CameraTuning` do planejamento de câmera e os parâmetros padrão do plano —
   ainda sem fonte de configuração externa, mas o ponto de extensão já
   existe, conforme o Princípio VIII da constituição). O pacote `config`
   tem tipos próprios (`config.Level`, `config.CameraTuning`,
   `config.PlanDefaults`, `config.SliceTuning`, `config.RenderTuning`,
-  `config.RenderDefaults`) e **não importa o domínio**; quem os mapeia para os
+  `config.RenderDefaults`, `config.VideoDefaults`) e **não importa o domínio**; quem os mapeia para os
   tipos de domínio é o composition root (`cmd/sobrevoo/config_mapping.go`).
 - **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
   traduz erros sentinela do domínio em códigos de saída de processo
@@ -162,7 +180,8 @@ adapter.
   `specs/002-geo-data-registry/contracts/cli.md` e
   `specs/003-camera-path-planning/contracts/cli.md` e
   `specs/004-geo-data-slice/contracts/cli.md` e
-  `specs/005-frame-rendering/contracts/cli.md` para o mapeamento exato.
+  `specs/005-frame-rendering/contracts/cli.md` e
+  `specs/006-video-assembly/contracts/cli.md` para o mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso
@@ -193,7 +212,34 @@ multiplicação-soma); só `+ − × ÷`, `Sqrt`, `Floor`, `Abs`, `Min`, `Max`, 
 pixel só depende de si mesmo. O teste de `frame_scene_test.go` compara o hash
 dos pixels de um quadro com uma referência (igual em arm64 e amd64): se ele
 falhar em outra máquina, corrija a aritmética, não a constante — a constante só
-muda junto com `domain.RenderVersion`.
+muda junto com `domain.RenderVersion`. Cada quadro carrega, dentro da imagem,
+a identificação do conjunto e a do plano de que veio (`FrameMark`): a
+`RenderVersion` 2 é a que grava a do plano, e quadros de versão anterior são
+de outro conjunto.
+
+### A montagem do vídeo (etapa 6)
+
+`sobrevoo video <plano> <quadros/> --output voo.mp4` junta os quadros num MP4
+(`specs/006-video-assembly/`). O `ffmpeg` roda como **processo externo**, atrás
+da porta `VideoEncoder` (`videoencoder.FFmpeg`): lê os quadros pelo nome
+(`frame_%06d.png`), com o diretório dos quadros como diretório de trabalho, e
+escreve num arquivo temporário que o `videofile.VideoExporter` publica por
+inteiro (`atomicfile.PublishPath`). Antes de codificar, `FrameDirectory.Verify`
+(regra de domínio) confere, nesta ordem, se há quadros da ferramenta, se
+trazem a identificação do plano informado, se têm a mesma resolução (par), se
+são de um só conjunto, se a numeração é exatamente 0 a N−1 e se são PNG inteiros;
+depois vêm o destino e o codificador (`VideoExporter.Check`, `Probe`). Para o
+**mesmo `ffmpeg`** o arquivo é idêntico byte a byte (confirmado com o `ffmpeg`
+real): a linha de comando fixa o que variaria com o ambiente (`-bitexact`
+global, `-metadata:s:v:0 encoder=`, `x264` com `threads=4`, cor BT.709
+explícita), remove do fluxo a mensagem SEI do `x264` com a versão e as opções
+de codificação, que nenhuma opção desliga (`-bsf:v
+filter_units=remove_types=6`), e faz um quadro que não decodifica falhar em
+vez de ser tolerado em silêncio (`-xerror`) — e os testes de `videoencoder` a
+fixam por inteiro: mudá-la muda os bytes de todos os vídeos e pede uma nota de
+versão em `specs/006-video-assembly/contracts/video-file.md`. Os testes do
+adapter usam um `ffmpeg` de mentira (script de shell); o `ffmpeg` real só entra
+na validação manual (`specs/006-video-assembly/quickstart.md`).
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 
@@ -300,8 +346,9 @@ uso) que a redação anterior da constituição permitia.
   de domain/application mockam as portas do domínio (`mockdomain`); os
   testes de `internal/infra/inbound/cli` mockam
   `application.TrackService`, `application.GeoDataService`,
-  `application.CameraPlanService`, `application.GeoSliceService` e
-  `application.FrameService` (`mockapplication`) e nunca conectam
+  `application.CameraPlanService`, `application.GeoSliceService`,
+  `application.FrameService` e `application.VideoService` (`mockapplication`) e
+  nunca conectam
   um serviço ou adapter de saída real. Não existe teste automatizado de
   ponta a ponta — `specs/<feature>/quickstart.md` é o checklist manual, com
   o binário real, pra isso.

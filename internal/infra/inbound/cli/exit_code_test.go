@@ -191,6 +191,65 @@ func Test_ExitCode(t *testing.T) {
 		assert.Equal(t, 31, cli.ExitCode(err))
 	})
 
+	t.Run("should map ErrFrameDirectoryInvalid to 40", func(t *testing.T) {
+		assert.Equal(t, 40, cli.ExitCode(domain.ErrFrameDirectoryInvalid))
+	})
+
+	t.Run("should map ErrFrameSequenceInvalid to 41", func(t *testing.T) {
+		assert.Equal(t, 41, cli.ExitCode(domain.ErrFrameSequenceInvalid))
+	})
+
+	t.Run("should map ErrFrameResolutionInvalid to 42", func(t *testing.T) {
+		assert.Equal(t, 42, cli.ExitCode(domain.ErrFrameResolutionInvalid))
+	})
+
+	t.Run("should map ErrFramesDoNotMatchPlan to 43", func(t *testing.T) {
+		assert.Equal(t, 43, cli.ExitCode(domain.ErrFramesDoNotMatchPlan))
+	})
+
+	t.Run("should map ErrFramesWithoutPlanID to 44", func(t *testing.T) {
+		assert.Equal(t, 44, cli.ExitCode(domain.ErrFramesWithoutPlanID))
+	})
+
+	t.Run("should map ErrFrameFileInvalid to 45", func(t *testing.T) {
+		assert.Equal(t, 45, cli.ExitCode(domain.ErrFrameFileInvalid))
+	})
+
+	t.Run("should map ErrEncoderUnavailable to 46", func(t *testing.T) {
+		assert.Equal(t, 46, cli.ExitCode(domain.ErrEncoderUnavailable))
+	})
+
+	t.Run("should map ErrVideoDestinationExists to 47", func(t *testing.T) {
+		assert.Equal(t, 47, cli.ExitCode(domain.ErrVideoDestinationExists))
+	})
+
+	t.Run("should map ErrVideoDestinationInvalid to 48", func(t *testing.T) {
+		assert.Equal(t, 48, cli.ExitCode(domain.ErrVideoDestinationInvalid))
+	})
+
+	t.Run("should map ErrVideoInterrupted to 49", func(t *testing.T) {
+		assert.Equal(t, 49, cli.ExitCode(domain.ErrVideoInterrupted))
+	})
+
+	t.Run("should map ErrVideoEncodingFailed to 50", func(t *testing.T) {
+		assert.Equal(t, 50, cli.ExitCode(domain.ErrVideoEncodingFailed))
+	})
+
+	t.Run("should map a wrapped sixth-stage error to its code", func(t *testing.T) {
+		// given
+		err := fmt.Errorf("%w: 4 missing (12-15)", domain.ErrFrameSequenceInvalid)
+
+		// when / then
+		assert.Equal(t, 41, cli.ExitCode(err))
+	})
+
+	t.Run("should not take the errors of the frames of a video for those of the stages before", func(t *testing.T) {
+		// given / when / then
+		assert.NotEqual(t, cli.ExitCode(domain.ErrSliceDoesNotMatchPlan), cli.ExitCode(domain.ErrFramesDoNotMatchPlan))
+		assert.NotEqual(t, cli.ExitCode(domain.ErrFrameDestinationInvalid), cli.ExitCode(domain.ErrFrameDirectoryInvalid))
+		assert.NotEqual(t, cli.ExitCode(domain.ErrRenderInterrupted), cli.ExitCode(domain.ErrVideoInterrupted))
+	})
+
 	t.Run("should keep the codes 1 to 26 of the earlier stages", func(t *testing.T) {
 		// given
 		expected := map[error]int{

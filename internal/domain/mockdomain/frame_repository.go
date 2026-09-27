@@ -55,6 +55,21 @@ func (mr *MockFrameRepositoryMockRecorder) Inspect(dir, resolution any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Inspect", reflect.TypeOf((*MockFrameRepository)(nil).Inspect), dir, resolution)
 }
 
+// List mocks base method.
+func (m *MockFrameRepository) List(dir string) (domain.FrameDirectory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", dir)
+	ret0, _ := ret[0].(domain.FrameDirectory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockFrameRepositoryMockRecorder) List(dir any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockFrameRepository)(nil).List), dir)
+}
+
 // Remove mocks base method.
 func (m *MockFrameRepository) Remove(dir string, indexes []int) error {
 	m.ctrl.T.Helper()
@@ -70,15 +85,15 @@ func (mr *MockFrameRepositoryMockRecorder) Remove(dir, indexes any) *gomock.Call
 }
 
 // Save mocks base method.
-func (m *MockFrameRepository) Save(dir string, index int, id domain.FrameSetID, image domain.FrameImage) error {
+func (m *MockFrameRepository) Save(dir string, index int, mark domain.FrameMark, image domain.FrameImage) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Save", dir, index, id, image)
+	ret := m.ctrl.Call(m, "Save", dir, index, mark, image)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Save indicates an expected call of Save.
-func (mr *MockFrameRepositoryMockRecorder) Save(dir, index, id, image any) *gomock.Call {
+func (mr *MockFrameRepositoryMockRecorder) Save(dir, index, mark, image any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockFrameRepository)(nil).Save), dir, index, id, image)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockFrameRepository)(nil).Save), dir, index, mark, image)
 }

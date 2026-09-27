@@ -79,6 +79,11 @@ conjunto (plano + recorte + resolução + versão do desenho).
 Cada imagem é publicada inteira ou não é. Uma interrupção deixa só quadros
 completos.
 
+**Nota da sexta etapa**: quadros desenhados antes da versão `2` do desenho (sem a
+identificação do plano dentro de cada imagem,
+[`frame-files.md`](./frame-files.md)) são de **outro conjunto**: sem
+`--overwrite`, `render all` os recusa (`37`); com ele, redesenha tudo.
+
 ### Saída (sucesso)
 
 Durante o desenho, em `stderr`, o progresso (item 19 da pesquisa): num terminal,

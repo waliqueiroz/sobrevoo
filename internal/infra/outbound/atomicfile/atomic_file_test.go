@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -146,5 +147,172 @@ func Test_Publish(t *testing.T) {
 		info, statErr := os.Stat(path)
 		require.NoError(t, statErr)
 		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+	})
+}
+
+func Test_PublishPath(t *testing.T) {
+	t.Run("should give the callback the path of an existing empty file next to the destination", func(t *testing.T) {
+		// given
+		dir := t.TempDir()
+		path := filepath.Join(dir, "out.bin")
+		var temporary string
+		var sizeSeen int64 = -1
+
+		// when
+		err := atomicfile.PublishPath(path, false, func(given string) error {
+			temporary = given
+			info, statErr := os.Stat(given)
+			require.NoError(t, statErr)
+			sizeSeen = info.Size()
+			return os.WriteFile(given, []byte("content"), 0o600)
+		})
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, dir, filepath.Dir(temporary))
+		assert.Regexp(t, `^\.sobrevoo-.*\.tmp$`, filepath.Base(temporary))
+		assert.Equal(t, int64(0), sizeSeen)
+	})
+
+	t.Run("should let the callback write to and move around in the file", func(t *testing.T) {
+		// given
+		path := filepath.Join(t.TempDir(), "out.bin")
+
+		// when
+		err := atomicfile.PublishPath(path, false, func(temporary string) error {
+			f, openErr := os.OpenFile(temporary, os.O_RDWR, 0)
+			if openErr != nil {
+				return openErr
+			}
+			defer f.Close()
+			if _, writeErr := f.WriteString("0123456789"); writeErr != nil {
+				return writeErr
+			}
+			if _, seekErr := f.Seek(2, io.SeekStart); seekErr != nil {
+				return seekErr
+			}
+			_, writeErr := f.WriteString("AB")
+			return writeErr
+		})
+
+		// then
+		require.NoError(t, err)
+		content, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		assert.Equal(t, "01AB456789", string(content))
+	})
+
+	t.Run("should publish the new file with what the callback wrote, readable by everyone, leaving no temporary file", func(t *testing.T) {
+		// given
+		dir := t.TempDir()
+		path := filepath.Join(dir, "out.bin")
+
+		// when
+		err := atomicfile.PublishPath(path, false, func(temporary string) error {
+			return os.WriteFile(temporary, []byte("content"), 0o600)
+		})
+
+		// then
+		require.NoError(t, err)
+		content, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		assert.Equal(t, "content", string(content))
+		info, statErr := os.Stat(path)
+		require.NoError(t, statErr)
+		if runtime.GOOS != "windows" {
+			assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+		}
+		assert.Equal(t, []string{"out.bin"}, listDir(t, dir))
+	})
+
+	t.Run("should refuse an existing destination without overwrite, leaving it intact and no temporary file", func(t *testing.T) {
+		// given
+		dir := t.TempDir()
+		path := filepath.Join(dir, "out.bin")
+		require.NoError(t, os.WriteFile(path, []byte("precious"), 0o600))
+
+		// when
+		err := atomicfile.PublishPath(path, false, func(temporary string) error {
+			return os.WriteFile(temporary, []byte("new"), 0o600)
+		})
+
+		// then
+		require.ErrorIs(t, err, atomicfile.ErrExists)
+		content, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		assert.Equal(t, "precious", string(content))
+		assert.Equal(t, []string{"out.bin"}, listDir(t, dir))
+	})
+
+	t.Run("should replace an existing destination all at once with overwrite", func(t *testing.T) {
+		// given
+		dir := t.TempDir()
+		path := filepath.Join(dir, "out.bin")
+		require.NoError(t, os.WriteFile(path, []byte("old"), 0o600))
+
+		// when
+		err := atomicfile.PublishPath(path, true, func(temporary string) error {
+			return os.WriteFile(temporary, []byte("new"), 0o600)
+		})
+
+		// then
+		require.NoError(t, err)
+		content, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		assert.Equal(t, "new", string(content))
+		assert.Equal(t, []string{"out.bin"}, listDir(t, dir))
+	})
+
+	t.Run("should return the error of the callback as it is, creating nothing", func(t *testing.T) {
+		// given
+		dir := t.TempDir()
+		path := filepath.Join(dir, "out.bin")
+		failure := errors.New("the encoder failed")
+
+		// when
+		err := atomicfile.PublishPath(path, false, func(temporary string) error {
+			require.NoError(t, os.WriteFile(temporary, []byte("half"), 0o600))
+			return failure
+		})
+
+		// then
+		assert.Same(t, failure, err)
+		assert.Empty(t, listDir(t, dir))
+	})
+
+	t.Run("should keep the previous file intact when the callback fails with overwrite", func(t *testing.T) {
+		// given
+		dir := t.TempDir()
+		path := filepath.Join(dir, "out.bin")
+		require.NoError(t, os.WriteFile(path, []byte("precious"), 0o600))
+
+		// when
+		err := atomicfile.PublishPath(path, true, func(temporary string) error {
+			require.NoError(t, os.WriteFile(temporary, []byte("half"), 0o600))
+			return errors.New("the encoder failed")
+		})
+
+		// then
+		require.Error(t, err)
+		content, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		assert.Equal(t, "precious", string(content))
+		assert.Equal(t, []string{"out.bin"}, listDir(t, dir))
+	})
+
+	t.Run("should refuse a destination whose folder does not exist", func(t *testing.T) {
+		// given
+		path := filepath.Join(t.TempDir(), "missing", "out.bin")
+		called := false
+
+		// when
+		err := atomicfile.PublishPath(path, false, func(string) error {
+			called = true
+			return nil
+		})
+
+		// then
+		require.ErrorIs(t, err, atomicfile.ErrInvalid)
+		assert.False(t, called)
 	})
 }

@@ -33,7 +33,13 @@ qualquer nome; o conteúdo é o do arquivo `frame_NNNNNN.png` do mesmo número.
   hexadecimal (64 caracteres minúsculos) de `"sobrevoo-frames" |
   RenderVersion | plan.ID() | slice.ContentID | largura | altura |
   RenderTuning.Fingerprint()` (`research.md` item 17). É o que permite
-  reconhecer quadros da ferramenta e a que conjunto pertencem. Nenhum outro
+  reconhecer quadros da ferramenta e a que conjunto pertencem.
+- Um **segundo** bloco `tEXt`, logo depois do primeiro, com a palavra-chave
+  `Sobrevoo` e o texto `plan=<id>`, em que `<id>` é o `CameraPlan.ID()` do plano de
+  que o quadro foi desenhado (SHA-256 hexadecimal, 64 caracteres minúsculos): é
+  o que a etapa que junta os quadros num vídeo confere com o plano que recebe
+  (acrescentado na sexta etapa, versão do desenho 2; ver
+  `specs/006-video-assembly/contracts/frame-files-change.md`). Nenhum outro
   bloco auxiliar é gravado.
 - **Sem** data, hora, caminho, versão do binário ou resumo dentro do arquivo.
 
@@ -101,8 +107,14 @@ conta. Um quadro com os dois tipos de pixel conta nas duas colunas.
 ## Compatibilidade
 
 O arquivo não referencia data, hora, caminhos, nome de máquina nem versão do
-binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `1`)
+binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `2`)
 sobe sempre que o algoritmo ou as constantes visuais mudam de forma
 visível; quadros de outra `RenderVersion` pertencem a outro conjunto e não são
 reaproveitados. Consumidores devem ignorar blocos auxiliares que não
 conhecem.
+
+**Nota da sexta etapa**: a versão do desenho passou de `1` para `2` quando os
+quadros passaram a trazer a identificação do plano dentro deles; os pixels não
+mudaram. Quadros da versão `1` são, portanto, de outro conjunto (`render all` os
+recusa sem `--overwrite` e os redesenha com ele), e a etapa 6 (`sobrevoo video`)
+os recusa por não trazerem a identificação do plano.

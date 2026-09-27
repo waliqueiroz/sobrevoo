@@ -173,6 +173,50 @@ var (
 	// ErrRenderInterrupted reports a drawing the user interrupted; the frames
 	// that were finished stay valid.
 	ErrRenderInterrupted = errors.New("drawing was interrupted")
+
+	// ErrFrameDirectoryInvalid reports a frame directory that cannot be joined
+	// into a video: one that does not exist, is not a directory, cannot be read,
+	// or holds no frame this tool drew.
+	ErrFrameDirectoryInvalid = errors.New("frame directory cannot be used")
+
+	// ErrFrameSequenceInvalid reports frames that do not number the frames of
+	// the plan: some missing, some the plan has no number for, or a number that
+	// repeats.
+	ErrFrameSequenceInvalid = errors.New("frames do not form the flight of the plan")
+
+	// ErrFrameResolutionInvalid reports frames of different resolutions, or of
+	// an odd width or height, which the video cannot have.
+	ErrFrameResolutionInvalid = errors.New("frame resolution cannot be used for the video")
+
+	// ErrFramesDoNotMatchPlan reports frames drawn from another plan, or of more
+	// than one set mixed in a directory.
+	ErrFramesDoNotMatchPlan = errors.New("frames were not drawn from the plan")
+
+	// ErrFramesWithoutPlanID reports frames of this tool that do not say which
+	// plan they were drawn from, as the ones drawn before frames did.
+	ErrFramesWithoutPlanID = errors.New("frames do not say which plan they were drawn from")
+
+	// ErrFrameFileInvalid reports a frame file that is not a whole PNG image.
+	ErrFrameFileInvalid = errors.New("frame file cannot be used")
+
+	// ErrEncoderUnavailable reports a video encoder that is not there, or that
+	// cannot make the video.
+	ErrEncoderUnavailable = errors.New("video encoder not available")
+
+	// ErrVideoDestinationExists reports a video destination that already exists,
+	// when overwriting was not requested.
+	ErrVideoDestinationExists = errors.New("video destination already exists")
+
+	// ErrVideoDestinationInvalid reports a video destination that cannot be
+	// written: a directory, or a file whose folder is missing or not writable.
+	ErrVideoDestinationInvalid = errors.New("video destination cannot be used")
+
+	// ErrVideoInterrupted reports an assembly the user interrupted; no video was
+	// written.
+	ErrVideoInterrupted = errors.New("video assembly was interrupted")
+
+	// ErrVideoEncodingFailed reports a video encoder that failed while encoding.
+	ErrVideoEncodingFailed = errors.New("video encoding failed")
 )
 
 // AreaNotCoveredError is the error for an area that the registered geo data

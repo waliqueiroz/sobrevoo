@@ -119,3 +119,23 @@ func Test_Load(t *testing.T) {
 		assert.Equal(t, config.RenderDefaults{Width: 1080, Height: 1920}, cfg.RenderDefaults)
 	})
 }
+
+func Test_Load_Video(t *testing.T) {
+	t.Run("should default the quality of the video to medium, for publishing", func(t *testing.T) {
+		// given / when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, config.VideoDefaults{Quality: config.LevelMedium}, cfg.VideoDefaults)
+	})
+
+	t.Run("should look for the video encoder as ffmpeg, on the PATH", func(t *testing.T) {
+		// given / when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, "ffmpeg", cfg.FFmpegBinary)
+	})
+}

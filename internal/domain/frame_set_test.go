@@ -13,6 +13,15 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain/builddomain"
 )
 
+func Test_FrameFilePattern(t *testing.T) {
+	t.Run("should be the name of the file of every frame, with the number as a format", func(t *testing.T) {
+		// given / when / then
+		for _, index := range []int{0, 7, 300, 431999} {
+			assert.Equal(t, domain.FrameFileName(index), fmt.Sprintf(domain.FrameFilePattern, index))
+		}
+	})
+}
+
 func Test_FrameFileName(t *testing.T) {
 	t.Run("should be frame_ and the number in six digits", func(t *testing.T) {
 		// given / when / then
@@ -185,6 +194,74 @@ func Test_NewFrameSetID(t *testing.T) {
 		// when / then
 		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning), current)
 		assert.NotEqual(t, current, next)
+	})
+}
+
+func Test_NewFrameMark(t *testing.T) {
+	plan := builddomain.NewCameraPlanBuilder().Build()
+	slice := builddomain.NewGeoSliceBuilder().WithContentID("content-a").Build()
+	resolution := domain.Resolution{Width: 1920, Height: 1080}
+	tuning := builddomain.NewRenderTuningBuilder().Build()
+
+	t.Run("should carry the set of the frames", func(t *testing.T) {
+		// given / when
+		mark := domain.NewFrameMark(plan, slice, resolution, tuning)
+
+		// then
+		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning), mark.SetID)
+	})
+
+	t.Run("should carry the identification of the plan, in 64 lowercase hexadecimal characters", func(t *testing.T) {
+		// given / when
+		mark := domain.NewFrameMark(plan, slice, resolution, tuning)
+
+		// then
+		assert.Equal(t, plan.ID(), mark.PlanID)
+		assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{64}$`), mark.PlanID)
+	})
+
+	t.Run("should have the same plan identification for plans of the same content", func(t *testing.T) {
+		// given
+		samePlan := builddomain.NewCameraPlanBuilder().Build()
+
+		// when
+		first := domain.NewFrameMark(plan, slice, resolution, tuning)
+		second := domain.NewFrameMark(samePlan, slice, resolution, tuning)
+
+		// then
+		assert.Equal(t, first, second)
+	})
+
+	t.Run("should change the plan identification and the set when the plan changes", func(t *testing.T) {
+		// given
+		other := builddomain.NewCameraPlanBuilder().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).WithCameraAltitude(101).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).Build(),
+		).Build()
+
+		// when
+		first := domain.NewFrameMark(plan, slice, resolution, tuning)
+		second := domain.NewFrameMark(other, slice, resolution, tuning)
+
+		// then
+		assert.NotEqual(t, first.PlanID, second.PlanID)
+		assert.NotEqual(t, first.SetID, second.SetID)
+	})
+
+	t.Run("should change the set, and not the plan identification, when only the resolution changes", func(t *testing.T) {
+		// given / when
+		first := domain.NewFrameMark(plan, slice, resolution, tuning)
+		second := domain.NewFrameMark(plan, slice, domain.Resolution{Width: 1280, Height: 720}, tuning)
+
+		// then
+		assert.Equal(t, first.PlanID, second.PlanID)
+		assert.NotEqual(t, first.SetID, second.SetID)
+	})
+
+	t.Run("should be of version 2 of the drawing, the one whose frames say which plan they came from", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, 2, domain.RenderVersion)
 	})
 }
 

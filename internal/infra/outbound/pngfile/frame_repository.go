@@ -23,12 +23,12 @@ func NewFrameRepository() FrameRepository {
 
 // Save publishes a frame in dir, creating dir when it does not exist (its parent
 // has to). A frame of the same number that is there is replaced, all at once.
-func (FrameRepository) Save(dir string, index int, id domain.FrameSetID, image domain.FrameImage) error {
+func (FrameRepository) Save(dir string, index int, mark domain.FrameMark, image domain.FrameImage) error {
 	if err := ensureDirectory(dir); err != nil {
 		return err
 	}
 
-	data, err := encodeFrame(image, id)
+	data, err := encodeFrame(image, mark)
 	if err != nil {
 		return fmt.Errorf("encoding the frame: %w", err)
 	}
@@ -64,7 +64,8 @@ func ensureDirectory(dir string) error {
 
 // Inspect lists the frame files of dir — the files named as a frame — by number,
 // and reads off each, from its start and its end alone, whether this tool drew it,
-// of which set, and whether it is whole for a frame of the resolution.
+// of which set and plan, its size, and whether it is whole for a frame of the
+// resolution. A directory that does not exist has no frames.
 func (FrameRepository) Inspect(dir string, resolution domain.Resolution) (domain.FrameDirectory, error) {
 	info, err := os.Stat(dir)
 	switch {
@@ -76,26 +77,62 @@ func (FrameRepository) Inspect(dir string, resolution domain.Resolution) (domain
 		return domain.FrameDirectory{}, fmt.Errorf("%w: %s is not a directory", domain.ErrFrameDestinationInvalid, dir)
 	}
 
-	entries, err := os.ReadDir(dir)
+	files, err := scanFrames(dir)
 	if err != nil {
 		return domain.FrameDirectory{}, fmt.Errorf("%w: %s: %w", domain.ErrFrameDestinationInvalid, dir, err)
 	}
+	for i := range files {
+		files[i].Complete = files[i].Whole && files[i].Width == resolution.Width && files[i].Height == resolution.Height
+	}
+	return domain.FrameDirectory{Files: files}, nil
+}
 
-	var directory domain.FrameDirectory
+// List lists the frame files of dir, by number, and reads off each what its image
+// says of itself; nothing is asked of a resolution. A directory that is not
+// there, is not a directory or cannot be read is an error, since there is nothing
+// to join into a video.
+func (FrameRepository) List(dir string) (domain.FrameDirectory, error) {
+	info, err := os.Stat(dir)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return domain.FrameDirectory{}, fmt.Errorf("%w: %s does not exist", domain.ErrFrameDirectoryInvalid, dir)
+	case err != nil:
+		return domain.FrameDirectory{}, fmt.Errorf("%w: %s: %w", domain.ErrFrameDirectoryInvalid, dir, err)
+	case !info.IsDir():
+		return domain.FrameDirectory{}, fmt.Errorf("%w: %s is not a directory", domain.ErrFrameDirectoryInvalid, dir)
+	}
+
+	files, err := scanFrames(dir)
+	if err != nil {
+		return domain.FrameDirectory{}, fmt.Errorf("%w: %s: %w", domain.ErrFrameDirectoryInvalid, dir, err)
+	}
+	return domain.FrameDirectory{Files: files}, nil
+}
+
+// scanFrames reads dir and each file in it that is named exactly as a frame — a
+// file, not a directory —, sorted by number.
+func scanFrames(dir string) ([]domain.FrameFile, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []domain.FrameFile
 	for _, entry := range entries {
 		index, ok := domain.ParseFrameFileName(entry.Name())
 		if !ok || entry.IsDir() {
 			continue
 		}
-		directory.Files = append(directory.Files, inspectFrame(filepath.Join(dir, entry.Name()), index, resolution))
+		files = append(files, inspectFrame(filepath.Join(dir, entry.Name()), index))
 	}
-	sort.Slice(directory.Files, func(i, j int) bool { return directory.Files[i].Index < directory.Files[j].Index })
-	return directory, nil
+	sort.Slice(files, func(i, j int) bool { return files[i].Index < files[j].Index })
+	return files, nil
 }
 
 // inspectFrame reads the start and the end of a frame file. A file that cannot
-// be read is one that is not this tool's, and not whole.
-func inspectFrame(path string, index int, resolution domain.Resolution) domain.FrameFile {
+// be read is one that is not this tool's, and not whole. Whole and the size say
+// what the file is, whatever the resolution it should have.
+func inspectFrame(path string, index int) domain.FrameFile {
 	file := domain.FrameFile{Index: index}
 
 	f, err := os.Open(path)
@@ -108,8 +145,8 @@ func inspectFrame(path string, index int, resolution domain.Resolution) domain.F
 	n, _ := io.ReadFull(f, head)
 	head = head[:n]
 
-	if id, ok := readMark(head); ok {
-		file.Ours, file.SetID = true, id
+	if mark, ok := readMark(head); ok {
+		file.Ours, file.SetID, file.PlanID = true, mark.SetID, mark.PlanID
 	}
 
 	var tail []byte
@@ -119,8 +156,7 @@ func inspectFrame(path string, index int, resolution domain.Resolution) domain.F
 			tail = nil
 		}
 	}
-	width, height, complete := readInfo(head, tail)
-	file.Complete = complete && width == resolution.Width && height == resolution.Height
+	file.Width, file.Height, file.Whole = readInfo(head, tail)
 	return file
 }
 

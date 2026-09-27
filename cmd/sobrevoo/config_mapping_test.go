@@ -122,3 +122,29 @@ func Test_domainRenderResolution(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrInvalidResolution)
 	})
 }
+
+func Test_domainVideoQuality(t *testing.T) {
+	t.Run("should map the low level to the low quality", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, domain.VideoQualityLow, domainVideoQuality(config.LevelLow))
+	})
+
+	t.Run("should map the medium level to the medium quality", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, domain.VideoQualityMedium, domainVideoQuality(config.LevelMedium))
+	})
+
+	t.Run("should map the high level to the high quality", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, domain.VideoQualityHigh, domainVideoQuality(config.LevelHigh))
+	})
+
+	t.Run("should map the default of the configuration to medium", func(t *testing.T) {
+		// given
+		cfg, err := config.Load()
+		require.NoError(t, err)
+
+		// when / then
+		assert.Equal(t, domain.VideoQualityMedium, domainVideoQuality(cfg.VideoDefaults.Quality))
+	})
+}
