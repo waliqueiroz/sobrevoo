@@ -73,8 +73,8 @@ func (t TreatedTrack) PlanCamera(parameters PlanParameters, tuning CameraTuning)
 
 	// All frames: opening, following, closing.
 	views := make([]CameraView, 0, frameCount)
-	overviewFirst := route.OverviewView(follow[0].Heading, tuning.OverviewMinDistanceFactor*follow[0].Distance, tuning)
-	overviewLast := route.OverviewView(follow[followCount-1].Heading, tuning.OverviewMinDistanceFactor*follow[followCount-1].Distance, tuning)
+	overviewFirst := route.OverviewView(follow[0].Heading, tuning.OverviewMinDistanceFactor*follow[0].Distance, parameters.Aspect, tuning)
+	overviewLast := route.OverviewView(follow[followCount-1].Heading, tuning.OverviewMinDistanceFactor*follow[followCount-1].Distance, parameters.Aspect, tuning)
 	for i := 0; i < openingCount; i++ {
 		views = append(views, overviewFirst.Blend(follow[0], float64(i)/float64(openingCount)))
 	}

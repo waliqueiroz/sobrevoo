@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +22,8 @@ import (
 )
 
 type manifest struct {
-	FormatVersion int `json:"format_version"`
+	FormatVersion int    `json:"format_version"`
+	PlanID        string `json:"plan_id"`
 	Area          struct {
 		MinLatitude float64 `json:"min_lat"`
 		MaxLatitude float64 `json:"max_lat"`
@@ -224,6 +226,23 @@ func Test_GeoSliceExporter_Export(t *testing.T) {
 		assert.Equal(t, "dem", m.Sources[2].Name)
 		assert.Equal(t, "elevation", m.Sources[2].Type)
 		assert.Equal(t, "GeoTIFF", m.Sources[2].Format)
+	})
+
+	t.Run("should write the identification of the plan right after the format version", func(t *testing.T) {
+		// given
+		planID := strings.Repeat("ab", 32)
+		slice := twoSourceSlice()
+		slice.PlanID = planID
+		_, content := exportSlice(t, slice)
+
+		// when
+		raw := string(readEntry(t, openZip(t, content), "manifest.json"))
+		m := readManifest(t, openZip(t, content))
+
+		// then
+		assert.Equal(t, planID, m.PlanID)
+		assert.Equal(t, 1, m.FormatVersion, "adding the field does not change the version")
+		assert.Contains(t, raw, "{\n  \"format_version\": 1,\n  \"plan_id\": \""+planID+"\",\n  \"area\": {")
 	})
 
 	t.Run("should list the base maps with their level, tiles and missing tiles", func(t *testing.T) {

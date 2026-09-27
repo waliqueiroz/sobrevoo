@@ -46,6 +46,10 @@ func Test_ExitCode(t *testing.T) {
 		assert.Equal(t, 11, cli.ExitCode(domain.ErrInvalidFrameRate))
 	})
 
+	t.Run("should map ErrInvalidAspectRatio to 39", func(t *testing.T) {
+		assert.Equal(t, 39, cli.ExitCode(domain.ErrInvalidAspectRatio))
+	})
+
 	t.Run("should map ErrDurationTooShort to 12", func(t *testing.T) {
 		assert.Equal(t, 12, cli.ExitCode(domain.ErrDurationTooShort))
 	})
@@ -129,5 +133,85 @@ func Test_ExitCode(t *testing.T) {
 		// when / then
 		assert.Equal(t, 19, cli.ExitCode(err))
 		assert.Equal(t, 19, cli.ExitCode(fmt.Errorf("slice: %w", err)))
+	})
+
+	t.Run("should map ErrSliceFileInvalid to 27", func(t *testing.T) {
+		assert.Equal(t, 27, cli.ExitCode(domain.ErrSliceFileInvalid))
+	})
+
+	t.Run("should map ErrSliceFormatVersionUnsupported to 28", func(t *testing.T) {
+		assert.Equal(t, 28, cli.ExitCode(domain.ErrSliceFormatVersionUnsupported))
+	})
+
+	t.Run("should map ErrSliceDoesNotMatchPlan to 29", func(t *testing.T) {
+		assert.Equal(t, 29, cli.ExitCode(domain.ErrSliceDoesNotMatchPlan))
+	})
+
+	t.Run("should map ErrSliceDoesNotCoverPlan to 30", func(t *testing.T) {
+		assert.Equal(t, 30, cli.ExitCode(domain.ErrSliceDoesNotCoverPlan))
+	})
+
+	t.Run("should map ErrTileFormatUnsupported to 31", func(t *testing.T) {
+		assert.Equal(t, 31, cli.ExitCode(domain.ErrTileFormatUnsupported))
+	})
+
+	t.Run("should map ErrNoElevationData to 32", func(t *testing.T) {
+		assert.Equal(t, 32, cli.ExitCode(domain.ErrNoElevationData))
+	})
+
+	t.Run("should map ErrFrameOutOfRange to 33", func(t *testing.T) {
+		assert.Equal(t, 33, cli.ExitCode(domain.ErrFrameOutOfRange))
+	})
+
+	t.Run("should map ErrInvalidResolution to 34", func(t *testing.T) {
+		assert.Equal(t, 34, cli.ExitCode(domain.ErrInvalidResolution))
+	})
+
+	t.Run("should map ErrFrameDestinationInvalid to 35", func(t *testing.T) {
+		assert.Equal(t, 35, cli.ExitCode(domain.ErrFrameDestinationInvalid))
+	})
+
+	t.Run("should map ErrFrameDestinationExists to 36", func(t *testing.T) {
+		assert.Equal(t, 36, cli.ExitCode(domain.ErrFrameDestinationExists))
+	})
+
+	t.Run("should map ErrFrameSetConflict to 37", func(t *testing.T) {
+		assert.Equal(t, 37, cli.ExitCode(domain.ErrFrameSetConflict))
+	})
+
+	t.Run("should map ErrRenderInterrupted to 38", func(t *testing.T) {
+		assert.Equal(t, 38, cli.ExitCode(domain.ErrRenderInterrupted))
+	})
+
+	t.Run("should map a wrapped fifth-stage error to its code", func(t *testing.T) {
+		// given
+		err := fmt.Errorf("%w: base map \"bbbike\" has vector tiles (pbf)", domain.ErrTileFormatUnsupported)
+
+		// when / then
+		assert.Equal(t, 31, cli.ExitCode(err))
+	})
+
+	t.Run("should keep the codes 1 to 26 of the earlier stages", func(t *testing.T) {
+		// given
+		expected := map[error]int{
+			domain.ErrEmptyFile:                    1,
+			domain.ErrInvalidDuration:              10,
+			domain.ErrPlanDestinationInvalid:       16,
+			domain.ErrPlanFileInvalid:              17,
+			domain.ErrPlanFormatVersionUnsupported: 18,
+			domain.ErrAreaNotCovered:               19,
+			domain.ErrSliceTooLarge:                20,
+			domain.ErrGeoDataContentUnreadable:     21,
+			domain.ErrElevationUnitUnsupported:     22,
+			domain.ErrSliceDestinationExists:       23,
+			domain.ErrSliceDestinationInvalid:      24,
+			domain.ErrElevationNotCovered:          25,
+			domain.ErrInvalidCoordinate:            26,
+		}
+
+		for err, code := range expected {
+			// when / then
+			assert.Equal(t, code, cli.ExitCode(err), err.Error())
+		}
 	})
 }

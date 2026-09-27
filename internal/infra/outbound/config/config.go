@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 )
 
@@ -93,13 +94,43 @@ type SliceTuning struct {
 	MaxSizeBytes          int64
 }
 
+// RenderTuning holds the heuristic constants of drawing a frame (the fifth
+// stage). VerticalFOVDegrees is the same constant the camera plan and the level
+// of detail assume (verticalFOVDegrees), so the three never disagree. Initial
+// values (specs/005-frame-rendering/research.md, item 22). The composition root
+// maps it to the domain's own RenderTuning.
+type RenderTuning struct {
+	VerticalFOVDegrees       float64
+	MinCameraClearanceMeters float64
+	MinTiltForTargetDegrees  float64
+	TrailLiftMeters          float64
+	DepthBiasMeters          float64
+	DepthBiasRatio           float64
+	TileCacheBytes           int64
+	Workers                  int
+}
+
+// RenderDefaults is the resolution of the images when the user does not
+// choose one: 1080 × 1920, vertical.
+type RenderDefaults struct {
+	Width, Height int
+}
+
+// verticalFOVDegrees is the vertical field of view of the camera: the camera
+// plan frames its overview with it, the slice chooses its level of detail by it
+// and drawing projects with it.
+const verticalFOVDegrees = 45
+
 // PlanDefaults are the camera plan parameters used when the user does not
-// choose them: 30 frames per second and medium distance and tilt. There is no
-// default duration: when the user gives none, it is computed from the track.
+// choose them: 30 frames per second, medium distance and tilt, and a vertical
+// video (AspectWidth:AspectHeight, the same shape as RenderDefaults). There is
+// no default duration: when the user gives none, it is computed from the track.
 type PlanDefaults struct {
-	FrameRate float64
-	Distance  Level
-	Tilt      Level
+	FrameRate    float64
+	Distance     Level
+	Tilt         Level
+	AspectWidth  int
+	AspectHeight int
 }
 
 // Config holds the internal thresholds used by the track treatment pipeline
@@ -137,6 +168,11 @@ type Config struct {
 	// choose them. They are distinct from DefaultLevel, which is the
 	// treatment level of the track.
 	PlanDefaults PlanDefaults
+
+	// RenderTuning holds the constants of drawing a frame, and RenderDefaults
+	// the resolution used when the user chooses none.
+	RenderTuning   RenderTuning
+	RenderDefaults RenderDefaults
 }
 
 // Load returns Sobrevoo's configuration. It fails only when the user's home
@@ -155,7 +191,9 @@ func Load() (Config, error) {
 		RegistryPath:         filepath.Join(home, registryDir, registryFileName),
 		CameraTuning:         cameraTuning(),
 		SliceTuning:          sliceTuning(),
-		PlanDefaults:         PlanDefaults{FrameRate: 30, Distance: LevelMedium, Tilt: LevelMedium},
+		PlanDefaults:         PlanDefaults{FrameRate: 30, Distance: LevelMedium, Tilt: LevelMedium, AspectWidth: 9, AspectHeight: 16},
+		RenderTuning:         renderTuning(),
+		RenderDefaults:       RenderDefaults{Width: 1080, Height: 1920},
 	}, nil
 }
 
@@ -176,7 +214,7 @@ func cameraTuning() CameraTuning {
 		GaussianSigmaSeconds:        0.5,
 
 		OverviewTiltDegrees:        60,
-		OverviewVerticalFOVDegrees: 45,
+		OverviewVerticalFOVDegrees: verticalFOVDegrees,
 		OverviewMargin:             1.2,
 		OverviewMinDistanceFactor:  2,
 
@@ -200,9 +238,22 @@ func cameraTuning() CameraTuning {
 func sliceTuning() SliceTuning {
 	return SliceTuning{
 		MarginFactor:          1.0,
-		ReferenceHeightPixels: 1080,
+		ReferenceHeightPixels: 1920,
 		TexelScreenRatio:      2.0,
 		EstimatedTileBytes:    64 * 1024,
 		MaxSizeBytes:          256 * 1024 * 1024,
+	}
+}
+
+func renderTuning() RenderTuning {
+	return RenderTuning{
+		VerticalFOVDegrees:       verticalFOVDegrees,
+		MinCameraClearanceMeters: 2,
+		MinTiltForTargetDegrees:  1,
+		TrailLiftMeters:          0.3,
+		DepthBiasMeters:          1,
+		DepthBiasRatio:           0.002,
+		TileCacheBytes:           256 * 1024 * 1024,
+		Workers:                  runtime.NumCPU(),
 	}
 }

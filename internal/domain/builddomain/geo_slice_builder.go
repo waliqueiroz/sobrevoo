@@ -8,6 +8,8 @@ type GeoSliceBuilder struct {
 	area      domain.BoundingBox
 	tileSets  []domain.TileSet
 	elevation []domain.ElevationGrid
+	planID    string
+	contentID string
 }
 
 func NewGeoSliceBuilder() *GeoSliceBuilder {
@@ -36,6 +38,21 @@ func (b *GeoSliceBuilder) WithElevation(grids ...domain.ElevationGrid) *GeoSlice
 	return b
 }
 
+// WithPlanID sets the identification of the plan the slice was made from.
+func (b *GeoSliceBuilder) WithPlanID(id string) *GeoSliceBuilder {
+	b.planID = id
+	return b
+}
+
+// WithContentID sets the identification of the slice file, which only the
+// reader of a slice file knows.
+func (b *GeoSliceBuilder) WithContentID(id string) *GeoSliceBuilder {
+	b.contentID = id
+	return b
+}
+
 func (b *GeoSliceBuilder) Build() domain.GeoSlice {
-	return domain.NewGeoSlice(b.area, b.tileSets, b.elevation)
+	slice := domain.NewGeoSlice(b.area, b.tileSets, b.elevation)
+	slice.PlanID, slice.ContentID = b.planID, b.contentID
+	return slice
 }

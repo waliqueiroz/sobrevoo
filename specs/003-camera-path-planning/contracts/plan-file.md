@@ -20,7 +20,8 @@ Ordem de campos fixa; objetos de topo indentados com 2 espaços, cada item de
     "duration_s": 42,
     "frame_rate": 30,
     "distance": "medium",
-    "tilt": "medium"
+    "tilt": "medium",
+    "aspect_ratio": "9:16"
   },
   "summary": {
     "duration_s": 42,
@@ -49,6 +50,7 @@ Ordem de campos fixa; objetos de topo indentados com 2 espaços, cada item de
 | `parameters.duration_s` | número | Duração **efetiva** do plano, em segundos: a informada pelo usuário ou a calculada automaticamente |
 | `parameters.frame_rate` | número | Quadros por segundo |
 | `parameters.distance`, `parameters.tilt` | texto | `low`, `medium` ou `high` |
+| `parameters.aspect_ratio` | texto | Proporção do vídeo para a qual o plano enquadra a abertura e o fechamento, `LARGURA:ALTURA` (`9:16`). Acrescentado depois da versão 1, sem mudar a versão; um plano sem este campo é lido como `16:9`, que é o que enquadrava só pelo campo de visão vertical |
 | `summary.*` | — | Mesmos valores de `PlanSummary` (`data-model.md`) |
 | `summary.duration_mode` | texto | `automatic` (calculada a partir do trajeto) ou `explicit` (informada pelo usuário) |
 | `summary.time_reference` | texto | `clock` ou `distance` |

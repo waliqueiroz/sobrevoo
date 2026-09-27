@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Quatro features estão implementadas até agora:
+Relive/Strava). Cinco features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -19,8 +19,11 @@ o exporta em JSON (comando `plan`); `specs/004-geo-data-slice/` lê o
 conteúdo dos dados registrados e reúne o recorte de mapa base e relevo que um
 plano de câmera exportado precisa, com resumo e exportação em ZIP
 (`geodata slice <plano.json>`), e consulta a elevação de uma coordenada
-(`geodata elevation --lat --lon`). Ainda não há desenho de mapa, renderização
-de quadros nem geração de vídeo.
+(`geodata elevation --lat --lon`); `specs/005-frame-rendering/` desenha os
+quadros do voo como imagens PNG — o relevo em perspectiva, vestido com as peças
+do mapa base, o traçado até o marcador e o marcador — a partir do plano e do
+recorte exportados, com progresso, retomada e resumo (`render frame` e
+`render all`). Ainda não há geração de vídeo.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -40,12 +43,15 @@ go test ./internal/infra/inbound/cli/... -run 'Test_InspectCommand_Execute/shoul
 
 # Rodar a CLI direto, sem compilar um binário:
 go run ./cmd/sobrevoo inspect path/to/track.gpx --simplification=low --smoothing=high
-go run ./cmd/sobrevoo plan path/to/track.gpx --duration 45 --distance high --export plan.json
+go run ./cmd/sobrevoo plan path/to/track.gpx --duration 45 --distance high --aspect 9:16 --export plan.json
 go run ./cmd/sobrevoo geodata slice plan.json --export slice.zip
 go run ./cmd/sobrevoo geodata elevation --lat -23.5505 --lon -46.6333
+go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png
+go run ./cmd/sobrevoo render all plan.json slice.zip --output frames/ --resolution 1280x720
 
-# Gerar os dados de exemplo sintéticos do quickstart da etapa 4:
-go run ./test/samples --out specs/004-geo-data-slice/amostras
+# Gerar os dados de exemplo sintéticos dos quickstarts das etapas 4 e 5:
+go run ./test/samples --out specs/005-frame-rendering/amostras
+go run ./test/samples --out specs/005-frame-rendering/amostras --raster-over resources/passeio.gpx
 ```
 
 ## Arquitetura
@@ -62,7 +68,9 @@ adapter.
   `PlanParameters`, `CameraTuning`, `CameraPlan`, `CameraFrame`, e os do recorte
   de dados: `SliceTuning`, `SliceRegion(s)`, `DetailLevel`, `Tile`, `TileSet`,
   `ElevationGrid`, `ElevationReading`, `Coordinate`, `GeoSlice`,
-  `SliceSummary`), construtores
+  `SliceSummary`, e os do desenho dos quadros: `Scene`, `Resolution`,
+  `RenderTuning`, `FrameImage`, `FrameStats`, `FrameSetID`, `FrameDirectory`,
+  `RenderSummary`), construtores
   que carregam regra de negócio (`NewGeoDataSource`, `NewTrackSummary`,
   `NewCameraPlan`, que calcula o resumo a partir dos quadros, `NewGeoSlice`,
   que calcula o resumo do recorte e o põe em ordem, `NewCoordinate`), e métodos de
@@ -96,10 +104,16 @@ adapter.
   `ErrSliceTooLarge`, `ErrGeoDataContentUnreadable`,
   `ErrElevationUnitUnsupported`, `ErrSliceDestinationExists`,
   `ErrSliceDestinationInvalid`, `ErrElevationNotCovered`,
-  `ErrInvalidCoordinate`), e as portas
+  `ErrInvalidCoordinate`; e os do desenho: `ErrSliceFileInvalid`,
+  `ErrSliceFormatVersionUnsupported`, `ErrSliceDoesNotMatchPlan`,
+  `ErrSliceDoesNotCoverPlan`, `ErrTileFormatUnsupported`, `ErrNoElevationData`,
+  `ErrFrameOutOfRange`, `ErrInvalidResolution`, `ErrFrameDestinationInvalid`,
+  `ErrFrameDestinationExists`, `ErrFrameSetConflict`,
+  `ErrRenderInterrupted`), e as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
   `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`,
-  `CameraPlanReader`, `BaseMapReader`, `ElevationReader`, `GeoSliceExporter`.
+  `CameraPlanReader`, `BaseMapReader`, `ElevationReader`, `GeoSliceExporter`,
+  `GeoSliceReader`, `TileDecoder`, `FrameRepository`, `FrameExporter`.
   Qualquer DTO de saída que não seja um
   valor trivial (ex.: `GeoDataSummary`, `CoverageReport`, `TrackSummary`)
   também é um tipo de domínio comum — não um DTO de `internal/application`
@@ -115,7 +129,8 @@ adapter.
   lugar que sabe transformar um trajeto bruto em limpo ou tratado),
   `GeoDataService` (`Register`, `List`, `Remove`, `CheckCoverage`,
   `ElevationAt`), `CameraPlanService` (`Generate`, `Export`, `Load`) e
-  `GeoSliceService` (`Generate`, `Export`); `GeoDataService` e
+  `GeoSliceService` (`Generate`, `Export`, `Load`) e `FrameService`
+  (`DrawFrame`, `DrawFrames`); `GeoDataService` e
   `CameraPlanService` dependem de `TrackService` em vez de repetir parse/
   limpeza/simplificação/suavização.
 - **`internal/infra/outbound/*`** — adapters que implementam as portas do
@@ -129,20 +144,25 @@ adapter.
   `elevationreader` (`NewGeoTIFF()`: GeoTIFF em Go puro — faixas ou peças, sem
   compressão/Deflate/LZW, predictors 1, 2 e 3 — que lê só o que uma janela
   precisa), `zipfile` (`NewGeoSliceExporter()`: o recorte num ZIP
-  determinístico), `config` (limiares internos fixos:
+  determinístico; `NewGeoSliceReader()`: lê e valida o recorte por inteiro),
+  `tiledecoder` (`NewRaster()`: PNG/JPEG/WebP → pixels), `pngfile`
+  (`NewFrameRepository()` e `NewFrameExporter()`: os quadros como PNG atômicos,
+  com a identificação do conjunto dentro de cada imagem), `config` (limiares internos fixos:
   mínimo de pontos, velocidade máxima plausível, nível padrão, os
   `CameraTuning` do planejamento de câmera e os parâmetros padrão do plano —
   ainda sem fonte de configuração externa, mas o ponto de extensão já
   existe, conforme o Princípio VIII da constituição). O pacote `config`
   tem tipos próprios (`config.Level`, `config.CameraTuning`,
-  `config.PlanDefaults`, `config.SliceTuning`) e **não importa o domínio**; quem os mapeia para os
+  `config.PlanDefaults`, `config.SliceTuning`, `config.RenderTuning`,
+  `config.RenderDefaults`) e **não importa o domínio**; quem os mapeia para os
   tipos de domínio é o composition root (`cmd/sobrevoo/config_mapping.go`).
 - **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
   traduz erros sentinela do domínio em códigos de saída de processo
   (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
   `specs/002-geo-data-registry/contracts/cli.md` e
   `specs/003-camera-path-planning/contracts/cli.md` e
-  `specs/004-geo-data-slice/contracts/cli.md` para o mapeamento exato.
+  `specs/004-geo-data-slice/contracts/cli.md` e
+  `specs/005-frame-rendering/contracts/cli.md` para o mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso
@@ -159,6 +179,21 @@ adapter.
   I/O real (`specs/002-geo-data-registry/research.md`, item 8).
 - **`cmd/sobrevoo/main.go`** — composition root; o único lugar que conecta
   todos os adapters concretos entre si.
+
+### O desenho dos quadros (etapa 5)
+
+O renderizador é código de domínio (`internal/domain/frame_*.go`), em Go puro,
+por lançamento de raios sobre as grades de elevação do recorte
+(`specs/005-frame-rendering/research.md`). Para o desenho ser **idêntico byte
+a byte** em qualquer processador e por qualquer número de goroutines: todo
+produto que entra numa soma é envolvido em `float64(...)` (nenhuma fusão
+multiplicação-soma); só `+ − × ÷`, `Sqrt`, `Floor`, `Abs`, `Min`, `Max`, `Sin`,
+`Cos`, `Tan`, `Atan2`, `Log`, `Log2` e `Ldexp` — nunca `Exp`, `Pow` nem `Sinh`
+(têm assembly por arquitetura); nunca iterar `map` para produzir valor; cada
+pixel só depende de si mesmo. O teste de `frame_scene_test.go` compara o hash
+dos pixels de um quadro com uma referência (igual em arm64 e amd64): se ele
+falhar em outra máquina, corrija a aritmética, não a constante — a constante só
+muda junto com `domain.RenderVersion`.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 
@@ -264,8 +299,9 @@ uso) que a redação anterior da constituição permitia.
 - Cada camada é testada isolada, com o que ela depende mockado: os testes
   de domain/application mockam as portas do domínio (`mockdomain`); os
   testes de `internal/infra/inbound/cli` mockam
-  `application.TrackService`, `application.GeoDataService` e
-  `application.CameraPlanService` (`mockapplication`) e nunca conectam
+  `application.TrackService`, `application.GeoDataService`,
+  `application.CameraPlanService`, `application.GeoSliceService` e
+  `application.FrameService` (`mockapplication`) e nunca conectam
   um serviço ou adapter de saída real. Não existe teste automatizado de
   ponta a ponta — `specs/<feature>/quickstart.md` é o checklist manual, com
   o binário real, pra isso.

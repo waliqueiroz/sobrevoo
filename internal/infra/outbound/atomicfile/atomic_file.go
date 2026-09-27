@@ -26,6 +26,10 @@ var (
 // cannot make hard links.
 var link = os.Link
 
+// syncFile flushes a file to stable storage; a variable only so tests can
+// simulate a failing disk.
+var syncFile = func(f *os.File) error { return f.Sync() }
+
 // Publish writes the content produced by write to path. The content goes to
 // a temporary file in the same directory first and is published only once
 // complete, so a failure never leaves a partial file. Without overwrite, an
@@ -42,6 +46,12 @@ func Publish(path string, overwrite bool, write func(io.Writer) error) error {
 	if err := write(temporary); err != nil {
 		temporary.Close()
 		return err
+	}
+	// Flush the content before the rename makes the file visible: after a
+	// power failure the final name must never hold an empty file.
+	if err := syncFile(temporary); err != nil {
+		temporary.Close()
+		return invalid(path, err)
 	}
 	if err := temporary.Close(); err != nil {
 		return invalid(path, err)

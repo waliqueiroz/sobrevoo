@@ -129,6 +129,30 @@ func (b BoundingBox) longitudeSpans() [][2]float64 {
 	return [][2]float64{{b.MinLongitude, b.MaxLongitude}}
 }
 
+// ContainsBox reports whether other is entirely inside b, touching an edge
+// included. Longitudes are compared as ranges of [-180, 180]: each range other
+// occupies has to be inside a range b occupies, so a box that crosses the
+// antimeridian is only inside one that crosses it too (or that spans the world).
+func (b BoundingBox) ContainsBox(other BoundingBox) bool {
+	if other.MinLatitude < b.MinLatitude || other.MaxLatitude > b.MaxLatitude {
+		return false
+	}
+
+	for _, inner := range other.longitudeSpans() {
+		inside := false
+		for _, outer := range b.longitudeSpans() {
+			if inner[0] >= outer[0] && inner[1] <= outer[1] {
+				inside = true
+				break
+			}
+		}
+		if !inside {
+			return false
+		}
+	}
+	return true
+}
+
 // Intersects reports whether b and other share any point, touching at an
 // edge included. Both may cross the antimeridian.
 func (b BoundingBox) Intersects(other BoundingBox) bool {

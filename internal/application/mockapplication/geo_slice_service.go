@@ -68,3 +68,18 @@ func (mr *MockGeoSliceServiceMockRecorder) Generate(plan any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockGeoSliceService)(nil).Generate), plan)
 }
+
+// Load mocks base method.
+func (m *MockGeoSliceService) Load(path string) (domain.GeoSlice, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Load", path)
+	ret0, _ := ret[0].(domain.GeoSlice)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Load indicates an expected call of Load.
+func (mr *MockGeoSliceServiceMockRecorder) Load(path any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockGeoSliceService)(nil).Load), path)
+}

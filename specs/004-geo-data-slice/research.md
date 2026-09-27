@@ -152,7 +152,7 @@ Cobra, testify, mockgen).
   ```
 
   com `FOV = CameraTuning.OverviewVerticalFOVDegrees` (o mesmo campo de visão
-  que o plano assume). Valores iniciais: `ReferenceHeightPixels = 1080`,
+  que o plano assume). Valores iniciais: `ReferenceHeightPixels = 1920` (a altura do vídeo vertical padrão da etapa 5; era 1080 até o padrão passar a ser vertical),
   `TexelScreenRatio = 2` (um pixel da peça pode ocupar até 2 pixels de tela
   na aproximação máxima).
 - **Dentro do que a fonte oferece**: por registro de mapa base usado, o nível
@@ -415,7 +415,7 @@ etapas anteriores. "Elevação sem valor" **não** é erro (código `0`).
   | Constante | Valor | Significado |
   |---|---|---|
   | `MarginFactor` | 1,0 | meio-lado do terreno relevante por quadro, em múltiplos de `camera_to_marker_m` |
-  | `ReferenceHeightPixels` | 1080 | altura de tela de referência para o nível de detalhe |
+  | `ReferenceHeightPixels` | 1920 | altura de tela de referência para o nível de detalhe |
   | `TexelScreenRatio` | 2,0 | pixels de tela que um pixel de peça pode ocupar na aproximação máxima |
   | `EstimatedTileBytes` | 65 536 | tamanho assumido por peça na estimativa |
   | `MaxSizeBytes` | 268 435 456 | limite do recorte (256 MiB) |

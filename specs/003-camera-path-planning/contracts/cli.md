@@ -14,7 +14,7 @@ contrato próprio em [`plan-file.md`](./plan-file.md).
 ```text
 sobrevoo plan <arquivo-de-trajeto> [--duration <segundos>] [--fps <n>]
               [--distance low|medium|high] [--tilt low|medium|high]
-              [--export <caminho>] [--overwrite]
+              [--aspect <L:A>] [--export <caminho>] [--overwrite]
 ```
 
 - `<arquivo-de-trajeto>` (posicional, obrigatório): trajeto GPS local, no
@@ -33,6 +33,14 @@ sobrevoo plan <arquivo-de-trajeto> [--duration <segundos>] [--fps <n>]
   trajeto.
 - `--tilt` (padrão `medium`): inclinação da câmera; `high` olha de mais
   perto da vertical, `low` mais rente ao horizonte.
+- `--aspect` (padrão `9:16`, de `Config.PlanDefaults`): a proporção do vídeo,
+  `LARGURA:ALTURA` com inteiros positivos (por exemplo `9:16` vertical,
+  `16:9` horizontal), de `1:5` a `5:1`. O campo de visão vertical da câmera é
+  fixo, então o horizontal depende da proporção: a abertura e o fechamento
+  enquadram o trajeto inteiro pelo **mais estreito** dos dois (num vídeo
+  vertical, o horizontal), e por isso ficam mais afastados. O acompanhamento
+  não muda. Fora do formato ou da faixa: `domain.ErrInvalidAspectRatio`,
+  código `39`.
 - `--export` (opcional): grava o plano completo neste caminho, no formato
   de `plan-file.md`. Sem esta flag, nada é gravado em disco.
 - `--overwrite` (opcional, só faz sentido com `--export`): permite
@@ -47,6 +55,7 @@ rótulos e a ordem são estáveis:
 ```text
 Duration: 42.0 s (automatic)
 Frame rate: 30.0 fps
+Aspect ratio: 9:16
 Frames: 1260
 Camera altitude: 127.3 m - 912.8 m
 Camera distance: 300.0 m - 1204.5 m
@@ -83,6 +92,7 @@ alterado no destino da exportação.
 | Arquivo de trajeto inexistente ou não legível (E/S) | erro genérico | `4` |
 | `--duration` informada e ≤ 0, ou acima de 3 600 s (uma hora) | `domain.ErrInvalidDuration` | `10` |
 | `--fps` ≤ 0 ou fora de 1–120 | `domain.ErrInvalidFrameRate` | `11` |
+| `--aspect` fora do formato `L:A` ou da faixa 1:5–5:1 | `domain.ErrInvalidAspectRatio` | `39` |
 | `--duration` informada abaixo do mínimo para o trajeto (nunca ocorre com duração automática) | `domain.ErrDurationTooShort` | `12` |
 | Trajeto curto demais (comprimento < 50 m) | `domain.ErrTrackTooShort` | `13` |
 | Trajeto grande demais (abrangência > 2 000 km) | `domain.ErrTrackTooLarge` | `14` |

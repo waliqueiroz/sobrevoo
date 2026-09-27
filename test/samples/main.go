@@ -23,6 +23,26 @@
 //	mapa-antimeridiano.mbtiles, relevo-antimeridiano.tif   around (-16.5, 180)
 //	mapa-polar.mbtiles, relevo-polar.tif                   around (82, 15)
 //
+// For the fifth stage (specs/005-frame-rendering/quickstart.md) it also writes
+// base maps made of images, which can be drawn:
+//
+//	mapa-imagem-sp.mbtiles             PNG tiles, levels 10 to 14, over the same area as
+//	                                   mapa-sp.mbtiles, with three tiles of level 14 missing
+//	                                   at the start of pedalada.gpx; every tile is a
+//	                                   checkerboard whose tone depends on its position
+//	mapa-vetorial-sp.mbtiles           the same area, with vector tiles (pbf), which are
+//	                                   refused
+//	relevo-sem-dado.tif                a GeoTIFF over that area in which no cell has a value
+//	relevo-buraco.tif                  relevo-sp.tif with one more block with no value, of 15
+//	                                   rows by 20 columns, at the start of pedalada.gpx (rows 345-359,
+//	                                   columns 360-379)
+//	mapa-imagem-antimeridiano.mbtiles,
+//	mapa-imagem-polar.mbtiles          PNG tiles over the two areas above
+//
+// and, with --raster-over <track.gpx>, mapa-imagem-passeio.mbtiles: PNG tiles,
+// levels 8 to 15, over the area of the track plus 0.1° on each side — smaller than
+// the vector map of a real download, so it wins the choice of the smaller area.
+//
 // The program prints the coordinates of the known cells.
 package main
 
@@ -34,6 +54,7 @@ import (
 	"path/filepath"
 
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/trackparser"
 	"github.com/waliqueiroz/sobrevoo/test/helper"
 )
 
@@ -45,10 +66,16 @@ const (
 
 func main() {
 	out := flag.String("out", "amostras", "directory to write the samples to")
+	rasterOver := flag.String("raster-over", "", "a GPX track: write mapa-imagem-passeio.mbtiles over its area, and nothing else")
 	flag.Parse()
 
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		fail(err)
+	}
+
+	if *rasterOver != "" {
+		writeRasterOver(*out, *rasterOver)
+		return
 	}
 
 	// São Paulo
@@ -125,6 +152,60 @@ func main() {
 		SampleType: helper.Int16, Values: ramp(500, 1000), Compression: helper.TIFFDeflate, RowsPerStrip: 50,
 	}))
 
+	// base maps made of images, for the fifth stage
+	saoPaulo := domain.BoundingBox{MinLatitude: saoPauloSouth, MaxLatitude: saoPauloNorth, MinLongitude: saoPauloWest, MaxLongitude: saoPauloEast}
+	start14 := tileOf(-23.5505, -46.6333, 14)
+	missing14 := map[domain.TileID]bool{
+		start14: true,
+		{Level: 14, X: start14.X + 1, Y: start14.Y}: true,
+		{Level: 14, X: start14.X, Y: start14.Y + 1}: true,
+	}
+	write(*out, "mapa-imagem-sp.mbtiles", helper.MBTilesWithTiles(helper.MBTilesSpec{
+		Bounds:  [4]float64{saoPauloWest, saoPauloSouth, saoPauloEast, saoPauloNorth},
+		MinZoom: new(10), MaxZoom: new(14),
+		Tiles: imageTiles(saoPaulo, 10, 14, missing14),
+	}))
+	write(*out, "mapa-vetorial-sp.mbtiles", helper.MBTilesWithTiles(helper.MBTilesSpec{
+		Bounds:  [4]float64{saoPauloWest, saoPauloSouth, saoPauloEast, saoPauloNorth},
+		MinZoom: new(10), MaxZoom: new(14), Format: "pbf",
+		Tiles: tiles(saoPaulo, 10, 14, nil),
+	}))
+	// relevo-sp.tif with another block with no value, under the start of pedalada.gpx
+	withBlock := make([][]float64, rows)
+	for r := range withBlock {
+		withBlock[r] = append([]float64(nil), values[r]...)
+		for c := range withBlock[r] {
+			if r >= 345 && r < 360 && c >= 360 && c < 380 {
+				withBlock[r][c] = -32768
+			}
+		}
+	}
+	write(*out, "relevo-buraco.tif", helper.GeoTIFFWithSamples(helper.GeoTIFFSpec{
+		Width: cols, Height: rows, OriginLon: saoPauloWest, OriginLat: saoPauloNorth, ScaleX: cell, ScaleY: cell,
+		SampleType: helper.Int16, Values: withBlock, Compression: helper.TIFFDeflate, Predictor: 2, RowsPerStrip: 50,
+		NoData: new("-32768"),
+	}))
+	empty := make([][]float64, rows)
+	for r := range empty {
+		empty[r] = make([]float64, cols)
+		for c := range empty[r] {
+			empty[r][c] = -32768
+		}
+	}
+	write(*out, "relevo-sem-dado.tif", helper.GeoTIFFWithSamples(helper.GeoTIFFSpec{
+		Width: cols, Height: rows, OriginLon: saoPauloWest, OriginLat: saoPauloNorth, ScaleX: cell, ScaleY: cell,
+		SampleType: helper.Int16, Values: empty, Compression: helper.TIFFDeflate, Predictor: 2, RowsPerStrip: 50,
+		NoData: new("-32768"),
+	}))
+	write(*out, "mapa-imagem-antimeridiano.mbtiles", helper.MBTilesWithTiles(helper.MBTilesSpec{
+		Bounds: [4]float64{179, -17, -179, -16},
+		Tiles:  imageTiles(domain.BoundingBox{MinLatitude: -17, MaxLatitude: -16, MinLongitude: 179, MaxLongitude: -179, CrossesAntimeridian: true}, 8, 12, nil),
+	}))
+	write(*out, "mapa-imagem-polar.mbtiles", helper.MBTilesWithTiles(helper.MBTilesSpec{
+		Bounds: [4]float64{10, 81, 20, 83},
+		Tiles:  imageTiles(domain.BoundingBox{MinLatitude: 81, MaxLatitude: 83, MinLongitude: 10, MaxLongitude: 20}, 6, 10, nil),
+	}))
+
 	fmt.Println("Known cells of relevo-sp.tif (cell row, column: latitude, longitude of its center):")
 	known := func(label string, r, c int) {
 		lat := saoPauloNorth - (float64(r)+0.5)*cell
@@ -173,6 +254,43 @@ func tiles(area domain.BoundingBox, low, high int, missing map[domain.TileID]boo
 		}
 	}
 	return list
+}
+
+// imageTiles is like tiles, with an image in each tile that shows where the tile is.
+func imageTiles(area domain.BoundingBox, low, high int, missing map[domain.TileID]bool) []helper.MBTile {
+	list := tiles(area, low, high, missing)
+	for i := range list {
+		list[i].Data = helper.PositionPNGTile(list[i].Z, list[i].X, list[i].Y)
+	}
+	return list
+}
+
+// writeRasterOver writes a base map of images over the area of a GPX track, plus
+// 0.1° on each side.
+func writeRasterOver(dir, gpxPath string) {
+	file, err := os.Open(gpxPath)
+	if err != nil {
+		fail(err)
+	}
+	defer file.Close()
+
+	track, err := trackparser.NewGPX().Parse(file)
+	if err != nil {
+		fail(err)
+	}
+	box := domain.Route{Points: track.Points}.BoundingBox()
+
+	const margin = 0.1
+	area := domain.BoundingBox{
+		MinLatitude: box.MinLatitude - margin, MaxLatitude: box.MaxLatitude + margin,
+		MinLongitude: box.MinLongitude - margin, MaxLongitude: box.MaxLongitude + margin,
+	}
+	write(dir, "mapa-imagem-passeio.mbtiles", helper.MBTilesWithTiles(helper.MBTilesSpec{
+		Bounds:  [4]float64{area.MinLongitude, area.MinLatitude, area.MaxLongitude, area.MaxLatitude},
+		MinZoom: new(8), MaxZoom: new(15),
+		Tiles: imageTiles(area, 8, 15, nil),
+	}))
+	fmt.Printf("area: lat %.4f to %.4f, lon %.4f to %.4f\n", area.MinLatitude, area.MaxLatitude, area.MinLongitude, area.MaxLongitude)
 }
 
 func tileOf(lat, lon float64, level int) domain.TileID {

@@ -161,6 +161,18 @@ func Test_CameraPlanExporter_Export(t *testing.T) {
 		}
 	})
 
+	t.Run("should write the aspect ratio of the plan among the parameters", func(t *testing.T) {
+		// given
+		parameters := builddomain.NewPlanParametersBuilder().WithAspect(domain.AspectRatio{Width: 9, Height: 16}).Build()
+		plan := builddomain.NewCameraPlanBuilder().WithParameters(parameters).Build()
+
+		// when
+		_, content := exportToTemp(t, plan)
+
+		// then
+		assert.Contains(t, string(content), `"aspect_ratio": "9:16"`)
+	})
+
 	t.Run("should mark the duration as explicit for a requested duration", func(t *testing.T) {
 		// given
 		plan := builddomain.NewCameraPlanBuilder().WithDurationMode(domain.DurationModeExplicit).Build()

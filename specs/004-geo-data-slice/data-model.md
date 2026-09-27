@@ -19,7 +19,7 @@ Constantes de ajuste, injetadas (Princípio VIII; `research.md` item 15).
 | Campo | Tipo | Valor inicial |
 |---|---|---|
 | `MarginFactor` | `float64` | 1,0 |
-| `ReferenceHeightPixels` | `float64` | 1080 |
+| `ReferenceHeightPixels` | `float64` | 1920 |
 | `TexelScreenRatio` | `float64` | 2,0 |
 | `EstimatedTileBytes` | `int64` | 65 536 |
 | `MaxSizeBytes` | `int64` | 268 435 456 |

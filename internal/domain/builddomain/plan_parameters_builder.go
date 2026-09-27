@@ -17,6 +17,7 @@ func NewPlanParametersBuilder() *PlanParametersBuilder {
 			FrameRate: 30,
 			Distance:  domain.LevelMedium,
 			Tilt:      domain.LevelMedium,
+			Aspect:    domain.LandscapeAspectRatio,
 		},
 	}
 }
@@ -43,6 +44,11 @@ func (b *PlanParametersBuilder) WithDistance(level domain.Level) *PlanParameters
 
 func (b *PlanParametersBuilder) WithTilt(level domain.Level) *PlanParametersBuilder {
 	b.parameters.Tilt = level
+	return b
+}
+
+func (b *PlanParametersBuilder) WithAspect(aspect domain.AspectRatio) *PlanParametersBuilder {
+	b.parameters.Aspect = aspect
 	return b
 }
 

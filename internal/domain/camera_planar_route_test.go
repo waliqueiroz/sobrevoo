@@ -200,7 +200,7 @@ func Test_PlanarRoute_OverviewView(t *testing.T) {
 
 	t.Run("should look at the center of the route's bounding box, tilted and pointing along the given heading", func(t *testing.T) {
 		// when
-		view := route.OverviewView(123, 0, tuning)
+		view := route.OverviewView(123, 0, domain.LandscapeAspectRatio, tuning)
 
 		// then
 		assert.InDelta(t, route.Points[len(route.Points)-1].X/2, view.Target.X, 1e-6)
@@ -211,7 +211,7 @@ func Test_PlanarRoute_OverviewView(t *testing.T) {
 
 	t.Run("should frame every point of the route within half the vertical field of view", func(t *testing.T) {
 		// when
-		view := route.OverviewView(45, 0, tuning)
+		view := route.OverviewView(45, 0, domain.LandscapeAspectRatio, tuning)
 
 		// then
 		for _, p := range route.Points {
@@ -224,7 +224,7 @@ func Test_PlanarRoute_OverviewView(t *testing.T) {
 		tiny := planarLine(1, 0, 1, 50)
 
 		// when
-		view := tiny.OverviewView(0, 1200, tuning)
+		view := tiny.OverviewView(0, 1200, domain.LandscapeAspectRatio, tuning)
 
 		// then
 		assert.Equal(t, 1200.0, view.Distance)
@@ -232,11 +232,43 @@ func Test_PlanarRoute_OverviewView(t *testing.T) {
 
 	t.Run("should use the framing distance when it exceeds the minimum", func(t *testing.T) {
 		// when
-		view := route.OverviewView(0, 10, tuning)
+		view := route.OverviewView(0, 10, domain.LandscapeAspectRatio, tuning)
 
 		// then: margin × radius / tan(FOV/2), radius half the diagonal
 		last := route.Points[len(route.Points)-1]
 		radius := math.Hypot(last.X, last.Y) / 2
 		assert.InDelta(t, 1.2*radius/math.Tan(22.5*math.Pi/180), view.Distance, 1e-6)
+	})
+
+	t.Run("should frame the route within half the horizontal field of view of a vertical video", func(t *testing.T) {
+		// given: 9:16, whose horizontal field of view is narrower than the vertical one
+		aspect := domain.AspectRatio{Width: 9, Height: 16}
+		halfHorizontal := math.Atan(math.Tan(tuning.OverviewVerticalFOVDegrees/2*math.Pi/180)*aspect.Ratio()) * 180 / math.Pi
+
+		// when
+		view := route.OverviewView(45, 0, aspect, tuning)
+
+		// then
+		for _, p := range route.Points {
+			assert.LessOrEqual(t, angleFromAxis(view, p), halfHorizontal, "point %v", p)
+		}
+	})
+
+	t.Run("should be farther for a vertical video than for a horizontal one", func(t *testing.T) {
+		// when
+		vertical := route.OverviewView(0, 0, domain.AspectRatio{Width: 9, Height: 16}, tuning)
+		horizontal := route.OverviewView(0, 0, domain.LandscapeAspectRatio, tuning)
+
+		// then: distance × (aspect ratio) is what the narrower field of view costs
+		assert.InDelta(t, horizontal.Distance/(9.0/16.0), vertical.Distance, 1e-6)
+	})
+
+	t.Run("should frame a landscape video by the vertical field of view alone", func(t *testing.T) {
+		// when
+		wide := route.OverviewView(0, 0, domain.AspectRatio{Width: 21, Height: 9}, tuning)
+		standard := route.OverviewView(0, 0, domain.LandscapeAspectRatio, tuning)
+
+		// then
+		assert.Equal(t, standard.Distance, wide.Distance)
 	})
 }

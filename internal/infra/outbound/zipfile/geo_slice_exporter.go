@@ -240,6 +240,7 @@ func buildManifest(slice domain.GeoSlice, sourceIndex map[string]int) (manifest 
 
 	var out bytes.Buffer
 	out.WriteString("{\n  \"format_version\": " + strconv.Itoa(sliceFormatVersion) + ",\n")
+	out.WriteString("  \"plan_id\": " + strconv.Quote(slice.PlanID) + ",\n")
 	out.WriteString("  \"area\": " + string(area) + ",\n")
 	out.WriteString("  \"summary\": " + string(summaryJSON) + ",\n")
 

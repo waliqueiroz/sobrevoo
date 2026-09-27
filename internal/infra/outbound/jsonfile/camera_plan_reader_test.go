@@ -193,6 +193,46 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		assert.ErrorContains(t, err, "frames[1].camera_to_marker_m")
 	})
 
+	t.Run("should read the aspect ratio of the plan", func(t *testing.T) {
+		// given
+		spec := helper.DefaultPlanFileSpec()
+		spec.AspectRatio = "9:16"
+		path := writePlanFile(t, helper.ValidPlanFile(spec))
+
+		// when
+		plan, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, domain.AspectRatio{Width: 9, Height: 16}, plan.Parameters.Aspect)
+	})
+
+	t.Run("should read a plan made before the aspect ratio existed as 16:9", func(t *testing.T) {
+		// given
+		path := writePlanFile(t, helper.ValidPlanFile(helper.DefaultPlanFileSpec()))
+
+		// when
+		plan, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, domain.LandscapeAspectRatio, plan.Parameters.Aspect)
+	})
+
+	t.Run("should refuse an aspect ratio that is not valid, naming the field", func(t *testing.T) {
+		// given
+		spec := helper.DefaultPlanFileSpec()
+		spec.AspectRatio = "tall"
+		path := writePlanFile(t, helper.ValidPlanFile(spec))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "parameters.aspect_ratio")
+	})
+
 	t.Run("should refuse a file without parameters", func(t *testing.T) {
 		// given
 		path := writePlanFile(t, helper.PlanFileWithoutSection("parameters"))

@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"math"
+	"regexp"
 	"testing"
 	"time"
 
@@ -236,5 +237,122 @@ func Test_CameraPlan_Validate(t *testing.T) {
 		// then
 		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
 		assert.ErrorContains(t, err, "frames[1].camera_to_marker_m")
+	})
+}
+
+func Test_CameraPlan_ID(t *testing.T) {
+	frames := func(mutate func(f *domain.CameraFrame)) []domain.CameraFrame {
+		list := []domain.CameraFrame{
+			builddomain.NewCameraFrameBuilder().WithIndex(0).WithPhase(domain.PhaseOpening).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).WithPhase(domain.PhaseFollowing).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).WithPhase(domain.PhaseClosing).Build(),
+		}
+		if mutate != nil {
+			mutate(&list[1])
+		}
+		return list
+	}
+	planWith := func(mutate func(f *domain.CameraFrame)) domain.CameraPlan {
+		return builddomain.NewCameraPlanBuilder().WithFrames(frames(mutate)...).Build()
+	}
+
+	t.Run("should be 64 lowercase hexadecimal characters", func(t *testing.T) {
+		// given
+		plan := planWith(nil)
+
+		// when
+		id := plan.ID()
+
+		// then
+		assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{64}$`), id)
+	})
+
+	t.Run("should be the same for two plans with the same content", func(t *testing.T) {
+		// given
+		first, second := planWith(nil), planWith(nil)
+
+		// when / then
+		assert.Equal(t, first.ID(), second.ID())
+	})
+
+	t.Run("should be the same for values that differ by less than the step of the plan", func(t *testing.T) {
+		// given: a plan read back from a file holds values rounded to the plan's steps
+		exact := planWith(nil)
+		noisy := planWith(func(f *domain.CameraFrame) {
+			f.CameraLatitude += 1e-9
+			f.CameraLongitude -= 1e-9
+			f.MarkerLatitude += 1e-9
+			f.CameraAltitude += 1e-5
+			f.Heading += 1e-5
+			f.Tilt -= 1e-5
+			f.MarkerDistance += 1e-5
+			f.CameraToMarkerDistance -= 1e-5
+		})
+
+		// when / then
+		assert.Equal(t, exact.ID(), noisy.ID())
+	})
+
+	t.Run("should change when one value of one frame changes by one step", func(t *testing.T) {
+		// given
+		base := planWith(nil).ID()
+
+		// when / then
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.CameraLatitude += 1e-7 }).ID(), "camera latitude")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.CameraLongitude += 1e-7 }).ID(), "camera longitude")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.MarkerLatitude += 1e-7 }).ID(), "marker latitude")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.MarkerLongitude += 1e-7 }).ID(), "marker longitude")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.CameraAltitude += 1e-3 }).ID(), "altitude")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.Heading += 1e-3 }).ID(), "heading")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.Tilt += 1e-3 }).ID(), "tilt")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.MarkerDistance += 1e-3 }).ID(), "marker distance")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.CameraToMarkerDistance += 1e-3 }).ID(), "camera to marker distance")
+	})
+
+	t.Run("should change when the index or the phase of a frame changes", func(t *testing.T) {
+		// given
+		base := planWith(nil).ID()
+
+		// when / then
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.Index = 7 }).ID(), "index")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.Phase = domain.PhaseClosing }).ID(), "phase")
+	})
+
+	t.Run("should change when a parameter changes", func(t *testing.T) {
+		// given
+		base := builddomain.NewCameraPlanBuilder().Build().ID()
+		with := func(parameters domain.PlanParameters) string {
+			return builddomain.NewCameraPlanBuilder().WithParameters(parameters).Build().ID()
+		}
+		builder := func() *builddomain.PlanParametersBuilder {
+			return builddomain.NewPlanParametersBuilder().WithDuration(100 * time.Millisecond).WithFrameRate(30)
+		}
+
+		// when / then
+		assert.NotEqual(t, base, with(builder().WithFrameRate(24).Build()), "frame rate")
+		assert.NotEqual(t, base, with(builder().WithDuration(133*time.Millisecond).Build()), "duration")
+		assert.NotEqual(t, base, with(builder().WithDistance(domain.LevelHigh).Build()), "distance level")
+		assert.NotEqual(t, base, with(builder().WithTilt(domain.LevelLow).Build()), "tilt level")
+	})
+
+	t.Run("should change when a frame is added", func(t *testing.T) {
+		// given
+		base := planWith(nil)
+		longer := builddomain.NewCameraPlanBuilder().WithFrames(append(frames(nil), builddomain.NewCameraFrameBuilder().WithIndex(3).Build())...).Build()
+
+		// when / then
+		assert.NotEqual(t, base.ID(), longer.ID())
+	})
+
+	t.Run("should not depend on the summary, which is derived from the frames", func(t *testing.T) {
+		// given
+		plan := planWith(nil)
+		other := plan
+		other.Summary.MaxCameraAltitude += 1000
+		other.TimeFallbackReason = "something else"
+		other.Summary.SmoothedSpans = []domain.SmoothedSpan{{Quantity: domain.QuantityHeading}}
+
+		// when / then
+		assert.Equal(t, plan.ID(), other.ID())
 	})
 }

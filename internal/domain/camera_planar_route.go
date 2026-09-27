@@ -99,10 +99,13 @@ func (p PlanarRoute) HeadingAt(distance, sigma float64) (heading float64, ok boo
 // center of the route's bounding box, tilted OverviewTiltDegrees, pointing
 // along heading (the opening and closing pass no rotation: they keep the
 // heading of the following phase), from far enough away that every point of
-// the route is within half the vertical field of view of the optical axis,
-// plus a margin. The distance is never below minDistance, so that the
-// overview is always farther than the following distance.
-func (p PlanarRoute) OverviewView(heading, minDistance float64, tuning CameraTuning) CameraView {
+// the route is within half the field of view of the optical axis, plus a
+// margin. The field of view that counts is the narrower of the vertical one
+// and the horizontal one, which the aspect ratio of the video gives (a
+// vertical video sees less to the sides than upwards). The distance is never
+// below minDistance, so that the overview is always farther than the
+// following distance.
+func (p PlanarRoute) OverviewView(heading, minDistance float64, aspect AspectRatio, tuning CameraTuning) CameraView {
 	minX, maxX, minY, maxY := p.Points[0].X, p.Points[0].X, p.Points[0].Y, p.Points[0].Y
 	for _, point := range p.Points {
 		minX, maxX = math.Min(minX, point.X), math.Max(maxX, point.X)
@@ -115,8 +118,16 @@ func (p PlanarRoute) OverviewView(heading, minDistance float64, tuning CameraTun
 		radius = math.Max(radius, math.Hypot(point.X-center.X, point.Y-center.Y))
 	}
 
-	halfFOV := degreesToRadians(tuning.OverviewVerticalFOVDegrees) / 2
-	framing := tuning.OverviewMargin * radius / math.Tan(halfFOV)
+	// tan(half the horizontal FOV) = aspect ratio × tan(half the vertical FOV).
+	// Only a video taller than wide makes the horizontal one the narrower;
+	// an aspect ratio that is not set (not a positive ratio) adds no
+	// constraint.
+	narrowing := 1.0
+	if ratio := aspect.Ratio(); ratio > 0 && ratio < 1 {
+		narrowing = ratio
+	}
+	halfTan := math.Tan(degreesToRadians(tuning.OverviewVerticalFOVDegrees)/2) * narrowing
+	framing := tuning.OverviewMargin * radius / halfTan
 
 	return CameraView{
 		Target:      center,

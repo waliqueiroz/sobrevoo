@@ -33,6 +33,7 @@ func domainPlanParameters(defaults config.PlanDefaults) domain.PlanParameters {
 		FrameRate: defaults.FrameRate,
 		Distance:  domainLevel(defaults.Distance),
 		Tilt:      domainLevel(defaults.Tilt),
+		Aspect:    domain.AspectRatio{Width: defaults.AspectWidth, Height: defaults.AspectHeight},
 	}
 }
 
@@ -82,4 +83,23 @@ func domainSliceTuning(t config.SliceTuning) domain.SliceTuning {
 		EstimatedTileBytes:    t.EstimatedTileBytes,
 		MaxSizeBytes:          t.MaxSizeBytes,
 	}
+}
+
+func domainRenderTuning(t config.RenderTuning) domain.RenderTuning {
+	return domain.RenderTuning{
+		VerticalFOVDegrees:       t.VerticalFOVDegrees,
+		MinCameraClearanceMeters: t.MinCameraClearanceMeters,
+		MinTiltForTargetDegrees:  t.MinTiltForTargetDegrees,
+		TrailLiftMeters:          t.TrailLiftMeters,
+		DepthBiasMeters:          t.DepthBiasMeters,
+		DepthBiasRatio:           t.DepthBiasRatio,
+		TileCacheBytes:           t.TileCacheBytes,
+		Workers:                  t.Workers,
+	}
+}
+
+// domainRenderResolution is the resolution of the images when the user
+// chooses none, checked as any resolution is.
+func domainRenderResolution(d config.RenderDefaults) (domain.Resolution, error) {
+	return domain.NewResolution(d.Width, d.Height)
 }

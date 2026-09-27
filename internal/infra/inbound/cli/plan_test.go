@@ -20,9 +20,9 @@ import (
 )
 
 // planDefaults are the defaults the composition root would inject: 30 fps,
-// medium distance and tilt, and an automatic duration.
+// medium distance and tilt, a 16:9 video and an automatic duration.
 func planDefaults() domain.PlanParameters {
-	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium}
+	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium, Aspect: domain.AspectRatio{Width: 16, Height: 9}}
 }
 
 // executePlanCommand runs the "plan" command against an existing temporary
@@ -165,11 +165,38 @@ func Test_PlanCommand_Parameters(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("should translate the aspect ratio", func(t *testing.T) {
+		// given
+		want := planDefaults()
+		want.Aspect = domain.AspectRatio{Width: 9, Height: 16}
+		service := expectParameters(t, want)
+
+		// when
+		_, err := executePlanCommand(t, service, "--aspect", "9:16")
+
+		// then
+		assert.NoError(t, err)
+	})
+
+	t.Run("should refuse an invalid aspect ratio with its own error, before reaching the service", func(t *testing.T) {
+		// given
+		service := mockapplication.NewMockCameraPlanService(gomock.NewController(t))
+
+		// when
+		_, malformedErr := executePlanCommand(t, service, "--aspect", "vertical")
+		_, tooTallErr := executePlanCommand(t, service, "--aspect", "1:9")
+
+		// then
+		assert.ErrorIs(t, malformedErr, domain.ErrInvalidAspectRatio)
+		assert.ErrorIs(t, tooTallErr, domain.ErrInvalidAspectRatio)
+		assert.Equal(t, 39, cli.ExitCode(malformedErr))
+	})
+
 	t.Run("should use the injected defaults for the flags it does not receive", func(t *testing.T) {
 		// given: defaults different from the usual ones
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		want := domain.PlanParameters{FrameRate: 24, Distance: domain.LevelLow, Tilt: domain.LevelHigh}
+		want := domain.PlanParameters{FrameRate: 24, Distance: domain.LevelLow, Tilt: domain.LevelHigh, Aspect: domain.AspectRatio{Width: 9, Height: 16}}
 		service.EXPECT().Generate(gomock.Any(), want).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
 
 		path := filepath.Join(t.TempDir(), "track.gpx")
@@ -293,6 +320,7 @@ func Test_PlanCommand_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Duration: 42.0 s (automatic)\n"+
 			"Frame rate: 30.0 fps\n"+
+			"Aspect ratio: 16:9\n"+
 			"Frames: 2\n"+
 			"Camera altitude: 127.3 m - 912.8 m\n"+
 			"Camera distance: 300.0 m - 1204.5 m\n"+

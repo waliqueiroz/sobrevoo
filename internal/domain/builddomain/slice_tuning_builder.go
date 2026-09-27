@@ -13,7 +13,7 @@ func NewSliceTuningBuilder() *SliceTuningBuilder {
 	return &SliceTuningBuilder{
 		tuning: domain.SliceTuning{
 			MarginFactor:          1.0,
-			ReferenceHeightPixels: 1080,
+			ReferenceHeightPixels: 1920,
 			TexelScreenRatio:      2.0,
 			EstimatedTileBytes:    64 * 1024,
 			MaxSizeBytes:          256 * 1024 * 1024,

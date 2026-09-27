@@ -63,6 +63,7 @@ type sliceMocks struct {
 	baseMapReader   *mockdomain.MockBaseMapReader
 	elevationReader *mockdomain.MockElevationReader
 	exporter        *mockdomain.MockGeoSliceExporter
+	reader          *mockdomain.MockGeoSliceReader
 	service         application.GeoSliceService
 }
 
@@ -80,9 +81,10 @@ func newSliceMocksWithTuning(t *testing.T, tuning domain.SliceTuning) sliceMocks
 		baseMapReader:   mockdomain.NewMockBaseMapReader(mockCtrl),
 		elevationReader: mockdomain.NewMockElevationReader(mockCtrl),
 		exporter:        mockdomain.NewMockGeoSliceExporter(mockCtrl),
+		reader:          mockdomain.NewMockGeoSliceReader(mockCtrl),
 	}
 	m.service = application.NewGeoSliceService(
-		m.repository, m.fileChecker, m.baseMapReader, m.elevationReader, m.exporter,
+		m.repository, m.fileChecker, m.baseMapReader, m.elevationReader, m.exporter, m.reader,
 		tuning, builddomain.NewCameraTuningBuilder().Build(),
 	)
 	return m
@@ -163,6 +165,32 @@ func Test_geoSliceService_Generate(t *testing.T) {
 		meters, hasValue := slice.Elevation[0].At(0, 0)
 		assert.True(t, hasValue)
 		assert.Equal(t, 100.0, meters)
+	})
+
+	t.Run("should say which plan the slice was made from", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		baseMap := baseMapSource("map", wholeWorldish)
+		relief := reliefSource("dem", wholeWorldish)
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{baseMap, relief}, nil)
+		m.baseMapReader.EXPECT().Levels(baseMap.Path).Return(domain.LevelRange{Min: 0, Max: 16}, nil)
+		m.baseMapReader.EXPECT().ReadTiles(baseMap.Path, 16, gomock.Any()).
+			DoAndReturn(func(_ string, _ int, ids []domain.TileID) (domain.TileRead, error) { return tilesFor(ids), nil })
+		m.elevationReader.EXPECT().Describe(relief.Path).Return(reliefInfo, nil)
+		m.elevationReader.EXPECT().ReadWindow(relief.Path, gomock.Any()).
+			DoAndReturn(func(_ string, window domain.GridWindow) (domain.ElevationWindow, error) {
+				return samplesFor(window), nil
+			})
+
+		// when
+		slice, err := m.service.Generate(plan)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, plan.ID(), slice.PlanID)
+		assert.Len(t, slice.PlanID, 64)
+		assert.Empty(t, slice.ContentID, "only the reader of a slice file knows the identification of the file")
 	})
 
 	t.Run("should ignore a registered source whose file is no longer there", func(t *testing.T) {
@@ -798,5 +826,41 @@ func Test_geoSliceService_Generate_AnywhereOnTheGlobe(t *testing.T) {
 		// then
 		assert.InEpsilon(t, equatorWidth, northWidth, 0.02)
 		assert.InEpsilon(t, equatorHeight, northHeight, 0.02)
+	})
+}
+
+func Test_geoSliceService_Load(t *testing.T) {
+	t.Run("should read the slice file with the reader, and give the slice it returns", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		want := builddomain.NewGeoSliceBuilder().WithPlanID("plan").WithContentID("content").Build()
+		m.reader.EXPECT().Read("/tmp/slice.zip").Return(want, nil)
+
+		// when
+		slice, err := m.service.Load("/tmp/slice.zip")
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, want, slice)
+	})
+
+	t.Run("should return the errors of the reader as they are", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		errs := []error{
+			fmt.Errorf("%w: not a ZIP file", domain.ErrSliceFileInvalid),
+			fmt.Errorf("%w: found 2, accepted: 1", domain.ErrSliceFormatVersionUnsupported),
+			errors.New("reading the slice file: permission denied"),
+		}
+
+		for _, want := range errs {
+			m.reader.EXPECT().Read("/tmp/slice.zip").Return(domain.GeoSlice{}, want)
+
+			// when
+			_, err := m.service.Load("/tmp/slice.zip")
+
+			// then
+			assert.Equal(t, want, err)
+		}
 	})
 }
