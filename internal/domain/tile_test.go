@@ -11,7 +11,7 @@ import (
 )
 
 func Test_SliceTuning_DetailLevel(t *testing.T) {
-	tuning := builddomain.NewSliceTuningBuilder().Build()
+	tuning := builddomain.NewSliceTuningBuilder().WithReferenceHeightPixels(1080).Build()
 	offered := domain.LevelRange{Min: 0, Max: 22}
 
 	t.Run("should ask for the smallest level whose resolution fits a screen pixel at the nearest distance", func(t *testing.T) {
@@ -101,7 +101,7 @@ func Test_SliceTuning_DetailLevel(t *testing.T) {
 }
 
 func Test_SliceTuning_DetailLevel_Reason(t *testing.T) {
-	tuning := builddomain.NewSliceTuningBuilder().Build()
+	tuning := builddomain.NewSliceTuningBuilder().WithReferenceHeightPixels(1080).Build()
 	area := box(-23.6, -23.5, -46.7, -46.6)
 
 	t.Run("should say the level is within the range the source offers", func(t *testing.T) {
@@ -220,5 +220,23 @@ func Test_TileRange_Bounds(t *testing.T) {
 		assert.Equal(t, single.MaxLatitude, joined.MaxLatitude)
 		assert.Greater(t, joined.MaxLongitude, single.MaxLongitude)
 		assert.Less(t, joined.MinLatitude, single.MinLatitude)
+	})
+}
+
+func Test_SliceTuning_DetailLevel_ReferenceHeight(t *testing.T) {
+	t.Run("should ask for a finer level for a taller screen, at the same distance", func(t *testing.T) {
+		// given: the default reference is the height of a vertical video, 1920 pixels
+		landscape := builddomain.NewSliceTuningBuilder().WithReferenceHeightPixels(1080).Build()
+		vertical := builddomain.NewSliceTuningBuilder().Build()
+		area := box(-0.1, 0.1, 10, 10.2)
+		offered := domain.LevelRange{Min: 0, Max: 22}
+
+		// when
+		short := landscape.DetailLevel(600, 45, area, offered)
+		tall := vertical.DetailLevel(600, 45, area, offered)
+
+		// then
+		assert.Equal(t, 18, short.Ideal)
+		assert.Equal(t, 19, tall.Ideal)
 	})
 }

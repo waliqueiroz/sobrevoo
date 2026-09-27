@@ -16,8 +16,10 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/filechecker"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/geodatainspector"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/jsonfile"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/pngfile"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/simplifier"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/tiledecoder"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/trackparser"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/zipfile"
 )
@@ -50,7 +52,18 @@ func run() int {
 
 	baseMapReader := basemapreader.NewMBTiles()
 	geoSliceExporter := zipfile.NewGeoSliceExporter()
-	geoSliceService := application.NewGeoSliceService(geoDataRepository, geoDataFileChecker, baseMapReader, elevationReader, geoSliceExporter, domainSliceTuning(cfg.SliceTuning), domainCameraTuning(cfg.CameraTuning))
+	geoSliceReader := zipfile.NewGeoSliceReader()
+	geoSliceService := application.NewGeoSliceService(geoDataRepository, geoDataFileChecker, baseMapReader, elevationReader, geoSliceExporter, geoSliceReader, domainSliceTuning(cfg.SliceTuning), domainCameraTuning(cfg.CameraTuning))
+
+	defaultResolution, err := domainRenderResolution(cfg.RenderDefaults)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 4
+	}
+	tileDecoder := tiledecoder.NewRaster()
+	frameExporter := pngfile.NewFrameExporter()
+	frameRepository := pngfile.NewFrameRepository()
+	frameService := application.NewFrameService(tileDecoder, frameRepository, frameExporter, domainRenderTuning(cfg.RenderTuning), domainSliceTuning(cfg.SliceTuning))
 
 	geoDataCommand := cli.NewGeoDataCommand()
 	geoDataCommand.AddCommand(cli.NewGeoDataRegisterCommand(geoDataService))
@@ -60,10 +73,15 @@ func run() int {
 	geoDataCommand.AddCommand(cli.NewGeoDataSliceCommand(cameraPlanService, geoSliceService))
 	geoDataCommand.AddCommand(cli.NewGeoDataElevationCommand(geoDataService))
 
+	renderCommand := cli.NewRenderCommand()
+	renderCommand.AddCommand(cli.NewRenderFrameCommand(cameraPlanService, geoSliceService, frameService, defaultResolution))
+	renderCommand.AddCommand(cli.NewRenderAllCommand(cameraPlanService, geoSliceService, frameService, defaultResolution))
+
 	root := cli.NewRootCommand()
 	root.AddCommand(cli.NewInspectCommand(trackService, domainLevel(cfg.DefaultLevel)))
 	root.AddCommand(cli.NewPlanCommand(cameraPlanService, domainPlanParameters(cfg.PlanDefaults)))
 	root.AddCommand(geoDataCommand)
+	root.AddCommand(renderCommand)
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -1,6 +1,7 @@
 package domain
 
 //go:generate go run go.uber.org/mock/mockgen -destination mockdomain/geo_slice_exporter.go -package mockdomain . GeoSliceExporter
+//go:generate go run go.uber.org/mock/mockgen -destination mockdomain/geo_slice_reader.go -package mockdomain . GeoSliceReader
 
 import (
 	"fmt"
@@ -16,6 +17,19 @@ type GeoSliceExporter interface {
 	// path that already exists (ErrSliceDestinationExists), and it must
 	// never leave a partial file behind on failure.
 	Export(slice GeoSlice, path string, overwrite bool) error
+}
+
+// GeoSliceReader reads back a geo data slice a GeoSliceExporter wrote, for the
+// stages that draw from it. Concrete implementations live in
+// internal/infra/outbound.
+type GeoSliceReader interface {
+	// Read reads the slice file at path, checks it is coherent with itself and
+	// returns the slice with PlanID and ContentID set. It fails with
+	// ErrSliceFileInvalid when the file is not a slice or is malformed, and with
+	// ErrSliceFormatVersionUnsupported for a format version it does not know; an
+	// I/O error opening or reading the file is returned wrapped, with no
+	// sentinel.
+	Read(path string) (GeoSlice, error)
 }
 
 const (
@@ -184,6 +198,73 @@ func (g *SizeGuard) AddGrid(grid ElevationGrid) error {
 	return g.tuning.EnsureFits(g.size, g.area, g.level)
 }
 
+// EnsureMatches refuses, with ErrSliceDoesNotMatchPlan, a slice that was not made
+// from plan: what a slice says of the plan it came from is the identification
+// in PlanID, so a slice made from another plan is told even when its area looks
+// right.
+func (g GeoSlice) EnsureMatches(plan CameraPlan) error {
+	if want := plan.ID(); g.PlanID != want {
+		return fmt.Errorf("%w: the slice was made for plan %s, not for plan %s", ErrSliceDoesNotMatchPlan, abbreviated(g.PlanID), abbreviated(want))
+	}
+	return nil
+}
+
+// abbreviated is the first 12 characters of an identification, enough to tell
+// two apart.
+func abbreviated(id string) string {
+	switch {
+	case id == "":
+		return "(none)"
+	case len(id) > 12:
+		return id[:12]
+	}
+	return id
+}
+
+// EnsureCovers refuses, with ErrSliceDoesNotCoverPlan, a slice whose area does
+// not contain the one the plan needs (BoundingBox.ContainsBox): a slice made
+// from the plan with another margin, say. The message compares the two areas.
+func (g GeoSlice) EnsureCovers(plan CameraPlan, tuning SliceTuning) error {
+	needed := plan.AreaOfInterest(tuning)
+	if !g.Area.ContainsBox(needed) {
+		return fmt.Errorf("%w: the plan needs %s, and the slice has %s", ErrSliceDoesNotCoverPlan, describeArea(needed), describeArea(g.Area))
+	}
+	return nil
+}
+
+// describeArea writes an area the way the summary of a slice does.
+func describeArea(area BoundingBox) string {
+	text := fmt.Sprintf("lat %.4f to %.4f, lon %.4f to %.4f", area.MinLatitude, area.MaxLatitude, area.MinLongitude, area.MaxLongitude)
+	if area.CrossesAntimeridian {
+		text += " (crosses the antimeridian)"
+	}
+	return text
+}
+
+// EnsureDrawable refuses a slice that cannot be drawn: one whose base map has
+// tiles that are not images — vector tiles, which are drawn by a later stage —
+// (ErrTileFormatUnsupported), or whose elevation has no sample with a value at
+// all (ErrNoElevationData). What is missing in a slice that can be drawn — a
+// tile, a sample — is drawn as the mark of what is missing.
+func (g GeoSlice) EnsureDrawable() error {
+	for _, tileSet := range g.TileSets {
+		switch tileSet.Format {
+		case "png", "jpg", "webp":
+		case "pbf", "mvt":
+			return fmt.Errorf("%w: base map %q has vector tiles (%s); drawing vector tiles is not supported yet, use a base map of image tiles (PNG, JPG or WebP)",
+				ErrTileFormatUnsupported, tileSet.Source.Name, tileSet.Format)
+		default:
+			return fmt.Errorf("%w: base map %q has tiles of format %q, which is not supported for drawing (use image tiles: PNG, JPG or WebP)",
+				ErrTileFormatUnsupported, tileSet.Source.Name, tileSet.Format)
+		}
+	}
+
+	if g.Summary.SampleCount == g.Summary.NoValueSampleCount {
+		return fmt.Errorf("%w: no elevation sample has a value, so there is no terrain to draw", ErrNoElevationData)
+	}
+	return nil
+}
+
 // SliceRegions are the regions of a slice's area, in order (see
 // BoundingBox.Regions).
 type SliceRegions []SliceRegion
@@ -232,6 +313,17 @@ type GeoSlice struct {
 	TileSets  []TileSet
 	Elevation []ElevationGrid
 	Summary   SliceSummary
+
+	// PlanID is CameraPlan.ID of the plan the slice was made from; it is
+	// written in the exported file, so a later stage can tell whether a slice
+	// belongs to a plan.
+	PlanID string
+
+	// ContentID identifies the slice file the slice was read from: the SHA-256,
+	// in lowercase hexadecimal, of the whole file. Only the reader of a slice
+	// file sets it; a slice that was just generated has no file yet, and it is
+	// never exported.
+	ContentID string
 }
 
 // NewGeoSlice assembles a slice from its content and computes its summary

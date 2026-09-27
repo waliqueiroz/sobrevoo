@@ -4,6 +4,9 @@ package domain
 //go:generate go run go.uber.org/mock/mockgen -destination mockdomain/camera_plan_reader.go -package mockdomain . CameraPlanReader
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"time"
@@ -291,4 +294,54 @@ func (c CameraPlan) AreaOfInterest(tuning SliceTuning) BoundingBox {
 	}
 
 	return area.rounded()
+}
+
+// ID identifies the plan by its content: the SHA-256, in lowercase
+// hexadecimal, of a canonical encoding of its effective parameters and of every
+// frame, with each value rounded to the step the plan itself uses (1e-7° for
+// coordinates, 1e-3 for lengths and angles) and written as a 64-bit integer in
+// a fixed byte order. It is the same for the same content whether the plan
+// comes from memory or was read back from a file, so a slice can say which
+// plan it was made from (a plan file's formatting never matters). The summary
+// is derived from the frames and does not take part.
+func (c CameraPlan) ID() string {
+	hash := sha256.New()
+	write := func(v int64) {
+		var buffer [8]byte
+		binary.BigEndian.PutUint64(buffer[:], uint64(v))
+		hash.Write(buffer[:])
+	}
+	writeText := func(text string) {
+		write(int64(len(text)))
+		hash.Write([]byte(text))
+	}
+	quantized := func(v, step float64) int64 { return int64(math.Round(v / step)) }
+
+	writeText("sobrevoo-plan-v1")
+
+	var duration int64
+	if c.Parameters.Duration != nil {
+		duration = int64(*c.Parameters.Duration)
+	}
+	write(duration)
+	write(int64(math.Float64bits(c.Parameters.FrameRate)))
+	write(int64(c.Parameters.Distance))
+	write(int64(c.Parameters.Tilt))
+
+	write(int64(len(c.Frames)))
+	for _, f := range c.Frames {
+		write(int64(f.Index))
+		writeText(string(f.Phase))
+		write(quantized(f.CameraLatitude, coordinateStep))
+		write(quantized(f.CameraLongitude, coordinateStep))
+		write(quantized(f.CameraAltitude, lengthStep))
+		write(quantized(f.Heading, angleStep))
+		write(quantized(f.Tilt, angleStep))
+		write(quantized(f.MarkerLatitude, coordinateStep))
+		write(quantized(f.MarkerLongitude, coordinateStep))
+		write(quantized(f.MarkerDistance, lengthStep))
+		write(quantized(f.CameraToMarkerDistance, lengthStep))
+	}
+
+	return hex.EncodeToString(hash.Sum(nil))
 }

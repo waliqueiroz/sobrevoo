@@ -25,6 +25,10 @@ type GeoSliceService interface {
 	// Export writes slice to path; unless overwrite is true it refuses a path
 	// that already exists.
 	Export(slice domain.GeoSlice, path string, overwrite bool) error
+
+	// Load reads the slice file at path — one Export wrote — and checks that it
+	// is coherent with itself, so the stages that draw from it can trust it.
+	Load(path string) (domain.GeoSlice, error)
 }
 
 type geoSliceService struct {
@@ -33,6 +37,7 @@ type geoSliceService struct {
 	baseMapReader   domain.BaseMapReader
 	elevationReader domain.ElevationReader
 	exporter        domain.GeoSliceExporter
+	reader          domain.GeoSliceReader
 
 	// sliceTuning holds the slice's constants and cameraTuning the camera's
 	// field of view, which the level of detail depends on. Both are resolved
@@ -49,6 +54,7 @@ func NewGeoSliceService(
 	baseMapReader domain.BaseMapReader,
 	elevationReader domain.ElevationReader,
 	exporter domain.GeoSliceExporter,
+	reader domain.GeoSliceReader,
 	sliceTuning domain.SliceTuning,
 	cameraTuning domain.CameraTuning,
 ) GeoSliceService {
@@ -58,6 +64,7 @@ func NewGeoSliceService(
 		baseMapReader:   baseMapReader,
 		elevationReader: elevationReader,
 		exporter:        exporter,
+		reader:          reader,
 		sliceTuning:     sliceTuning,
 		cameraTuning:    cameraTuning,
 	}
@@ -118,7 +125,9 @@ func (s *geoSliceService) Generate(plan domain.CameraPlan) (domain.GeoSlice, err
 		grids = append(grids, grid)
 	}
 
-	return domain.NewGeoSlice(area, tileSets, grids), nil
+	slice := domain.NewGeoSlice(area, tileSets, grids)
+	slice.PlanID = plan.ID()
+	return slice, nil
 }
 
 // planTiles chooses the level of detail of each base map that wins in some
@@ -204,4 +213,8 @@ func sourceError(source domain.GeoDataSource, err error) error {
 
 func (s *geoSliceService) Export(slice domain.GeoSlice, path string, overwrite bool) error {
 	return s.exporter.Export(slice, path, overwrite)
+}
+
+func (s *geoSliceService) Load(path string) (domain.GeoSlice, error) {
+	return s.reader.Read(path)
 }

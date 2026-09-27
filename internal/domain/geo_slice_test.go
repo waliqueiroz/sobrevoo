@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -422,5 +423,259 @@ func Test_SizeGuard(t *testing.T) {
 
 		// then: 70 + 36 = 106
 		assert.ErrorIs(t, err, domain.ErrSliceTooLarge)
+	})
+}
+
+func Test_NewGeoSlice_Identification(t *testing.T) {
+	t.Run("should leave the plan and the content identification empty: they come from elsewhere", func(t *testing.T) {
+		// given / when
+		slice := builddomain.NewGeoSliceBuilder().Build()
+
+		// then
+		assert.Empty(t, slice.PlanID)
+		assert.Empty(t, slice.ContentID)
+	})
+}
+
+// planWithMarkerAt is a plan of one frame whose marker and camera are around the
+// given point, 1 km from it.
+func planWithMarkerAt(lat, lon float64) domain.CameraPlan {
+	frame := builddomain.NewCameraFrameBuilder().
+		WithMarkerPosition(lat, lon).WithCameraPosition(lat-0.004, lon).WithCameraToMarkerDistance(1000).Build()
+	return builddomain.NewCameraPlanBuilder().WithFrames(frame).Build()
+}
+
+func Test_GeoSlice_EnsureMatches(t *testing.T) {
+	plan := planWithMarkerAt(-23.55, -46.63)
+
+	t.Run("should accept a slice made from the plan", func(t *testing.T) {
+		// given
+		slice := builddomain.NewGeoSliceBuilder().WithPlanID(plan.ID()).Build()
+
+		// when / then
+		assert.NoError(t, slice.EnsureMatches(plan))
+	})
+
+	t.Run("should refuse a slice made from another plan, naming both by their first 12 characters", func(t *testing.T) {
+		// given
+		other := planWithMarkerAt(-23.56, -46.63)
+		slice := builddomain.NewGeoSliceBuilder().WithPlanID(other.ID()).Build()
+
+		// when
+		err := slice.EnsureMatches(plan)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceDoesNotMatchPlan)
+		assert.ErrorContains(t, err, other.ID()[:12])
+		assert.ErrorContains(t, err, plan.ID()[:12])
+		assert.NotContains(t, err.Error(), plan.ID()[:13])
+	})
+
+	t.Run("should refuse a slice that says nothing of its plan", func(t *testing.T) {
+		// given
+		slice := builddomain.NewGeoSliceBuilder().Build()
+
+		// when
+		err := slice.EnsureMatches(plan)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceDoesNotMatchPlan)
+	})
+}
+
+func Test_GeoSlice_EnsureCovers(t *testing.T) {
+	tuning := builddomain.NewSliceTuningBuilder().Build()
+	plan := planWithMarkerAt(-23.55, -46.63)
+	needed := plan.AreaOfInterest(tuning)
+
+	t.Run("should accept a slice whose area is the one the plan needs, or bigger", func(t *testing.T) {
+		// given
+		bigger := needed
+		bigger.MinLatitude -= 0.1
+		bigger.MaxLongitude += 0.1
+
+		// when
+		exact := builddomain.NewGeoSliceBuilder().WithArea(needed).Build().EnsureCovers(plan, tuning)
+		wider := builddomain.NewGeoSliceBuilder().WithArea(bigger).Build().EnsureCovers(plan, tuning)
+
+		// then
+		assert.NoError(t, exact)
+		assert.NoError(t, wider)
+	})
+
+	t.Run("should refuse a slice smaller than what the plan needs, on any side", func(t *testing.T) {
+		for _, side := range []func(a *domain.BoundingBox){
+			func(a *domain.BoundingBox) { a.MinLatitude += 0.001 },
+			func(a *domain.BoundingBox) { a.MaxLatitude -= 0.001 },
+			func(a *domain.BoundingBox) { a.MinLongitude += 0.001 },
+			func(a *domain.BoundingBox) { a.MaxLongitude -= 0.001 },
+		} {
+			// given
+			area := needed
+			side(&area)
+
+			// when
+			err := builddomain.NewGeoSliceBuilder().WithArea(area).Build().EnsureCovers(plan, tuning)
+
+			// then
+			assert.ErrorIs(t, err, domain.ErrSliceDoesNotCoverPlan)
+		}
+	})
+
+	t.Run("should say the area the plan needs and the one the slice has, as the slice summary writes an area", func(t *testing.T) {
+		// given
+		small := domain.BoundingBox{MinLatitude: -23.5600, MaxLatitude: -23.5500, MinLongitude: -46.6400, MaxLongitude: -46.6200}
+
+		// when
+		err := builddomain.NewGeoSliceBuilder().WithArea(small).Build().EnsureCovers(plan, tuning)
+
+		// then
+		assert.ErrorContains(t, err, "the plan needs lat -23.5")
+		assert.ErrorContains(t, err, "the slice has lat -23.5600 to -23.5500, lon -46.6400 to -46.6200")
+	})
+
+	t.Run("should cover an area that crosses the antimeridian only with one that does", func(t *testing.T) {
+		// given
+		crossing := planWithMarkerAt(-16.5, 179.999)
+		crossingNeed := crossing.AreaOfInterest(tuning)
+		require.True(t, crossingNeed.CrossesAntimeridian)
+		notCrossing := crossingNeed
+		notCrossing.CrossesAntimeridian = false
+
+		// when
+		ok := builddomain.NewGeoSliceBuilder().WithArea(crossingNeed).Build().EnsureCovers(crossing, tuning)
+		bad := builddomain.NewGeoSliceBuilder().WithArea(notCrossing).Build().EnsureCovers(crossing, tuning)
+
+		// then
+		assert.NoError(t, ok)
+		assert.ErrorIs(t, bad, domain.ErrSliceDoesNotCoverPlan)
+	})
+
+	t.Run("should mark in the message an area that crosses the antimeridian", func(t *testing.T) {
+		// given
+		crossing := planWithMarkerAt(-16.5, 179.999)
+		small := domain.BoundingBox{MinLatitude: -16.51, MaxLatitude: -16.49, MinLongitude: 179.9995, MaxLongitude: -179.9995, CrossesAntimeridian: true}
+
+		// when
+		err := builddomain.NewGeoSliceBuilder().WithArea(small).Build().EnsureCovers(crossing, tuning)
+
+		// then
+		assert.ErrorContains(t, err, "(crosses the antimeridian)")
+	})
+}
+
+func Test_GeoSlice_EnsureDrawable(t *testing.T) {
+	tileSetOf := func(name, format string) domain.TileSet {
+		return builddomain.NewTileSetBuilder().WithSource(builddomain.NewGeoDataSourceBuilder().WithName(name).Build()).WithFormat(format).Build()
+	}
+
+	t.Run("should accept tiles that are images", func(t *testing.T) {
+		for _, format := range []string{"png", "jpg", "webp"} {
+			// given
+			slice := builddomain.NewGeoSliceBuilder().WithTileSets(tileSetOf("map", format)).Build()
+
+			// when / then
+			assert.NoError(t, slice.EnsureDrawable(), format)
+		}
+	})
+
+	t.Run("should refuse vector tiles, naming the base map and the format, and saying it is not supported yet", func(t *testing.T) {
+		// given
+		slice := builddomain.NewGeoSliceBuilder().WithTileSets(tileSetOf("bbbike", "pbf")).Build()
+
+		// when
+		err := slice.EnsureDrawable()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrTileFormatUnsupported)
+		assert.ErrorContains(t, err, `base map "bbbike" has vector tiles (pbf); drawing vector tiles is not supported yet, use a base map of image tiles (PNG, JPG or WebP)`)
+	})
+
+	t.Run("should refuse the vector tiles of the other name they go by", func(t *testing.T) {
+		// given
+		slice := builddomain.NewGeoSliceBuilder().WithTileSets(tileSetOf("map", "mvt")).Build()
+
+		// when / then
+		assert.ErrorContains(t, slice.EnsureDrawable(), "has vector tiles (mvt)")
+	})
+
+	t.Run("should refuse any other format, naming it", func(t *testing.T) {
+		// given
+		gif := builddomain.NewGeoSliceBuilder().WithTileSets(tileSetOf("map", "gif")).Build()
+		none := builddomain.NewGeoSliceBuilder().WithTileSets(tileSetOf("map", "")).Build()
+
+		// when
+		errGIF := gif.EnsureDrawable()
+		errNone := none.EnsureDrawable()
+
+		// then
+		assert.ErrorIs(t, errGIF, domain.ErrTileFormatUnsupported)
+		assert.ErrorContains(t, errGIF, `has tiles of format "gif", which is not supported for drawing`)
+		assert.ErrorIs(t, errNone, domain.ErrTileFormatUnsupported)
+	})
+
+	t.Run("should refuse a slice in which one base map has vector tiles even when another has images", func(t *testing.T) {
+		// given
+		slice := builddomain.NewGeoSliceBuilder().WithTileSets(tileSetOf("a-images", "png"), tileSetOf("b-vectors", "pbf")).Build()
+
+		// when
+		err := slice.EnsureDrawable()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrTileFormatUnsupported)
+		assert.ErrorContains(t, err, `"b-vectors"`)
+	})
+
+	t.Run("should accept a slice with no tiles at all: it is drawn with the marks of a missing map", func(t *testing.T) {
+		// given
+		slice := builddomain.NewGeoSliceBuilder().WithTileSets().Build()
+
+		// when / then
+		assert.NoError(t, slice.EnsureDrawable())
+	})
+
+	t.Run("should refuse a slice in which no elevation sample has a value", func(t *testing.T) {
+		// given
+		nan := float32(math.NaN())
+		grid := builddomain.NewElevationGridBuilder().WithValues(nan, nan, nan, nan, nan, nan, nan, nan, nan).Build()
+		slice := builddomain.NewGeoSliceBuilder().WithElevation(grid).Build()
+
+		// when
+		err := slice.EnsureDrawable()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrNoElevationData)
+		assert.ErrorContains(t, err, "no elevation sample has a value")
+	})
+
+	t.Run("should refuse a slice with no elevation grid at all", func(t *testing.T) {
+		// given
+		slice := builddomain.NewGeoSliceBuilder().WithElevation().Build()
+
+		// when / then
+		assert.ErrorIs(t, slice.EnsureDrawable(), domain.ErrNoElevationData)
+	})
+
+	t.Run("should accept a slice in which one sample has a value", func(t *testing.T) {
+		// given
+		nan := float32(math.NaN())
+		grid := builddomain.NewElevationGridBuilder().WithValues(nan, nan, nan, nan, 10, nan, nan, nan, nan).Build()
+		slice := builddomain.NewGeoSliceBuilder().WithElevation(grid).Build()
+
+		// when / then
+		assert.NoError(t, slice.EnsureDrawable())
+	})
+
+	t.Run("should check the format of the tiles before the elevation", func(t *testing.T) {
+		// given
+		nan := float32(math.NaN())
+		grid := builddomain.NewElevationGridBuilder().WithValues(nan, nan, nan, nan, nan, nan, nan, nan, nan).Build()
+		slice := builddomain.NewGeoSliceBuilder().WithElevation(grid).WithTileSets(tileSetOf("map", "pbf")).Build()
+
+		// when
+		err := slice.EnsureDrawable()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrTileFormatUnsupported)
 	})
 }

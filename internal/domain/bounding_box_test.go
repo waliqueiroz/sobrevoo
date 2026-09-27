@@ -393,3 +393,60 @@ func Test_BoundingBox_ClippedTo(t *testing.T) {
 		assert.Equal(t, crossing, clipped)
 	})
 }
+
+func Test_BoundingBox_ContainsBox(t *testing.T) {
+	box := domain.BoundingBox{MinLatitude: -10, MaxLatitude: 10, MinLongitude: 20, MaxLongitude: 40}
+
+	t.Run("should contain itself and a box inside it, touching an edge included", func(t *testing.T) {
+		// given / when / then
+		assert.True(t, box.ContainsBox(box))
+		assert.True(t, box.ContainsBox(domain.BoundingBox{MinLatitude: -5, MaxLatitude: 5, MinLongitude: 25, MaxLongitude: 35}))
+		assert.True(t, box.ContainsBox(domain.BoundingBox{MinLatitude: -10, MaxLatitude: 0, MinLongitude: 20, MaxLongitude: 30}))
+	})
+
+	t.Run("should not contain a bigger box, or one that sticks out of it on a single side", func(t *testing.T) {
+		// given / when / then
+		assert.False(t, box.ContainsBox(domain.BoundingBox{MinLatitude: -11, MaxLatitude: 10, MinLongitude: 20, MaxLongitude: 40}))
+		assert.False(t, box.ContainsBox(domain.BoundingBox{MinLatitude: -10, MaxLatitude: 11, MinLongitude: 20, MaxLongitude: 40}))
+		assert.False(t, box.ContainsBox(domain.BoundingBox{MinLatitude: -10, MaxLatitude: 10, MinLongitude: 19, MaxLongitude: 40}))
+		assert.False(t, box.ContainsBox(domain.BoundingBox{MinLatitude: -10, MaxLatitude: 10, MinLongitude: 20, MaxLongitude: 41}))
+	})
+
+	t.Run("should not contain a box next to it", func(t *testing.T) {
+		// given / when / then
+		assert.False(t, box.ContainsBox(domain.BoundingBox{MinLatitude: 10, MaxLatitude: 20, MinLongitude: 20, MaxLongitude: 40}))
+		assert.False(t, box.ContainsBox(domain.BoundingBox{MinLatitude: -10, MaxLatitude: 10, MinLongitude: 50, MaxLongitude: 60}))
+	})
+
+	t.Run("should contain, across the antimeridian, a box on either side of it or crossing it inside", func(t *testing.T) {
+		// given
+		crossing := domain.BoundingBox{MinLatitude: -10, MaxLatitude: 10, MinLongitude: 170, MaxLongitude: -170, CrossesAntimeridian: true}
+
+		// when / then
+		assert.True(t, crossing.ContainsBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 5, MinLongitude: 175, MaxLongitude: -175, CrossesAntimeridian: true}))
+		assert.True(t, crossing.ContainsBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 5, MinLongitude: 179, MaxLongitude: 179.5}))
+		assert.True(t, crossing.ContainsBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 5, MinLongitude: -179.5, MaxLongitude: -178}))
+		assert.True(t, crossing.ContainsBox(crossing))
+		assert.False(t, crossing.ContainsBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 5, MinLongitude: 160, MaxLongitude: 175}))
+		assert.False(t, crossing.ContainsBox(domain.BoundingBox{MinLatitude: 0, MaxLatitude: 5, MinLongitude: 175, MaxLongitude: -165, CrossesAntimeridian: true}))
+	})
+
+	t.Run("should not let a box that crosses the antimeridian be inside one that does not", func(t *testing.T) {
+		// given
+		crossing := domain.BoundingBox{MinLatitude: 0, MaxLatitude: 5, MinLongitude: 175, MaxLongitude: -175, CrossesAntimeridian: true}
+
+		// when / then
+		assert.False(t, box.ContainsBox(crossing))
+	})
+
+	t.Run("should have the whole world contain any box, and a box that crosses not contain the world", func(t *testing.T) {
+		// given
+		world := domain.BoundingBox{MinLatitude: -90, MaxLatitude: 90, MinLongitude: -180, MaxLongitude: 180}
+		crossing := domain.BoundingBox{MinLatitude: -10, MaxLatitude: 10, MinLongitude: 170, MaxLongitude: -170, CrossesAntimeridian: true}
+
+		// when / then
+		assert.True(t, world.ContainsBox(box))
+		assert.True(t, world.ContainsBox(crossing))
+		assert.False(t, crossing.ContainsBox(world))
+	})
+}

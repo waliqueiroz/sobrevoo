@@ -45,6 +45,7 @@ type parametersFile struct {
 	FrameRate       number `json:"frame_rate"`
 	Distance        string `json:"distance"`
 	Tilt            string `json:"tilt"`
+	AspectRatio     string `json:"aspect_ratio"`
 }
 
 type rangeFile struct {
@@ -106,6 +107,7 @@ func encodePlan(plan domain.CameraPlan) ([]byte, error) {
 		FrameRate:       number{plan.Parameters.FrameRate, 6},
 		Distance:        levelText(plan.Parameters.Distance),
 		Tilt:            levelText(plan.Parameters.Tilt),
+		AspectRatio:     plan.Parameters.Aspect.String(),
 	}, "  ", "  ")
 	if err != nil {
 		return nil, err

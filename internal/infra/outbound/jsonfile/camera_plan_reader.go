@@ -32,6 +32,7 @@ type readParameters struct {
 	FrameRate       *float64 `json:"frame_rate"`
 	Distance        string   `json:"distance"`
 	Tilt            string   `json:"tilt"`
+	AspectRatio     *string  `json:"aspect_ratio"`
 }
 
 type readSpan struct {
@@ -149,11 +150,22 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 		}
 	}
 
+	// A plan made before the aspect ratio existed framed the track by the
+	// vertical field of view only, which is what a landscape video needs.
+	aspect := domain.LandscapeAspectRatio
+	if file.Parameters.AspectRatio != nil {
+		var err error
+		if aspect, err = domain.ParseAspectRatio(*file.Parameters.AspectRatio); err != nil {
+			return domain.CameraPlan{}, invalidPlanFile("parameters.aspect_ratio: %v", err)
+		}
+	}
+
 	parameters := domain.PlanParameters{
 		Duration:  new(secondsToDuration(*file.Parameters.DurationSeconds)),
 		FrameRate: *file.Parameters.FrameRate,
 		Distance:  parseLevel(file.Parameters.Distance),
 		Tilt:      parseLevel(file.Parameters.Tilt),
+		Aspect:    aspect,
 	}
 
 	return domain.NewCameraPlan(

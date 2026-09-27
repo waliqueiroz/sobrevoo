@@ -34,10 +34,13 @@ type PlanParameters struct {
 	// Distance and Tilt choose how far and how steep the camera flies.
 	Distance Level
 	Tilt     Level
+
+	// Aspect is the shape of the video the plan is made for.
+	Aspect AspectRatio
 }
 
-// Validate checks the ranges of the parameters. The frame rate is always
-// validated; the duration only when the user provided one.
+// Validate checks the ranges of the parameters. The frame rate and the aspect
+// ratio are always validated; the duration only when the user provided one.
 func (p PlanParameters) Validate() error {
 	if math.IsNaN(p.FrameRate) || math.IsInf(p.FrameRate, 0) || p.FrameRate < MinFrameRate || p.FrameRate > MaxFrameRate {
 		return fmt.Errorf("%w: %g, must be between %g and %g frames per second", ErrInvalidFrameRate, p.FrameRate, MinFrameRate, MaxFrameRate)
@@ -47,7 +50,7 @@ func (p PlanParameters) Validate() error {
 		return fmt.Errorf("%w: %s, must be greater than 0 s and at most %s", ErrInvalidDuration, *p.Duration, MaxExplicitDuration)
 	}
 
-	return nil
+	return p.Aspect.Validate()
 }
 
 // FrameCount returns how many frames a video of the given duration has at the
@@ -132,7 +135,7 @@ func (p PlanParameters) MinimumDuration(route Route, tuning CameraTuning) time.D
 
 func (p PlanParameters) minimumDuration(route PlanarRoute, tuning CameraTuning) time.Duration {
 	base := tuning.BaseDistanceMeters[p.Distance.index()]
-	overview := route.OverviewView(0, tuning.OverviewMinDistanceFactor*base, tuning)
+	overview := route.OverviewView(0, tuning.OverviewMinDistanceFactor*base, p.Aspect, tuning)
 	followTilt := tuning.TiltDegrees[p.Tilt.index()]
 
 	phase := math.Max(tuning.MinPhaseDuration.Seconds(), math.Max(

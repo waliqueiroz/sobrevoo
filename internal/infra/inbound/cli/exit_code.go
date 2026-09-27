@@ -66,6 +66,32 @@ func ExitCode(err error) int {
 		return 25
 	case errors.Is(err, domain.ErrInvalidCoordinate):
 		return 26
+	case errors.Is(err, domain.ErrSliceFileInvalid):
+		return 27
+	case errors.Is(err, domain.ErrSliceFormatVersionUnsupported):
+		return 28
+	case errors.Is(err, domain.ErrSliceDoesNotMatchPlan):
+		return 29
+	case errors.Is(err, domain.ErrSliceDoesNotCoverPlan):
+		return 30
+	case errors.Is(err, domain.ErrTileFormatUnsupported):
+		return 31
+	case errors.Is(err, domain.ErrNoElevationData):
+		return 32
+	case errors.Is(err, domain.ErrFrameOutOfRange):
+		return 33
+	case errors.Is(err, domain.ErrInvalidResolution):
+		return 34
+	case errors.Is(err, domain.ErrFrameDestinationInvalid):
+		return 35
+	case errors.Is(err, domain.ErrFrameDestinationExists):
+		return 36
+	case errors.Is(err, domain.ErrFrameSetConflict):
+		return 37
+	case errors.Is(err, domain.ErrRenderInterrupted):
+		return 38
+	case errors.Is(err, domain.ErrInvalidAspectRatio):
+		return 39
 	default:
 		// Anything else (file-open I/O errors, malformed-but-recognized
 		// content, CLI usage errors not already handled by Cobra itself) is

@@ -22,6 +22,10 @@ type PlanFileSpec struct {
 	Frames          []PlanFrameSpec
 	DurationSeconds float64
 	FrameRate       float64
+
+	// AspectRatio is parameters.aspect_ratio; empty leaves the field out, as
+	// in a plan made before it existed.
+	AspectRatio string
 }
 
 // DefaultPlanFileSpec is a plan of three following frames, 0.1 s at 30 fps,
@@ -65,12 +69,17 @@ func planDocument(spec PlanFileSpec) map[string]any {
 		minAlt, maxAlt, minDistance, maxDistance = 0, 0, 0, 0
 	}
 
+	parameters := map[string]any{
+		"duration_s": spec.DurationSeconds, "frame_rate": spec.FrameRate,
+		"distance": "medium", "tilt": "medium",
+	}
+	if spec.AspectRatio != "" {
+		parameters["aspect_ratio"] = spec.AspectRatio
+	}
+
 	return map[string]any{
 		"format_version": 1,
-		"parameters": map[string]any{
-			"duration_s": spec.DurationSeconds, "frame_rate": spec.FrameRate,
-			"distance": "medium", "tilt": "medium",
-		},
+		"parameters":     parameters,
 		"summary": map[string]any{
 			"duration_s":           spec.DurationSeconds,
 			"duration_mode":        "automatic",

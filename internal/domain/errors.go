@@ -56,6 +56,10 @@ var (
 	// within the accepted range.
 	ErrInvalidFrameRate = errors.New("invalid frame rate")
 
+	// ErrInvalidAspectRatio reports a video aspect ratio that is not a
+	// "WIDTH:HEIGHT" pair of whole numbers within the accepted range.
+	ErrInvalidAspectRatio = errors.New("invalid aspect ratio")
+
 	// ErrDurationTooShort reports a requested duration shorter than the
 	// minimum needed to plan a smooth flight over the track.
 	ErrDurationTooShort = errors.New("duration too short for this track")
@@ -118,6 +122,57 @@ var (
 	// ErrInvalidCoordinate reports a latitude or longitude that is not a
 	// finite number within the valid range.
 	ErrInvalidCoordinate = errors.New("invalid coordinate")
+
+	// ErrSliceFileInvalid reports a geo data slice file that cannot be used:
+	// not a slice at all, missing required fields, truncated, corrupted,
+	// incoherent with itself, without the identification of its plan, or
+	// holding a tile that is not an image.
+	ErrSliceFileInvalid = errors.New("geo data slice file is invalid")
+
+	// ErrSliceFormatVersionUnsupported reports a slice file whose format
+	// version this tool does not recognize.
+	ErrSliceFormatVersionUnsupported = errors.New("geo data slice file format version is not supported")
+
+	// ErrSliceDoesNotMatchPlan reports a slice that was made from another
+	// plan than the one it is used with.
+	ErrSliceDoesNotMatchPlan = errors.New("geo data slice does not match the camera plan")
+
+	// ErrSliceDoesNotCoverPlan reports a slice whose area does not contain the
+	// area the plan needs.
+	ErrSliceDoesNotCoverPlan = errors.New("geo data slice does not cover the camera plan")
+
+	// ErrTileFormatUnsupported reports base map tiles this tool cannot draw:
+	// vector tiles, or any format that is not an image.
+	ErrTileFormatUnsupported = errors.New("tile format is not supported for drawing")
+
+	// ErrNoElevationData reports a slice in which no elevation sample has a
+	// value: there is no terrain to draw and no height to put the camera at.
+	ErrNoElevationData = errors.New("geo data slice has no elevation data")
+
+	// ErrFrameOutOfRange reports a frame number that is not a whole number of
+	// the plan's frames.
+	ErrFrameOutOfRange = errors.New("frame number is out of range")
+
+	// ErrInvalidResolution reports an image resolution outside the documented
+	// limits, or that is not written as WIDTHxHEIGHT.
+	ErrInvalidResolution = errors.New("invalid resolution")
+
+	// ErrFrameDestinationInvalid reports a frame destination that cannot be
+	// used (not a directory, missing directory, no permission, ...).
+	ErrFrameDestinationInvalid = errors.New("frame destination cannot be used")
+
+	// ErrFrameDestinationExists reports a single frame file that already
+	// exists, when overwriting was not requested.
+	ErrFrameDestinationExists = errors.New("frame destination already exists")
+
+	// ErrFrameSetConflict reports a directory that holds frames of another set
+	// (or files named like frames that are not this tool's), when overwriting
+	// was not requested.
+	ErrFrameSetConflict = errors.New("frame destination holds frames of another set")
+
+	// ErrRenderInterrupted reports a drawing the user interrupted; the frames
+	// that were finished stay valid.
+	ErrRenderInterrupted = errors.New("drawing was interrupted")
 )
 
 // AreaNotCoveredError is the error for an area that the registered geo data

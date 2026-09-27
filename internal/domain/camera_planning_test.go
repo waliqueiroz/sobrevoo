@@ -45,6 +45,39 @@ func Test_PlanCamera(t *testing.T) {
 		}
 	})
 
+	t.Run("should open and close farther from the track for a vertical video than for a horizontal one", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(10000, 45).WithConstantSpeed(4).Build()
+		horizontal := builddomain.NewPlanParametersBuilder().WithDuration(90 * time.Second).WithAspect(domain.LandscapeAspectRatio).Build()
+		vertical := builddomain.NewPlanParametersBuilder().WithDuration(90 * time.Second).WithAspect(domain.AspectRatio{Width: 9, Height: 16}).Build()
+
+		// when
+		horizontalPlan, horizontalErr := treatedOf(points).PlanCamera(horizontal, tuning)
+		verticalPlan, verticalErr := treatedOf(points).PlanCamera(vertical, tuning)
+
+		// then: the overview at the start and the end is farther, the following phase is not
+		require.NoError(t, horizontalErr)
+		require.NoError(t, verticalErr)
+		last := len(horizontalPlan.Frames) - 1
+		assert.Greater(t, verticalPlan.Frames[0].CameraToMarkerDistance, horizontalPlan.Frames[0].CameraToMarkerDistance)
+		assert.Greater(t, verticalPlan.Frames[last].CameraToMarkerDistance, horizontalPlan.Frames[last].CameraToMarkerDistance)
+		middle := last / 2
+		assert.InDelta(t, horizontalPlan.Frames[middle].CameraToMarkerDistance, verticalPlan.Frames[middle].CameraToMarkerDistance, 1)
+		assert.Equal(t, domain.AspectRatio{Width: 9, Height: 16}, verticalPlan.Parameters.Aspect)
+	})
+
+	t.Run("should refuse to plan without a valid aspect ratio", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(5000, 90).Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithAspect(domain.AspectRatio{Width: 1, Height: 9}).Build()
+
+		// when
+		_, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidAspectRatio)
+	})
+
 	t.Run("should time frames by their index over the frame rate", func(t *testing.T) {
 		// given
 		points := builddomain.NewSyntheticRouteBuilder().WithLine(5000, 90).Build()

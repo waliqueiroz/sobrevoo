@@ -12,3 +12,4 @@ Thumbs.db
 .idea/
 resources/
 specs/004-geo-data-slice/amostras/
+specs/005-frame-rendering/amostras/

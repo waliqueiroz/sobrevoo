@@ -55,7 +55,7 @@ func Test_domainCameraTuning(t *testing.T) {
 func Test_domainPlanParameters(t *testing.T) {
 	t.Run("should map the plan defaults, leaving the duration automatic", func(t *testing.T) {
 		// given
-		defaults := config.PlanDefaults{FrameRate: 24, Distance: config.LevelHigh, Tilt: config.LevelLow}
+		defaults := config.PlanDefaults{FrameRate: 24, Distance: config.LevelHigh, Tilt: config.LevelLow, AspectWidth: 9, AspectHeight: 16}
 
 		// when
 		parameters := domainPlanParameters(defaults)
@@ -65,6 +65,7 @@ func Test_domainPlanParameters(t *testing.T) {
 		assert.Equal(t, 24.0, parameters.FrameRate)
 		assert.Equal(t, domain.LevelHigh, parameters.Distance)
 		assert.Equal(t, domain.LevelLow, parameters.Tilt)
+		assert.Equal(t, domain.AspectRatio{Width: 9, Height: 16}, parameters.Aspect)
 	})
 }
 
@@ -79,5 +80,45 @@ func Test_domainSliceTuning(t *testing.T) {
 
 		// then
 		assert.Equal(t, builddomain.NewSliceTuningBuilder().Build(), tuning)
+	})
+}
+
+func Test_domainRenderTuning(t *testing.T) {
+	t.Run("should map the configuration's render tuning to the values the domain tests are built on", func(t *testing.T) {
+		// given
+		cfg, err := config.Load()
+		require.NoError(t, err)
+
+		// when
+		tuning := domainRenderTuning(cfg.RenderTuning)
+
+		// then: the number of goroutines is the one of the machine
+		assert.Equal(t, builddomain.NewRenderTuningBuilder().WithWorkers(cfg.RenderTuning.Workers).Build(), tuning)
+	})
+}
+
+func Test_domainRenderResolution(t *testing.T) {
+	t.Run("should map the default resolution to a valid one", func(t *testing.T) {
+		// given
+		cfg, err := config.Load()
+		require.NoError(t, err)
+
+		// when
+		resolution, err := domainRenderResolution(cfg.RenderDefaults)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, domain.Resolution{Width: 1080, Height: 1920}, resolution)
+	})
+
+	t.Run("should refuse a default resolution outside the limits", func(t *testing.T) {
+		// given
+		defaults := config.RenderDefaults{Width: 1921, Height: 1080}
+
+		// when
+		_, err := domainRenderResolution(defaults)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidResolution)
 	})
 }

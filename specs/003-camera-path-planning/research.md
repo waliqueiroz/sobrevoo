@@ -208,7 +208,17 @@ biblioteca padrão e `encoding/json`.
   usa como cota conservadora. O campo de visão
   vertical de referência é de 45° (`OverviewVerticalFOV` — a etapa de
   renderização poderá usar outro, mas o plano precisa de um valor para
-  garantir que "o trajeto inteiro esteja enquadrado", FR-012).
+  garantir que "o trajeto inteiro esteja enquadrado", FR-012). **Proporção do
+  vídeo (adicionada depois da etapa 5)**: com o campo de visão vertical fixo,
+  o horizontal é `2·atan(L/A · tan(45°/2))`, ~26° num vídeo 9:16, e a
+  distância acima só pelo vertical cortava as laterais da abertura e do
+  fechamento de um vídeo vertical. `plan --aspect L:A` (padrão `9:16`) passa a
+  entrar na conta: o `tan` do meio-campo usado é o do **mais estreito** dos
+  dois, isto é, o vertical multiplicado por `min(1, L/A)`. Em vídeo horizontal
+  nada muda (o resultado é idêntico ao de antes); em 9:16 a abertura e o
+  fechamento ficam ~1,8× mais afastados (o círculo continua sendo o
+  envoltório, sem olhar a direção da câmera: conservador para um trajeto
+  comprido no sentido em que a câmera olha).
   Na abertura, `T`, `ψ`, `θ` e `ln D` interpolam da visão geral para a pose
   de acompanhamento do primeiro quadro do acompanhamento com **smoothstep**
   (`3u² − 2u³`), cuja derivada nula nas pontas elimina saltos na junção. O

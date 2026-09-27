@@ -5,7 +5,7 @@ de sobrevoo de trajetos a partir de arquivos de GPS.
 
 ## Status atual
 
-Quatro etapas estão implementadas:
+Cinco etapas estão implementadas:
 
 1. Leitura e tratamento de um trajeto GPX, exposta pelo comando `inspect`.
 2. Registro local de dados geográficos (mapas base e relevo que você já
@@ -16,8 +16,12 @@ Quatro etapas estão implementadas:
 4. Leitura do conteúdo dos dados geográficos registrados: o recorte de mapa
    base e relevo que um plano de câmera precisa, exposto por `geodata slice`,
    e a consulta de elevação de uma coordenada, por `geodata elevation`.
+5. Desenho dos quadros do voo como imagens: o relevo em perspectiva, vestido
+   com as peças do mapa base, o traçado e o marcador, exposto pelo grupo de
+   comandos `render`.
 
-Ainda não há desenho de mapa, renderização de quadros nem geração de vídeo.
+Ainda não há geração de vídeo: os quadros desenhados são o que a etapa
+seguinte vai juntar.
 
 ## Instalação
 
@@ -121,7 +125,7 @@ nome não registrado), documentados em
 ```sh
 sobrevoo plan <arquivo.gpx> [--duration <segundos>] [--fps <n>] \
     [--distance low|medium|high] [--tilt low|medium|high] \
-    [--export <plano.json>] [--overwrite]
+    [--aspect <L:A>] [--export <plano.json>] [--overwrite]
 ```
 
 A partir de um trajeto (tratado como em `inspect`), calcula o caminho que uma
@@ -138,6 +142,7 @@ mesmo plano, em qualquer lugar do planeta.
 $ sobrevoo plan atividade.gpx --export plano.json
 Duration: 42.0 s (automatic)
 Frame rate: 30.0 fps
+Aspect ratio: 9:16
 Frames: 1260
 Camera altitude: 2098.6 m - 11711.6 m
 Camera distance: 2780.9 m - 15982.9 m
@@ -152,6 +157,7 @@ Plan written to plano.json
 | `--fps` | 1 a 120 | `30` | Quadros por segundo |
 | `--distance` | `low`, `medium`, `high` | `medium` | Quão longe a câmera fica do trajeto |
 | `--tilt` | `low`, `medium`, `high` | `medium` | Quão de cima a câmera olha (`high` é quase vertical) |
+| `--aspect` | `L:A` (`1:5` a `5:1`) | `9:16` | Proporção do vídeo: a abertura e o fechamento enquadram o trajeto inteiro por ela (`9:16` vertical, `16:9` horizontal) |
 | `--export` | caminho | — | Grava o plano completo em JSON (formato em `specs/003-camera-path-planning/contracts/plan-file.md`) |
 | `--overwrite` | — | — | Com `--export`, substitui um arquivo que já exista |
 
@@ -159,7 +165,8 @@ Sem `--export`, só o resumo é impresso e nada é gravado em disco. O arquivo
 exportado nunca sobrescreve outro sem `--overwrite`. Os erros têm código de
 saída próprio (`10` a `16`: duração ou taxa inválida, duração curta demais para
 o trajeto, trajeto curto ou grande demais, destino da exportação já existente
-ou inválido), documentados em `specs/003-camera-path-planning/contracts/cli.md`.
+ou inválido; e `39`, proporção do vídeo inválida), documentados em
+`specs/003-camera-path-planning/contracts/cli.md`.
 
 ### `geodata slice` e `geodata elevation`: ler o conteúdo dos dados registrados
 
@@ -213,6 +220,63 @@ desconhecida, área não coberta, recorte grande demais, dado ilegível ou em
 unidade não suportada, destino da exportação já existente ou inválido,
 coordenada sem cobertura ou inválida), documentados em
 `specs/004-geo-data-slice/contracts/cli.md`.
+
+### `render frame` e `render all`: desenhar os quadros do voo
+
+```sh
+sobrevoo render frame <plano.json> <recorte.zip> --number <n> --output <quadro.png> [--resolution LxA] [--overwrite]
+sobrevoo render all   <plano.json> <recorte.zip> --output <diretório>              [--resolution LxA] [--overwrite]
+```
+
+A partir do plano exportado por `plan --export` e do recorte exportado por
+`geodata slice --export` **desse mesmo plano**, desenha o que a câmera vê em
+cada quadro: o relevo do terreno em perspectiva, vestido com as peças do mapa
+base, o traçado do trajeto até o ponto em que o marcador está e o marcador da
+atividade. `render frame` desenha um só, pelo número, para conferir o
+enquadramento antes de gastar tempo com o voo inteiro; `render all` desenha
+todos, em `frame_000000.png`, `frame_000001.png`, ..., na ordem do plano, com o
+progresso na tela e um resumo ao final.
+
+```console
+$ sobrevoo render frame plano.json recorte.zip --number 300 --output conferir.png
+Frame 300 of 1260 drawn to conferir.png
+Resolution: 1080x1920
+Time: 00:00:01
+Holes: map tiles missing: no, elevation without value: no
+$ sobrevoo render all plano.json recorte.zip --output quadros/
+Frames: 1260 requested, 1260 drawn, 0 kept (already in the destination)
+Resolution: 1080x1920
+Time: 00:14:52
+Holes (in the frames drawn now): 87 with missing map tiles, 4 with elevation without value
+Destination: quadros/ (frame_000000.png to frame_001259.png)
+```
+
+- **Sem inventar dado**: onde falta uma peça de mapa, o quadro mostra uma
+  hachura cinza; onde o relevo não tem valor, um xadrez magenta; o resumo conta
+  os quadros afetados. O fundo liso é o que está fora do recorte.
+- **Determinismo**: o mesmo plano, o mesmo recorte e a mesma resolução dão
+  sempre as mesmas imagens, byte a byte, seja qual for a ordem ou o número de
+  quadros por execução.
+- **Retomada e proteção**: `render all` continua de onde parou (é só repetir o
+  comando; `Ctrl+C` encerra sem deixar imagem pela metade) e só redesenha os
+  quadros que faltam. Um diretório com quadros de **outro** voo ou resolução é
+  recusado, para não misturar; `--overwrite` refaz tudo e remove os quadros
+  sobrando do voo anterior (só os que a ferramenta desenhou). `--resolution`
+  aceita `LxA` par, de 180 a 3840 por lado (padrão `1080x1920`, vídeo vertical, a mesma
+  proporção do `plan --aspect 9:16`; se você planejar em `16:9`, desenhe em
+  resolução horizontal; com uma resolução mais estreita que o plano, o comando
+  avisa em `stderr` que as laterais da abertura e do fechamento podem ser cortadas).
+- **Só mapa em imagem**: peças de mapa base em imagem (PNG, JPG, WebP). Peças
+  vetoriais (`pbf`) são recusadas com mensagem clara; desenhá-las fica para uma
+  etapa futura.
+
+O recorte precisa ter sido exportado por esta versão (ele guarda a
+identificação do plano de que veio); um recorte antigo é recusado com a
+orientação de gerá-lo de novo. Os erros têm código de saída próprio (`27` a
+`38`: recorte inválido, de versão desconhecida, de outro plano, que não cobre o
+plano, com peças vetoriais ou sem elevação; número de quadro ou resolução
+inválidos; destino inválido, existente ou de outro conjunto; execução
+interrompida), documentados em `specs/005-frame-rendering/contracts/cli.md`.
 
 ## Desenvolvimento
 

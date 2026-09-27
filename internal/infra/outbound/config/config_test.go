@@ -62,18 +62,60 @@ func Test_Load(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, 1.0, cfg.SliceTuning.MarginFactor)
-		assert.Equal(t, 1080.0, cfg.SliceTuning.ReferenceHeightPixels)
+		assert.Equal(t, 1920.0, cfg.SliceTuning.ReferenceHeightPixels)
 		assert.Equal(t, 2.0, cfg.SliceTuning.TexelScreenRatio)
 		assert.Equal(t, int64(65_536), cfg.SliceTuning.EstimatedTileBytes)
 		assert.Equal(t, int64(268_435_456), cfg.SliceTuning.MaxSizeBytes)
 	})
 
-	t.Run("should default the plan to 30 fps, medium distance and medium tilt", func(t *testing.T) {
+	t.Run("should default the plan to 30 fps, medium distance, medium tilt and a vertical 9:16 video", func(t *testing.T) {
 		// when
 		cfg, err := config.Load()
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, config.PlanDefaults{FrameRate: 30, Distance: config.LevelMedium, Tilt: config.LevelMedium}, cfg.PlanDefaults)
+		assert.Equal(t, config.PlanDefaults{FrameRate: 30, Distance: config.LevelMedium, Tilt: config.LevelMedium, AspectWidth: 9, AspectHeight: 16}, cfg.PlanDefaults)
+	})
+
+	t.Run("should provide the initial render tuning of research.md", func(t *testing.T) {
+		// when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, 2.0, cfg.RenderTuning.MinCameraClearanceMeters)
+		assert.Equal(t, 1.0, cfg.RenderTuning.MinTiltForTargetDegrees)
+		assert.Equal(t, 0.3, cfg.RenderTuning.TrailLiftMeters)
+		assert.Equal(t, 1.0, cfg.RenderTuning.DepthBiasMeters)
+		assert.Equal(t, 0.002, cfg.RenderTuning.DepthBiasRatio)
+		assert.Equal(t, int64(268_435_456), cfg.RenderTuning.TileCacheBytes)
+	})
+
+	t.Run("should use one field of view for the camera plan and for drawing", func(t *testing.T) {
+		// when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, 45.0, cfg.RenderTuning.VerticalFOVDegrees)
+		assert.Equal(t, cfg.CameraTuning.OverviewVerticalFOVDegrees, cfg.RenderTuning.VerticalFOVDegrees)
+	})
+
+	t.Run("should draw with at least one goroutine", func(t *testing.T) {
+		// when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, cfg.RenderTuning.Workers, 1)
+	})
+
+	t.Run("should default the resolution of the images to 1080 x 1920, vertical", func(t *testing.T) {
+		// when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, config.RenderDefaults{Width: 1080, Height: 1920}, cfg.RenderDefaults)
 	})
 }

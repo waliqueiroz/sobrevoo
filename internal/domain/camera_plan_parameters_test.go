@@ -82,6 +82,17 @@ func Test_PlanParameters_Validate(t *testing.T) {
 		}
 	})
 
+	t.Run("should reject a plan without an aspect ratio", func(t *testing.T) {
+		// given
+		parameters := builddomain.NewPlanParametersBuilder().WithAspect(domain.AspectRatio{}).Build()
+
+		// when
+		err := parameters.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidAspectRatio)
+	})
+
 	t.Run("should mention the valid frame rate range in the error", func(t *testing.T) {
 		// given
 		parameters := builddomain.NewPlanParametersBuilder().WithFrameRate(200).Build()

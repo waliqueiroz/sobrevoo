@@ -41,6 +41,7 @@ UTF-8, campos em ordem fixa, indentado com 2 espaços; cada item de
 ```json
 {
   "format_version": 1,
+  "plan_id": "9f2c…64 caracteres hexadecimais minúsculos…",
   "area": {
     "min_lat": -23.61, "max_lat": -23.48,
     "min_lon": -46.72, "max_lon": -46.53,
@@ -82,6 +83,7 @@ UTF-8, campos em ordem fixa, indentado com 2 espaços; cada item de
 | Campo | Tipo | Semântica |
 |---|---|---|
 | `format_version` | inteiro | Muda **somente** quando um campo é removido ou muda de significado; acrescentar campos não muda a versão. Esta etapa emite `1`. |
+| `plan_id` | texto | Acrescentado na etapa 5 (`specs/005-frame-rendering/contracts/slice-file-change.md`): `CameraPlan.ID()` do plano informado a `geodata slice` — SHA-256 hexadecimal (64 caracteres minúsculos) do conteúdo do plano —, com o qual a etapa 5 confere que o recorte é do plano que ela recebe. |
 | `area.*` | número | Área de interesse, graus decimais, 7 casas. Com `crosses_antimeridian: true`, `min_lon > max_lon` e a área vai de `min_lon` até 180° e de −180° até `max_lon` (mesma convenção de `BoundingBox`). |
 | `summary.*` | — | Mesmos valores do resumo impresso (`GeoSlice.Summary`), recalculáveis a partir do conteúdo. `elevation_m` é `null` quando nenhuma amostra tem valor. `size_bytes` é a soma dos bytes das peças mais `4 × sample_count`. |
 | `sources[]` | lista | Procedência: cada registro usado, ordenado por `name` (índice = posição). Traz `path` exatamente como registrado. |
@@ -119,6 +121,12 @@ valor", e o consumidor deve testar NaN.
    entradas.
 
 ## Compatibilidade
+
+**Nota (etapa 5):** o campo `plan_id` foi acrescentado depois da entrega da etapa 4,
+sem mudar `format_version` (acrescentar um campo não muda a versão). Um recorte
+exportado antes dele não tem o campo e é recusado pela etapa 5, que orienta a
+gerá-lo de novo com `geodata slice --export`; `geodata slice` em si não lê
+recortes e continua igual.
 
 O arquivo não referencia data/hora de geração, nome de máquina nem versão
 do binário — para preservar a igualdade byte a byte (FR-013). `sources[].path`
