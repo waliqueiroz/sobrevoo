@@ -55,3 +55,32 @@ func (mr *MockVideoServiceMockRecorder) Assemble(ctx, plan, request, progress an
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Assemble", reflect.TypeOf((*MockVideoService)(nil).Assemble), ctx, plan, request, progress)
 }
+
+// CheckDestination mocks base method.
+func (m *MockVideoService) CheckDestination(output string, overwrite bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckDestination", output, overwrite)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CheckDestination indicates an expected call of CheckDestination.
+func (mr *MockVideoServiceMockRecorder) CheckDestination(output, overwrite any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckDestination", reflect.TypeOf((*MockVideoService)(nil).CheckDestination), output, overwrite)
+}
+
+// CheckEncoder mocks base method.
+func (m *MockVideoService) CheckEncoder(ctx context.Context) (domain.EncoderInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CheckEncoder", ctx)
+	ret0, _ := ret[0].(domain.EncoderInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CheckEncoder indicates an expected call of CheckEncoder.
+func (mr *MockVideoServiceMockRecorder) CheckEncoder(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckEncoder", reflect.TypeOf((*MockVideoService)(nil).CheckEncoder), ctx)
+}

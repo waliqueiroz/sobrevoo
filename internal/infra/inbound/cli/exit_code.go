@@ -114,6 +114,8 @@ func ExitCode(err error) int {
 		return 49
 	case errors.Is(err, domain.ErrVideoEncodingFailed):
 		return 50
+	case errors.Is(err, domain.ErrFlightInterrupted):
+		return 51
 	default:
 		// Anything else (file-open I/O errors, malformed-but-recognized
 		// content, CLI usage errors not already handled by Cobra itself) is

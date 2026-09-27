@@ -5,7 +5,7 @@ de sobrevoo de trajetos a partir de arquivos de GPS.
 
 ## Status atual
 
-Seis etapas estão implementadas:
+Sete etapas estão implementadas:
 
 1. Leitura e tratamento de um trajeto GPX, exposta pelo comando `inspect`.
 2. Registro local de dados geográficos (mapas base e relevo que você já
@@ -21,12 +21,16 @@ Seis etapas estão implementadas:
    comandos `render`.
 6. Montagem do vídeo: os quadros juntos num único arquivo MP4, na ordem e na
    taxa de quadros do plano, exposta pelo comando `video`.
+7. As seis etapas anteriores encadeadas atrás de um único comando, `fly`: do
+   arquivo de trajeto direto ao vídeo, sem administrar arquivo intermediário
+   nenhum, com os mesmos parâmetros de sempre e a opção de guardar e
+   reaproveitar plano, recorte e quadros entre execuções.
 
 Ainda não há sobreposição de texto ou de estatísticas, nem áudio.
 
 ## Instalação
 
-Requer Go 1.26+. Para montar o vídeo (o comando `video`), requer também o
+Requer Go 1.26+. Para montar o vídeo (os comandos `video` e `fly`), requer também o
 [`ffmpeg`](https://ffmpeg.org) com o codificador `libx264` instalado e no `PATH`
 (`brew install ffmpeg` no macOS, `sudo apt install ffmpeg` no Debian e no
 Ubuntu, `winget install Gyan.FFmpeg` no Windows); o Sobrevoo não o traz nem o
@@ -329,6 +333,69 @@ inválido; quadros que faltam, sobram ou se repetem; resoluções diferentes ou
 truncado; codificador ausente; destino existente ou inválido; montagem
 interrompida; falha do codificador), documentados em
 `specs/006-video-assembly/contracts/cli.md`.
+
+### `fly`: do trajeto ao vídeo, num único comando
+
+```sh
+sobrevoo fly <trajeto> --output <voo.mp4>
+             [--duration <segundos>] [--fps <n>] [--distance low|medium|high] [--tilt low|medium|high]
+             [--aspect <L:A>] [--resolution <LxA>] [--quality low|medium|high]
+             [--keep <diretório>] [--overwrite]
+```
+
+Encadeia as seis etapas anteriores — tratamento do trajeto, planejamento da
+câmera, recorte dos dados geográficos já registrados, desenho dos quadros e
+montagem do vídeo — atrás de um único comando: informe o trajeto e o destino
+do vídeo, e o resto acontece sozinho, usando os dados que você já registrou
+com `geodata register`. Todas as flags de `plan`, `render all` e `video` estão
+aqui, com os mesmos nomes, os mesmos valores aceitos e os mesmos padrões — o
+resultado é idêntico, byte a byte, ao de rodar os seis comandos na mão com os
+mesmos valores.
+
+```console
+$ sobrevoo fly pedalada.gpx --output pedalada.mp4
+Stage 1/5: treating the track
+Stage 2/5: planning the camera
+Stage 3/5: slicing the geo data
+Stage 4/5: drawing the frames
+Stage 5/5: encoding the video
+Frames: 1260 requested, 1260 drawn, 0 kept (already in the destination)
+Resolution: 1080x1920
+Time: 00:31:07
+Holes (in the frames drawn now): none
+Destination: /tmp/sobrevoo-fly-3f9a2c/frames (frame_000000.png to frame_001259.png)
+Video written to pedalada.mp4
+Frames: 1260
+Duration: 00:00:42.000
+Resolution: 1080x1920
+Frame rate: 30 fps
+Quality: medium
+Size: 18.4 MiB
+Encoder: ffmpeg 7.1 (libx264)
+Time: 00:01:52
+Total time: 00:33:00
+```
+
+- **Recusa cedo**: a disponibilidade do `ffmpeg` e o destino do vídeo são
+  conferidos antes de tratar o trajeto; a cobertura dos dados registrados,
+  logo após planejar a câmera — bem antes de gastar tempo desenhando quadros.
+- **Sem `--keep`**: nada fica para trás. O plano e o recorte nunca tocam
+  disco, e os quadros vivem num diretório temporário, sempre apagado ao
+  final — inclusive em caso de falha ou interrupção.
+- **Com `--keep <diretório>`**: o plano (`plan.json`), o recorte
+  (`slice.zip`) e os quadros (`frames/`) ficam nesse diretório, nos mesmos
+  formatos que `plan --export`/`geodata slice --export`/`render all
+  --output` já produzem — abríveis com as ferramentas de sempre. Uma
+  execução seguinte, com o mesmo trajeto e os mesmos valores, reaproveita o
+  que ainda vale em vez de refazer (o mesmo `--overwrite` substitui um
+  conteúdo de outro trajeto ou de outros valores).
+- **Interrupção**: encerra de forma ordenada assim que a etapa em curso
+  permitir, diz o que já havia sido concluído e sai com código próprio (`51`)
+  — nunca o de uma etapa; nenhum vídeo parcial fica.
+
+Os erros de cada etapa usam exatamente o mesmo erro, a mesma mensagem e o
+mesmo código de saída que o comando individual dessa etapa já usa —
+documentados em `specs/007-full-flight-pipeline/contracts/cli.md`.
 
 ## Desenvolvimento
 
