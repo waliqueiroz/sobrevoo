@@ -3,9 +3,11 @@ package domain
 import "strconv"
 
 // RenderVersion is the version of how a frame is drawn: it goes up whenever
-// the algorithm, the colors or the patterns change in a way that shows, so
-// frames drawn by another version are never taken for frames of the same set.
-const RenderVersion = 1
+// the algorithm, the colors or the patterns change in a way that shows, or the
+// file of a frame changes what it says, so frames drawn by another version are
+// never taken for frames of the same set. Version 2 writes, inside each image,
+// the plan the frame was drawn from; the pixels are those of version 1.
+const RenderVersion = 2
 
 // RGB is a color, 8 bits per channel.
 type RGB struct {

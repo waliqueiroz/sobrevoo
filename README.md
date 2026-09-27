@@ -5,7 +5,7 @@ de sobrevoo de trajetos a partir de arquivos de GPS.
 
 ## Status atual
 
-Cinco etapas estão implementadas:
+Seis etapas estão implementadas:
 
 1. Leitura e tratamento de um trajeto GPX, exposta pelo comando `inspect`.
 2. Registro local de dados geográficos (mapas base e relevo que você já
@@ -19,13 +19,18 @@ Cinco etapas estão implementadas:
 5. Desenho dos quadros do voo como imagens: o relevo em perspectiva, vestido
    com as peças do mapa base, o traçado e o marcador, exposto pelo grupo de
    comandos `render`.
+6. Montagem do vídeo: os quadros juntos num único arquivo MP4, na ordem e na
+   taxa de quadros do plano, exposta pelo comando `video`.
 
-Ainda não há geração de vídeo: os quadros desenhados são o que a etapa
-seguinte vai juntar.
+Ainda não há sobreposição de texto ou de estatísticas, nem áudio.
 
 ## Instalação
 
-Requer Go 1.26+.
+Requer Go 1.26+. Para montar o vídeo (o comando `video`), requer também o
+[`ffmpeg`](https://ffmpeg.org) com o codificador `libx264` instalado e no `PATH`
+(`brew install ffmpeg` no macOS, `sudo apt install ffmpeg` no Debian e no
+Ubuntu, `winget install Gyan.FFmpeg` no Windows); o Sobrevoo não o traz nem o
+baixa, e diz o que instalar se ele faltar.
 
 ```sh
 go install github.com/waliqueiroz/sobrevoo/cmd/sobrevoo@latest
@@ -277,6 +282,53 @@ orientação de gerá-lo de novo. Os erros têm código de saída próprio (`27`
 plano, com peças vetoriais ou sem elevação; número de quadro ou resolução
 inválidos; destino inválido, existente ou de outro conjunto; execução
 interrompida), documentados em `specs/005-frame-rendering/contracts/cli.md`.
+
+### `video`: montar o vídeo do voo
+
+```sh
+sobrevoo video <plano.json> <diretório-de-quadros> --output <voo.mp4> [--quality low|medium|high] [--overwrite]
+```
+
+Junta os quadros que `render all` desenhou num único arquivo MP4 (H.264, sem
+áudio), na ordem e na taxa de quadros do **mesmo plano** de que eles vieram.
+Antes de começar, confere que os quadros são do plano, que estão todos ali (sem
+lacuna nem sobra), que têm a mesma resolução e que estão inteiros, e diz
+exatamente o que falta ou destoa. Mostra o progresso na tela e, ao final, um
+resumo.
+
+```console
+$ sobrevoo video plano.json quadros/ --output pedalada.mp4
+Video written to pedalada.mp4
+Frames: 1260
+Duration: 00:00:42.000
+Resolution: 1080x1920
+Frame rate: 30 fps
+Quality: medium
+Size: 18.4 MiB
+Encoder: ffmpeg 7.1 (libx264)
+Time: 00:01:52
+```
+
+- **Qualidade**: `low` (rápido e pequeno, para conferir), `medium` (padrão, para
+  publicar) e `high` (para guardar). Um nível mais alto dá um arquivo maior ou
+  igual, sem mudar a duração, a resolução nem a ordem dos quadros.
+- **Sempre o mesmo vídeo**: o mesmo plano, os mesmos quadros, a mesma qualidade
+  e o mesmo `ffmpeg` (o resumo diz qual foi) dão o mesmo arquivo, byte a byte; e
+  o arquivo não leva data, caminho, nome de máquina nem outro dado do ambiente.
+- **Proteção**: o destino deve terminar em `.mp4` e, por padrão, não pode existir
+  (`--overwrite` o substitui por inteiro). O vídeo só aparece pronto: `Ctrl+C`,
+  falta de espaço ou uma falha do codificador não deixam arquivo pela metade nem
+  temporário. Não há retomada: repetir o comando recomeça.
+- **Quadros de versões anteriores**: quadros desenhados antes de a etapa 6 (sem a
+  identificação do plano dentro deles) são recusados com a orientação de
+  desenhá-los de novo (`render all --overwrite`).
+
+Os erros têm código de saída próprio (`40` a `50`: diretório de quadros
+inválido; quadros que faltam, sobram ou se repetem; resoluções diferentes ou
+ímpares; quadros de outro plano ou sem a identificação do plano; quadro
+truncado; codificador ausente; destino existente ou inválido; montagem
+interrompida; falha do codificador), documentados em
+`specs/006-video-assembly/contracts/cli.md`.
 
 ## Desenvolvimento
 

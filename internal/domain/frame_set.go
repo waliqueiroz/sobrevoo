@@ -22,12 +22,21 @@ type FrameRepository interface {
 	// ErrFrameDestinationInvalid.
 	Inspect(dir string, resolution Resolution) (FrameDirectory, error)
 
+	// List lists the frame files of dir — the files named FrameFileName(n) —,
+	// sorted by number, saying for each what its image says of itself: whether
+	// this tool drew it, its set and plan, its size and whether it is whole.
+	// Nothing is asked of the resolution. Unlike Inspect, a dir that does not
+	// exist, is not a directory or cannot be read is an error:
+	// ErrFrameDirectoryInvalid.
+	List(dir string) (FrameDirectory, error)
+
 	// Save publishes the frame as dir/FrameFileName(index), marked as belonging
-	// to the set id, creating dir when it does not exist (its parent must). A
-	// file that is already there is replaced — deciding that is FrameDirectory's
-	// job — and a failure never leaves a partial file: the previous file, if
-	// any, stays as it was. Failures are ErrFrameDestinationInvalid.
-	Save(dir string, index int, id FrameSetID, image FrameImage) error
+	// to the set of mark and as drawn from its plan, creating dir when it does
+	// not exist (its parent must). A file that is already there is replaced —
+	// deciding that is FrameDirectory's job — and a failure never leaves a
+	// partial file: the previous file, if any, stays as it was. Failures are
+	// ErrFrameDestinationInvalid.
+	Save(dir string, index int, mark FrameMark, image FrameImage) error
 
 	// Remove deletes the frame files with the given numbers; one that is not
 	// there is not an error.
@@ -37,12 +46,32 @@ type FrameRepository interface {
 // FrameExporter writes one frame to a file the user chose. Concrete
 // implementations live in internal/infra/outbound.
 type FrameExporter interface {
-	// Export writes image to path, marked as belonging to the set id. Unless
-	// overwrite is true it refuses a path that already exists
-	// (ErrFrameDestinationExists), and it never leaves a partial file: on
-	// failure the previous file, if any, stays as it was. A path that cannot be
-	// written fails with ErrFrameDestinationInvalid.
-	Export(image FrameImage, id FrameSetID, path string, overwrite bool) error
+	// Export writes image to path, marked as belonging to the set of mark and as
+	// drawn from its plan. Unless overwrite is true it refuses a path that
+	// already exists (ErrFrameDestinationExists), and it never leaves a partial
+	// file: on failure the previous file, if any, stays as it was. A path that
+	// cannot be written fails with ErrFrameDestinationInvalid.
+	Export(image FrameImage, mark FrameMark, path string, overwrite bool) error
+}
+
+// FrameMark is what a frame says about itself, inside its image: the set it
+// belongs to and the plan it was drawn from. The plan is what lets the stage
+// that joins the frames into a video tell, without the slice, that they are the
+// ones of the plan it was given.
+type FrameMark struct {
+	SetID FrameSetID
+
+	// PlanID is the CameraPlan.ID of the plan the frame was drawn from.
+	PlanID string
+}
+
+// NewFrameMark is the mark of the frames of plan drawn from slice at
+// resolution: the set they belong to and the identification of the plan.
+func NewFrameMark(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning) FrameMark {
+	return FrameMark{
+		SetID:  NewFrameSetID(plan, slice, resolution, tuning),
+		PlanID: plan.ID(),
+	}
 }
 
 // FrameSetID identifies a set of frames: those drawn from the same plan, the
@@ -82,6 +111,10 @@ const (
 	frameFileSuffix = ".png"
 	frameFileDigits = 6
 )
+
+// FrameFilePattern is FrameFileName as a format for the number of the frame: the
+// way a tool that reads a sequence of images asks for the files of the frames.
+const FrameFilePattern = frameFilePrefix + "%06d" + frameFileSuffix
 
 // FrameFileName is the name of the file of a frame: its number in the plan, in
 // six digits — the plan has at most 432 000 frames — so the names sort in the
@@ -147,6 +180,18 @@ type FrameFile struct {
 	// else's, whatever its name.
 	Ours  bool
 	SetID FrameSetID
+
+	// PlanID is the identification of the plan the frame says it was drawn from;
+	// empty when the frame is this tool's but does not say it (one drawn before
+	// frames carried it).
+	PlanID string
+
+	// Width and Height are the size the header of the image gives; 0 when the
+	// header cannot be read.
+	Width, Height int
+
+	// Whole is true when the file ends where a PNG ends, whatever its size.
+	Whole bool
 
 	// Complete is true when the file is whole: a PNG whose header has the
 	// resolution asked for and that ends where a PNG ends.

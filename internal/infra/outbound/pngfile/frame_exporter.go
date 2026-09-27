@@ -20,8 +20,8 @@ func NewFrameExporter() FrameExporter {
 // Export writes the frame to path, atomically: a failure never leaves a partial
 // file — nor spoils the one that was there —, and without overwrite an existing
 // path is refused.
-func (FrameExporter) Export(image domain.FrameImage, id domain.FrameSetID, path string, overwrite bool) error {
-	data, err := encodeFrame(image, id)
+func (FrameExporter) Export(image domain.FrameImage, mark domain.FrameMark, path string, overwrite bool) error {
+	data, err := encodeFrame(image, mark)
 	if err != nil {
 		return fmt.Errorf("encoding the frame: %w", err)
 	}

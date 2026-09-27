@@ -82,8 +82,8 @@ func (s *frameService) DrawFrame(ctx context.Context, plan domain.CameraPlan, sl
 		return finish(interruption(ctx, &summary, err))
 	}
 
-	id := domain.NewFrameSetID(plan, slice, request.Resolution, s.renderTuning)
-	if err := s.exporter.Export(image, id, request.Path, request.Overwrite); err != nil {
+	mark := domain.NewFrameMark(plan, slice, request.Resolution, s.renderTuning)
+	if err := s.exporter.Export(image, mark, request.Path, request.Overwrite); err != nil {
 		return finish(err)
 	}
 
@@ -108,8 +108,8 @@ func (s *frameService) DrawFrames(ctx context.Context, plan domain.CameraPlan, s
 		return finish(err)
 	}
 
-	id := domain.NewFrameSetID(plan, slice, request.Resolution, s.renderTuning)
-	work, err := directory.Plan(id, len(plan.Frames), request.Overwrite)
+	mark := domain.NewFrameMark(plan, slice, request.Resolution, s.renderTuning)
+	work, err := directory.Plan(mark.SetID, len(plan.Frames), request.Overwrite)
 	if err != nil {
 		return finish(err)
 	}
@@ -137,7 +137,7 @@ func (s *frameService) DrawFrames(ctx context.Context, plan domain.CameraPlan, s
 		if err != nil {
 			return finish(interruption(ctx, &summary, err))
 		}
-		if err := s.repository.Save(request.Directory, index, id, image); err != nil {
+		if err := s.repository.Save(request.Directory, index, mark, image); err != nil {
 			return finish(err)
 		}
 

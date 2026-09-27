@@ -103,3 +103,16 @@ func domainRenderTuning(t config.RenderTuning) domain.RenderTuning {
 func domainRenderResolution(d config.RenderDefaults) (domain.Resolution, error) {
 	return domain.NewResolution(d.Width, d.Height)
 }
+
+// domainVideoQuality is the quality of the video the user gets when they choose
+// none.
+func domainVideoQuality(level config.Level) domain.VideoQuality {
+	switch level {
+	case config.LevelLow:
+		return domain.VideoQualityLow
+	case config.LevelHigh:
+		return domain.VideoQualityHigh
+	default:
+		return domain.VideoQualityMedium
+	}
+}

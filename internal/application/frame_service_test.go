@@ -98,14 +98,14 @@ func Test_frameService_DrawFrame(t *testing.T) {
 	plan := framesPlan(3)
 	slice := forPlan(framesSlice(), plan)
 
-	t.Run("should draw the frame asked for and export it once, marked with the set of the plan, the slice and the resolution", func(t *testing.T) {
+	t.Run("should draw the frame asked for and export it once, marked with the set of the plan, the slice and the resolution, and with the plan itself", func(t *testing.T) {
 		// given
 		m := newFrameMocks(t)
 		request := domain.SingleFrameRequest{Number: 2, Path: "/tmp/frame.png", Resolution: frameResolution, Overwrite: true}
-		wantID := domain.NewFrameSetID(plan, slice, frameResolution, m.tuning)
+		wantMark := domain.FrameMark{SetID: domain.NewFrameSetID(plan, slice, frameResolution, m.tuning), PlanID: plan.ID()}
 		var exported domain.FrameImage
-		m.exporter.EXPECT().Export(gomock.Any(), wantID, "/tmp/frame.png", true).
-			DoAndReturn(func(image domain.FrameImage, _ domain.FrameSetID, _ string, _ bool) error {
+		m.exporter.EXPECT().Export(gomock.Any(), wantMark, "/tmp/frame.png", true).
+			DoAndReturn(func(image domain.FrameImage, _ domain.FrameMark, _ string, _ bool) error {
 				exported = image
 				return nil
 			})
@@ -226,15 +226,15 @@ func Test_frameService_DrawFrames(t *testing.T) {
 	slice := forPlan(framesSlice(), plan)
 	request := domain.FrameSetRequest{Directory: "/tmp/frames", Resolution: frameResolution}
 
-	t.Run("should draw every frame of the plan, in order, saving each with the set of the plan, the slice and the resolution", func(t *testing.T) {
+	t.Run("should draw every frame of the plan, in order, saving each with the set of the plan, the slice and the resolution and with the plan itself", func(t *testing.T) {
 		// given
 		m := newFrameMocks(t)
 		m.emptyDirectory()
-		id := domain.NewFrameSetID(plan, slice, frameResolution, m.tuning)
+		wantMark := domain.FrameMark{SetID: domain.NewFrameSetID(plan, slice, frameResolution, m.tuning), PlanID: plan.ID()}
 		saved := map[int]domain.FrameImage{}
 		var order []int
-		m.repository.EXPECT().Save("/tmp/frames", gomock.Any(), id, gomock.Any()).Times(3).
-			DoAndReturn(func(_ string, index int, _ domain.FrameSetID, image domain.FrameImage) error {
+		m.repository.EXPECT().Save("/tmp/frames", gomock.Any(), wantMark, gomock.Any()).Times(3).
+			DoAndReturn(func(_ string, index int, _ domain.FrameMark, image domain.FrameImage) error {
 				saved[index] = image
 				order = append(order, index)
 				return nil
@@ -441,7 +441,7 @@ func Test_frameService_DrawFrames_Resuming(t *testing.T) {
 		m.repository.EXPECT().Inspect(gomock.Any(), gomock.Any()).Return(directoryWith(m, 0, 1), nil)
 		var saved []int
 		m.repository.EXPECT().Save(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(3).
-			DoAndReturn(func(_ string, index int, _ domain.FrameSetID, _ domain.FrameImage) error {
+			DoAndReturn(func(_ string, index int, _ domain.FrameMark, _ domain.FrameImage) error {
 				saved = append(saved, index)
 				return nil
 			})

@@ -1,9 +1,10 @@
 // Package pngfile implements the outbound adapters that keep the frames of a
 // flight as PNG files: a directory of frames and a single frame in a file.
 //
-// Every frame carries, inside, the identification of the set it belongs to, so a
-// directory needs no register of what it holds: what is a frame of this tool, and
-// of which set, is read off the images themselves.
+// Every frame carries, inside, the identification of the set it belongs to and of
+// the plan it was drawn from, so a directory needs no register of what it holds:
+// what is a frame of this tool, of which set and of which plan, is read off the
+// images themselves.
 package pngfile
 
 import (
@@ -23,9 +24,11 @@ const (
 	tailBytes = 12
 
 	// markKeyword and markPrefix say, in the text chunk, that the frame is of this
-	// tool and of which set.
+	// tool and of which set; planPrefix, in the text chunk that follows it, of
+	// which plan the frame was drawn.
 	markKeyword = "Sobrevoo"
 	markPrefix  = markKeyword + "\x00frame-set="
+	planPrefix  = markKeyword + "\x00plan="
 
 	// afterHeader is where the first chunk after the header starts: the
 	// signature, and the header chunk of 13 bytes of data.
@@ -38,9 +41,10 @@ var (
 )
 
 // encodeFrame writes a frame as a PNG: 8 bits per channel, RGB, not interlaced,
-// with a text chunk right after the header that says the frame is of this tool
-// and belongs to the set id. The same frame and set are always the same bytes.
-func encodeFrame(frame domain.FrameImage, id domain.FrameSetID) ([]byte, error) {
+// with two text chunks right after the header: the first says the frame is of
+// this tool and belongs to the set of mark, the second which plan it was drawn
+// from. The same frame and mark are always the same bytes.
+func encodeFrame(frame domain.FrameImage, mark domain.FrameMark) ([]byte, error) {
 	width, height := frame.Resolution.Width, frame.Resolution.Height
 
 	// The encoder writes RGB, with no alpha, when every pixel is opaque.
@@ -58,7 +62,8 @@ func encodeFrame(frame domain.FrameImage, id domain.FrameSetID) ([]byte, error) 
 	data := encoded.Bytes()
 	out := make([]byte, 0, len(data)+64)
 	out = append(out, data[:afterHeader]...)
-	out = append(out, textChunk(markPrefix+string(id))...)
+	out = append(out, textChunk(markPrefix+string(mark.SetID))...)
+	out = append(out, textChunk(planPrefix+mark.PlanID)...)
 	out = append(out, data[afterHeader:]...)
 	return out, nil
 }
@@ -72,12 +77,14 @@ func textChunk(text string) []byte {
 	return binary.BigEndian.AppendUint32(chunk, crc32.ChecksumIEEE(chunk[4:]))
 }
 
-// readMark reads, from the start of a file, the set a frame of this tool says it
-// belongs to; ok is false for a file that is not a PNG, that has no such text
-// chunk before its image data, or whose chunk does not check out.
-func readMark(head []byte) (id domain.FrameSetID, ok bool) {
+// readMark reads, from the start of a file, what a frame of this tool says about
+// itself: the set it belongs to and the plan it was drawn from. ok is false for a
+// file that is not a PNG, that has no set chunk before its image data, or whose
+// set chunk does not check out; a frame with no plan chunk (or one that does not
+// check out) is this tool's, with an empty PlanID.
+func readMark(head []byte) (mark domain.FrameMark, ok bool) {
 	if len(head) < len(pngSignature) || !bytes.Equal(head[:len(pngSignature)], pngSignature) {
-		return "", false
+		return domain.FrameMark{}, false
 	}
 
 	for position := len(pngSignature); position+8 <= len(head); {
@@ -85,18 +92,25 @@ func readMark(head []byte) (id domain.FrameSetID, ok bool) {
 		kind := string(head[position+4 : position+8])
 		end := position + 8 + length
 		if kind == "IDAT" || kind == "IEND" || end+4 > len(head) || length < 0 {
-			return "", false
+			break
 		}
 
-		if kind == "tEXt" {
+		if kind == "tEXt" && binary.BigEndian.Uint32(head[end:]) == crc32.ChecksumIEEE(head[position+4:end]) {
 			text := head[position+8 : end]
-			if binary.BigEndian.Uint32(head[end:]) == crc32.ChecksumIEEE(head[position+4:end]) && bytes.HasPrefix(text, []byte(markPrefix)) {
-				return domain.FrameSetID(text[len(markPrefix):]), true
+			switch {
+			case bytes.HasPrefix(text, []byte(markPrefix)):
+				mark.SetID, ok = domain.FrameSetID(text[len(markPrefix):]), true
+			case bytes.HasPrefix(text, []byte(planPrefix)):
+				mark.PlanID = string(text[len(planPrefix):])
 			}
 		}
 		position = end + 4
 	}
-	return "", false
+
+	if !ok {
+		return domain.FrameMark{}, false
+	}
+	return mark, true
 }
 
 // readInfo reads the size of a PNG off the start of its file and says whether it

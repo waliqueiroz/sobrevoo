@@ -71,3 +71,43 @@ func Test_Publish_Sync(t *testing.T) {
 		assert.Equal(t, "precious", string(content))
 	})
 }
+
+func Test_PublishPath_Sync(t *testing.T) {
+	t.Run("should sync the file once, after the callback wrote it and before publishing it", func(t *testing.T) {
+		// given
+		var order []string
+		replaceSync(t, func(f *os.File) error {
+			order = append(order, "sync")
+			return f.Sync()
+		})
+		path := filepath.Join(t.TempDir(), "out.bin")
+
+		// when
+		err := PublishPath(path, false, func(temporary string) error {
+			order = append(order, "produce")
+			return os.WriteFile(temporary, []byte("content"), 0o600)
+		})
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, []string{"produce", "sync"}, order)
+	})
+
+	t.Run("should refuse to publish when the sync fails, leaving no file behind", func(t *testing.T) {
+		// given
+		replaceSync(t, func(*os.File) error { return errors.New("disk on fire") })
+		dir := t.TempDir()
+		path := filepath.Join(dir, "out.bin")
+
+		// when
+		err := PublishPath(path, false, func(temporary string) error {
+			return os.WriteFile(temporary, []byte("content"), 0o600)
+		})
+
+		// then
+		require.ErrorIs(t, err, ErrInvalid)
+		entries, readErr := os.ReadDir(dir)
+		require.NoError(t, readErr)
+		assert.Empty(t, entries)
+	})
+}

@@ -41,15 +41,15 @@ func (m *MockFrameExporter) EXPECT() *MockFrameExporterMockRecorder {
 }
 
 // Export mocks base method.
-func (m *MockFrameExporter) Export(image domain.FrameImage, id domain.FrameSetID, path string, overwrite bool) error {
+func (m *MockFrameExporter) Export(image domain.FrameImage, mark domain.FrameMark, path string, overwrite bool) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Export", image, id, path, overwrite)
+	ret := m.ctrl.Call(m, "Export", image, mark, path, overwrite)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Export indicates an expected call of Export.
-func (mr *MockFrameExporterMockRecorder) Export(image, id, path, overwrite any) *gomock.Call {
+func (mr *MockFrameExporterMockRecorder) Export(image, mark, path, overwrite any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Export", reflect.TypeOf((*MockFrameExporter)(nil).Export), image, id, path, overwrite)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Export", reflect.TypeOf((*MockFrameExporter)(nil).Export), image, mark, path, overwrite)
 }

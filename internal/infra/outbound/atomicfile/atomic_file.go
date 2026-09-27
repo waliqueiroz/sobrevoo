@@ -1,6 +1,7 @@
 // Package atomicfile publishes a file so that it either appears complete or
 // does not appear at all. It is shared by the outbound adapters that write a
-// file the user asked for (the camera plan and the geo data slice).
+// file the user asked for (the camera plan, the geo data slice, the frames and
+// the video).
 package atomicfile
 
 import (
@@ -56,18 +57,63 @@ func Publish(path string, overwrite bool, write func(io.Writer) error) error {
 	if err := temporary.Close(); err != nil {
 		return invalid(path, err)
 	}
-	if err := os.Chmod(temporary.Name(), 0o644); err != nil {
+
+	return publish(temporary.Name(), path, overwrite)
+}
+
+// PublishPath is Publish for a writer that needs a path of its own to write to
+// — an external program, or a format that is written by going back and forth
+// in the file. produce is given the path of a temporary file that already
+// exists, empty, in the same directory as path, and writes the content there;
+// the file is published, as Publish does, only once produce returns without an
+// error. Whatever produce leaves is removed when it fails, and a previous file
+// at path stays as it was. An error returned by produce is returned as it is.
+func PublishPath(path string, overwrite bool, produce func(temporary string) error) error {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".sobrevoo-*.tmp")
+	if err != nil {
+		return invalid(path, err)
+	}
+	name := temporary.Name()
+	defer os.Remove(name)
+	if err := temporary.Close(); err != nil {
+		return invalid(path, err)
+	}
+
+	if err := produce(name); err != nil {
+		return err
+	}
+
+	// The same flush as Publish: produce closed the file, so reopen it for it.
+	written, err := os.OpenFile(name, os.O_RDWR, 0)
+	if err != nil {
+		return invalid(path, err)
+	}
+	if err := syncFile(written); err != nil {
+		written.Close()
+		return invalid(path, err)
+	}
+	if err := written.Close(); err != nil {
+		return invalid(path, err)
+	}
+
+	return publish(name, path, overwrite)
+}
+
+// publish makes the complete temporary file appear at path: readable by
+// everyone, replacing what is there with overwrite, and refusing it without.
+func publish(temporary, path string, overwrite bool) error {
+	if err := os.Chmod(temporary, 0o644); err != nil {
 		return invalid(path, err)
 	}
 
 	if overwrite {
-		if err := os.Rename(temporary.Name(), path); err != nil {
+		if err := os.Rename(temporary, path); err != nil {
 			return invalid(path, err)
 		}
 		return nil
 	}
 
-	return publishExclusive(temporary.Name(), path)
+	return publishExclusive(temporary, path)
 }
 
 // publishExclusive makes the temporary file appear at path, failing with

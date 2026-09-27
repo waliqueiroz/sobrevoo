@@ -92,6 +92,28 @@ func ExitCode(err error) int {
 		return 38
 	case errors.Is(err, domain.ErrInvalidAspectRatio):
 		return 39
+	case errors.Is(err, domain.ErrFrameDirectoryInvalid):
+		return 40
+	case errors.Is(err, domain.ErrFrameSequenceInvalid):
+		return 41
+	case errors.Is(err, domain.ErrFrameResolutionInvalid):
+		return 42
+	case errors.Is(err, domain.ErrFramesDoNotMatchPlan):
+		return 43
+	case errors.Is(err, domain.ErrFramesWithoutPlanID):
+		return 44
+	case errors.Is(err, domain.ErrFrameFileInvalid):
+		return 45
+	case errors.Is(err, domain.ErrEncoderUnavailable):
+		return 46
+	case errors.Is(err, domain.ErrVideoDestinationExists):
+		return 47
+	case errors.Is(err, domain.ErrVideoDestinationInvalid):
+		return 48
+	case errors.Is(err, domain.ErrVideoInterrupted):
+		return 49
+	case errors.Is(err, domain.ErrVideoEncodingFailed):
+		return 50
 	default:
 		// Anything else (file-open I/O errors, malformed-but-recognized
 		// content, CLI usage errors not already handled by Cobra itself) is

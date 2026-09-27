@@ -21,6 +21,8 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/smoother"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/tiledecoder"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/trackparser"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/videoencoder"
+	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/videofile"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/zipfile"
 )
 
@@ -65,6 +67,10 @@ func run() int {
 	frameRepository := pngfile.NewFrameRepository()
 	frameService := application.NewFrameService(tileDecoder, frameRepository, frameExporter, domainRenderTuning(cfg.RenderTuning), domainSliceTuning(cfg.SliceTuning))
 
+	videoEncoder := videoencoder.NewFFmpeg(cfg.FFmpegBinary)
+	videoExporter := videofile.NewVideoExporter()
+	videoService := application.NewVideoService(frameRepository, videoEncoder, videoExporter)
+
 	geoDataCommand := cli.NewGeoDataCommand()
 	geoDataCommand.AddCommand(cli.NewGeoDataRegisterCommand(geoDataService))
 	geoDataCommand.AddCommand(cli.NewGeoDataCheckCommand(geoDataService))
@@ -82,6 +88,7 @@ func run() int {
 	root.AddCommand(cli.NewPlanCommand(cameraPlanService, domainPlanParameters(cfg.PlanDefaults)))
 	root.AddCommand(geoDataCommand)
 	root.AddCommand(renderCommand)
+	root.AddCommand(cli.NewVideoCommand(cameraPlanService, videoService, domainVideoQuality(cfg.VideoDefaults.Quality)))
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

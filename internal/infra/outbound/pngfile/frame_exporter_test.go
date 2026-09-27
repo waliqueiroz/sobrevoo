@@ -14,7 +14,13 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/pngfile"
 )
 
-const setID = domain.FrameSetID("aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+const (
+	setID  = domain.FrameSetID("aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+	planID = "99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa"
+)
+
+// frameMark is what a frame of the set, drawn from the plan, says about itself.
+var frameMark = domain.FrameMark{SetID: setID, PlanID: planID}
 
 // drawnFrame is a small frame whose pixels tell where they are.
 func drawnFrame() domain.FrameImage {
@@ -33,7 +39,7 @@ func Test_FrameExporter_Export(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "frame.png")
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, path, false)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, path, false)
 
 		// then
 		require.NoError(t, err)
@@ -52,7 +58,7 @@ func Test_FrameExporter_Export(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "frame.png")
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, path, false)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, path, false)
 
 		// then
 		require.NoError(t, err)
@@ -61,14 +67,29 @@ func Test_FrameExporter_Export(t *testing.T) {
 		assert.Contains(t, string(data), "Sobrevoo\x00frame-set="+string(setID))
 	})
 
+	t.Run("should say, inside the image, which plan the frame was drawn from", func(t *testing.T) {
+		// given
+		path := filepath.Join(t.TempDir(), "frame.png")
+
+		// when
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, path, false)
+
+		// then
+		require.NoError(t, err)
+		data, readErr := os.ReadFile(path)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(data), "Sobrevoo\x00plan="+planID)
+		assert.Less(t, bytes.Index(data, []byte("frame-set=")), bytes.Index(data, []byte("plan=")), "the set chunk comes first")
+	})
+
 	t.Run("should write the same bytes as the repository writes for a frame of a set", func(t *testing.T) {
 		// given
 		dir := t.TempDir()
 		single := filepath.Join(dir, "single.png")
 
 		// when
-		require.NoError(t, pngfile.NewFrameExporter().Export(drawnFrame(), setID, single, false))
-		require.NoError(t, pngfile.NewFrameRepository().Save(dir, 7, setID, drawnFrame()))
+		require.NoError(t, pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, single, false))
+		require.NoError(t, pngfile.NewFrameRepository().Save(dir, 7, frameMark, drawnFrame()))
 
 		// then
 		first, err1 := os.ReadFile(single)
@@ -83,7 +104,7 @@ func Test_FrameExporter_Export(t *testing.T) {
 		dir := t.TempDir()
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, filepath.Join(dir, "frame.png"), false)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, filepath.Join(dir, "frame.png"), false)
 
 		// then
 		require.NoError(t, err)
@@ -101,7 +122,7 @@ func Test_FrameExporter_Export_Protection(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("precious"), 0o600))
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, path, false)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, path, false)
 
 		// then
 		require.ErrorIs(t, err, domain.ErrFrameDestinationExists)
@@ -117,7 +138,7 @@ func Test_FrameExporter_Export_Protection(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("old and much longer than the new one, or so it would seem: "+string(make([]byte, 5000))), 0o600))
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, path, true)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, path, true)
 
 		// then
 		require.NoError(t, err)
@@ -132,7 +153,7 @@ func Test_FrameExporter_Export_Protection(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "missing", "frame.png")
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, path, false)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, path, false)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrFrameDestinationInvalid)
@@ -147,7 +168,7 @@ func Test_FrameExporter_Export_Protection(t *testing.T) {
 		t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, filepath.Join(dir, "frame.png"), false)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, filepath.Join(dir, "frame.png"), false)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrFrameDestinationInvalid)
@@ -163,7 +184,7 @@ func Test_FrameExporter_Export_Protection(t *testing.T) {
 		t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
 
 		// when
-		err := pngfile.NewFrameExporter().Export(drawnFrame(), setID, path, true)
+		err := pngfile.NewFrameExporter().Export(drawnFrame(), frameMark, path, true)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrFrameDestinationInvalid)
