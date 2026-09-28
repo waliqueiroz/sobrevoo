@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 
@@ -117,7 +118,15 @@ func open(path string) (*sql.DB, error) {
 		return nil, unreadable(path, err)
 	}
 
-	dsn := (&url.URL{Scheme: "file", Path: path, RawQuery: "mode=ro&immutable=1"}).String()
+	// A relative path in a "file:" URI is read by SQLite as a URI authority
+	// (file://resources/... reads "resources" as a host, which SQLite only
+	// accepts as empty or "localhost"), so it must be made absolute first.
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, unreadable(path, err)
+	}
+
+	dsn := (&url.URL{Scheme: "file", Path: absolute, RawQuery: "mode=ro&immutable=1"}).String()
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, unreadable(path, err)
