@@ -14,6 +14,11 @@ type overlay struct {
 	// +Inf where there is none.
 	depth  []float32
 	tuning RenderTuning
+
+	// appearance is the color and the size of the trail and the marker this
+	// overlay draws with; TrailCasingColor, MarkerRingColor, MarkerRingRatio
+	// and MarkerRingMin stay fixed, not part of it.
+	appearance Appearance
 }
 
 // visible says whether something at distance meters from the camera shows at
@@ -61,7 +66,7 @@ func (o overlay) toScreen(p cameraPoint) screenPoint {
 // trail of a frame at the start of the track has nothing to show.
 func (o overlay) drawTrail(points [][3]float64) {
 	height := float64(o.image.Resolution.Height)
-	core := math.Max(TrailMinWidth, float64(TrailWidthRatio*height)) / 2
+	core := math.Max(TrailMinWidth, float64(o.appearance.TrailWidthRatio*height)) / 2
 
 	var segments [][2]screenPoint
 	for i := 1; i < len(points); i++ {
@@ -88,7 +93,7 @@ func (o overlay) drawTrail(points [][3]float64) {
 		o.drawCapsule(segment[0], segment[1], core+1, TrailCasingColor)
 	}
 	for _, segment := range segments {
-		o.drawCapsule(segment[0], segment[1], core, TrailColor)
+		o.drawCapsule(segment[0], segment[1], core, o.appearance.TrailColor)
 	}
 }
 
@@ -155,7 +160,7 @@ func (o overlay) drawMarker(point [3]float64) {
 		return
 	}
 
-	radius := math.Max(MarkerMinRadius, float64(MarkerRadiusRatio*float64(height)))
+	radius := math.Max(MarkerMinRadius, float64(o.appearance.MarkerRadiusRatio*float64(height)))
 	ring := math.Max(MarkerRingMin, float64(MarkerRingRatio*float64(height)))
 
 	x0 := max(int(math.Floor(px-radius-1)), 0)
@@ -177,7 +182,7 @@ func (o overlay) drawMarker(point [3]float64) {
 			mix := func(fill, edge uint8) uint8 {
 				return rounded(float64(float64(fill)*(1-ringShare)) + float64(float64(edge)*ringShare))
 			}
-			o.blend(x, y, RGB{mix(MarkerColor.R, MarkerRingColor.R), mix(MarkerColor.G, MarkerRingColor.G), mix(MarkerColor.B, MarkerRingColor.B)}, coverage)
+			o.blend(x, y, RGB{mix(o.appearance.MarkerColor.R, MarkerRingColor.R), mix(o.appearance.MarkerColor.G, MarkerRingColor.G), mix(o.appearance.MarkerColor.B, MarkerRingColor.B)}, coverage)
 		}
 	}
 }

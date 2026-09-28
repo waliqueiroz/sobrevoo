@@ -20,8 +20,8 @@ import (
 func executeFlyCommandWith(t *testing.T, flightService *mockapplication.MockFlightService, options []cli.RenderOption, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
-	parameters, resolution, quality := flightDefaults()
-	cmd := cli.NewFlightCommand(flightService, parameters, resolution, quality, options...)
+	parameters, resolution, appearance, quality := flightDefaults()
+	cmd := cli.NewFlightCommand(flightService, parameters, resolution, appearance, quality, options...)
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)

@@ -19,9 +19,14 @@ import (
 
 // flightDefaults is the same shape of defaults "plan"/"render all"/"video"
 // already use.
-func flightDefaults() (domain.PlanParameters, domain.Resolution, domain.VideoQuality) {
+func flightDefaults() (domain.PlanParameters, domain.Resolution, domain.Appearance, domain.VideoQuality) {
 	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium, Aspect: domain.AspectRatio{Width: 9, Height: 16}},
 		domain.Resolution{Width: 1080, Height: 1920},
+		domain.Appearance{
+			TrailColor: domain.RGB{R: 0xFF, G: 0xB0, B: 0x00}, TrailWidthRatio: 0.005,
+			MarkerColor: domain.RGB{R: 0xE5, G: 0x25, B: 0x2A}, MarkerRadiusRatio: 0.012,
+			BackgroundColor: domain.RGB{R: 0x20, G: 0x26, B: 0x2E},
+		},
 		domain.VideoQualityMedium
 }
 
@@ -33,8 +38,8 @@ func newFlightCommandMocks(t *testing.T) *mockapplication.MockFlightService {
 func executeFlyCommand(t *testing.T, flightService *mockapplication.MockFlightService, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
-	parameters, resolution, quality := flightDefaults()
-	cmd := cli.NewFlightCommand(flightService, parameters, resolution, quality)
+	parameters, resolution, appearance, quality := flightDefaults()
+	cmd := cli.NewFlightCommand(flightService, parameters, resolution, appearance, quality)
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
@@ -157,7 +162,7 @@ func Test_FlightCommand_Parameters(t *testing.T) {
 	t.Run("should use the given defaults when no parameter flag is given", func(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
-		parameters, _, _ := flightDefaults()
+		parameters, _, _, _ := flightDefaults()
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
 			return x.(domain.FlightRequest).Parameters == parameters
 		}), gomock.Any()).Return(aFlight(), nil)
@@ -185,8 +190,9 @@ func Test_FlightCommand_Parameters(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), domain.FlightRequest{
-			Parameters: func() domain.PlanParameters { p, _, _ := flightDefaults(); return p }(),
+			Parameters: func() domain.PlanParameters { p, _, _, _ := flightDefaults(); return p }(),
 			Resolution: domain.Resolution{Width: 640, Height: 360},
+			Appearance: func() domain.Appearance { _, _, a, _ := flightDefaults(); return a }(),
 			Quality:    domain.VideoQualityMedium,
 			Output:     "flight.mp4",
 		}, gomock.Any()).Return(aFlight(), nil)
@@ -238,13 +244,74 @@ func Test_FlightCommand_Parameters(t *testing.T) {
 	})
 }
 
+func Test_FlightCommand_Appearance(t *testing.T) {
+	t.Run("should use the given defaults when no appearance flag is given", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		_, _, appearance, _ := flightDefaults()
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
+			return x.(domain.FlightRequest).Appearance == appearance
+		}), gomock.Any()).Return(aFlight(), nil)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should pass the five appearance values given, all at once, to the request", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		want := domain.Appearance{
+			TrailColor: domain.RGB{R: 0x00, G: 0xFF, B: 0x00}, TrailWidthRatio: 0.02,
+			MarkerColor: domain.RGB{R: 0x00, G: 0x00, B: 0xFF}, MarkerRadiusRatio: 0.05,
+			BackgroundColor: domain.RGB{R: 0xFF, G: 0xFF, B: 0xFF},
+		}
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
+			return x.(domain.FlightRequest).Appearance == want
+		}), gomock.Any()).Return(aFlight(), nil)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4",
+			"--trail-color", "#00FF00", "--trail-width", "0.02", "--marker-color", "#0000FF", "--marker-radius", "0.05", "--background-color", "#FFFFFF")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should refuse a malformed color with the same error render frame already gives, without flying anything", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--background-color", "sky")
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidColor)
+		assert.Equal(t, 52, cli.ExitCode(err))
+	})
+
+	t.Run("should refuse a trail width outside the documented range with the same error render frame already gives", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--trail-width", "1")
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidTrailWidth)
+		assert.Equal(t, 53, cli.ExitCode(err))
+	})
+}
+
 func Test_FlightCommand_Execute(t *testing.T) {
 	t.Run("should open the track file and fly it, with the default parameters, resolution and quality, without overwriting", func(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
-		parameters, resolution, quality := flightDefaults()
+		parameters, resolution, appearance, quality := flightDefaults()
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), domain.FlightRequest{
-			Parameters: parameters, Resolution: resolution, Quality: quality, Output: "flight.mp4", Overwrite: false,
+			Parameters: parameters, Resolution: resolution, Appearance: appearance, Quality: quality, Output: "flight.mp4", Overwrite: false,
 		}, gomock.Any()).Return(aFlight(), nil)
 
 		// when

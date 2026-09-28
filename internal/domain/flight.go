@@ -14,6 +14,10 @@ type FlightRequest struct {
 	// Resolution is the size of the frames drawn.
 	Resolution Resolution
 
+	// Appearance is the trail, the marker and the background the frames are
+	// drawn with (008-frame-appearance).
+	Appearance Appearance
+
 	// Quality is the quality of the video.
 	Quality VideoQuality
 

@@ -157,6 +157,17 @@ var (
 	// limits, or that is not written as WIDTHxHEIGHT.
 	ErrInvalidResolution = errors.New("invalid resolution")
 
+	// ErrInvalidColor reports a color that is not written as #RRGGBB.
+	ErrInvalidColor = errors.New("invalid color")
+
+	// ErrInvalidTrailWidth reports a trail width ratio outside the documented
+	// limits.
+	ErrInvalidTrailWidth = errors.New("invalid trail width")
+
+	// ErrInvalidMarkerRadius reports a marker radius ratio outside the
+	// documented limits.
+	ErrInvalidMarkerRadius = errors.New("invalid marker radius")
+
 	// ErrFrameDestinationInvalid reports a frame destination that cannot be
 	// used (not a directory, missing directory, no permission, ...).
 	ErrFrameDestinationInvalid = errors.New("frame destination cannot be used")

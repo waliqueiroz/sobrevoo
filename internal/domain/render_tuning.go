@@ -14,22 +14,24 @@ type RGB struct {
 	R, G, B uint8
 }
 
-// The colors and patterns of a frame (specs/005-frame-rendering/contracts/
-// frame-files.md). They are what the image means, not something to tune.
+// The fixed patterns and marks of a frame (specs/005-frame-rendering/contracts/
+// frame-files.md). They are what the image means, not a matter of style, so
+// they are not part of Appearance and stay the same whatever appearance is
+// chosen (008-frame-appearance FR-005). The trail's color and width, the
+// marker's fill color and radius, and the background color moved to
+// Appearance — only the trail's casing, the marker's ring and the two "no
+// data" patterns stay fixed here.
 var (
-	// BackgroundColor is where a ray meets no terrain: outside the slice and
-	// above the horizon.
-	BackgroundColor = RGB{0x20, 0x26, 0x2E}
-
 	// NoMapColors are the two tones of the diagonal hatch of terrain with no
 	// map tile; NoElevationColors, of the checkerboard of terrain over a cell
 	// with no elevation.
 	NoMapColors       = [2]RGB{{0xC8, 0xC8, 0xC8}, {0x6E, 0x6E, 0x6E}}
 	NoElevationColors = [2]RGB{{0xFF, 0x00, 0xFF}, {0x3A, 0x00, 0x3A}}
 
-	TrailColor       = RGB{0xFF, 0xB0, 0x00}
+	// TrailCasingColor is the dark casing under the trail's core (Appearance.
+	// TrailColor); MarkerRingColor, the ring around the marker's fill
+	// (Appearance.MarkerColor).
 	TrailCasingColor = RGB{0x10, 0x10, 0x10}
-	MarkerColor      = RGB{0xE5, 0x25, 0x2A}
 	MarkerRingColor  = RGB{0xFF, 0xFF, 0xFF}
 )
 
@@ -38,14 +40,15 @@ const (
 	// squares of the checkerboard.
 	PatternPeriod = 12
 
-	// The size of the trail and of the marker, as a share of the height of the
-	// image, and the least each has, in pixels.
-	TrailWidthRatio   = 0.005
-	TrailMinWidth     = 2.0
-	MarkerRadiusRatio = 0.012
-	MarkerMinRadius   = 4.0
-	MarkerRingRatio   = 0.003
-	MarkerRingMin     = 1.5
+	// TrailMinWidth and MarkerMinRadius are the least the trail and the
+	// marker have, in pixels, whatever ratio Appearance chooses
+	// (TrailWidthRatio, MarkerRadiusRatio) — so neither disappears on a small
+	// resolution. MarkerRingRatio and MarkerRingMin size the fixed ring the
+	// same way.
+	TrailMinWidth   = 2.0
+	MarkerMinRadius = 4.0
+	MarkerRingRatio = 0.003
+	MarkerRingMin   = 1.5
 )
 
 // RenderTuning holds the heuristic constants of drawing a frame. They are

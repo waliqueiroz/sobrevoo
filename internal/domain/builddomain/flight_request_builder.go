@@ -14,6 +14,7 @@ func NewFlightRequestBuilder() *FlightRequestBuilder {
 		request: domain.FlightRequest{
 			Parameters: NewPlanParametersBuilder().Build(),
 			Resolution: domain.Resolution{Width: 1080, Height: 1920},
+			Appearance: NewAppearanceBuilder().Build(),
 			Quality:    domain.VideoQualityMedium,
 			Output:     "/tmp/flight.mp4",
 		},
@@ -27,6 +28,11 @@ func (b *FlightRequestBuilder) WithParameters(parameters domain.PlanParameters) 
 
 func (b *FlightRequestBuilder) WithResolution(resolution domain.Resolution) *FlightRequestBuilder {
 	b.request.Resolution = resolution
+	return b
+}
+
+func (b *FlightRequestBuilder) WithAppearance(appearance domain.Appearance) *FlightRequestBuilder {
+	b.request.Appearance = appearance
 	return b
 }
 

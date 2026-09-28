@@ -34,13 +34,14 @@ type imagerySet struct {
 // holds a point, its decoded image, and the color of a point as the camera sees
 // it (research.md item 7).
 type imagery struct {
-	decoder TileDecoder
-	sets    []imagerySet
-	cache   *tileCache
+	decoder    TileDecoder
+	sets       []imagerySet
+	cache      *tileCache
+	background RGB
 }
 
-func newImagery(tileSets []TileSet, decoder TileDecoder, cacheBytes int64) *imagery {
-	im := &imagery{decoder: decoder, cache: newTileCache(cacheBytes)}
+func newImagery(tileSets []TileSet, decoder TileDecoder, cacheBytes int64, background RGB) *imagery {
+	im := &imagery{decoder: decoder, cache: newTileCache(cacheBytes), background: background}
 
 	for _, tileSet := range tileSets {
 		set := imagerySet{
@@ -120,11 +121,11 @@ type textureLevel struct {
 }
 
 // newTileTexture builds the texture of a decoded tile. A pixel with some
-// transparency is put over BackgroundColor, so a tile with a transparent stretch
+// transparency is put over background, so a tile with a transparent stretch
 // looks like an absence of map, not like a color that is not in the file.
-func newTileTexture(image TileImage) *tileTexture {
+func newTileTexture(image TileImage, background RGB) *tileTexture {
 	base := textureLevel{width: image.Width, height: image.Height, pix: make([]uint8, 3*image.Width*image.Height)}
-	background := [3]int{int(BackgroundColor.R), int(BackgroundColor.G), int(BackgroundColor.B)}
+	backgroundInt := [3]int{int(background.R), int(background.G), int(background.B)}
 
 	for i := 0; i < image.Width*image.Height; i++ {
 		r, g, b, a := image.Pix[4*i], image.Pix[4*i+1], image.Pix[4*i+2], image.Pix[4*i+3]
@@ -133,9 +134,9 @@ func newTileTexture(image TileImage) *tileTexture {
 			continue
 		}
 		alpha := int(a)
-		base.pix[3*i] = uint8((int(r)*alpha + background[0]*(255-alpha) + 127) / 255)
-		base.pix[3*i+1] = uint8((int(g)*alpha + background[1]*(255-alpha) + 127) / 255)
-		base.pix[3*i+2] = uint8((int(b)*alpha + background[2]*(255-alpha) + 127) / 255)
+		base.pix[3*i] = uint8((int(r)*alpha + backgroundInt[0]*(255-alpha) + 127) / 255)
+		base.pix[3*i+1] = uint8((int(g)*alpha + backgroundInt[1]*(255-alpha) + 127) / 255)
+		base.pix[3*i+2] = uint8((int(b)*alpha + backgroundInt[2]*(255-alpha) + 127) / 255)
 	}
 
 	texture := &tileTexture{levels: []textureLevel{base}}
@@ -246,7 +247,7 @@ func (im *imagery) texture(ref tileRef) (*tileTexture, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%w: base map %q level %d x=%d y=%d: %w", ErrSliceFileInvalid, set.source, ref.id.Level, ref.id.X, ref.id.Y, err)
 		}
-		return newTileTexture(image), nil
+		return newTileTexture(image, im.background), nil
 	})
 }
 

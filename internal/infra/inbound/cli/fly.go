@@ -18,19 +18,23 @@ import (
 // stages behind a single call (FlightService.Fly): from a GPS track straight
 // to a video, using the geo data already registered, without requiring any
 // other command or intermediate file (the seventh stage). defaults are the
-// plan parameters, defaultResolution the frame resolution and defaultQuality
-// the video quality used when the corresponding flag is not given — the same
-// defaults "plan", "render all" and "video" already use.
+// plan parameters, defaultResolution the frame resolution, defaultAppearance
+// the trail/marker/background the frames are drawn with (008-frame-
+// appearance) and defaultQuality the video quality used when the
+// corresponding flag is not given — the same defaults "plan", "render all"
+// and "video" already use.
 func NewFlightCommand(
 	flightService application.FlightService,
 	defaults domain.PlanParameters,
 	defaultResolution domain.Resolution,
+	defaultAppearance domain.Appearance,
 	defaultQuality domain.VideoQuality,
 	options ...RenderOption,
 ) *cobra.Command {
 	settings := newRenderSettings(options)
 	var outputFlag, qualityFlag, resolutionFlag, keepFlag string
 	var durationFlag, fpsFlag, distanceFlag, tiltFlag, aspectFlag string
+	var trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag string
 	var overwriteFlag bool
 
 	cmd := &cobra.Command{
@@ -72,11 +76,16 @@ func NewFlightCommand(
 			if err != nil {
 				return newUsageError(fmt.Errorf("--quality %w", err))
 			}
+			appearance, err := parseAppearance(cmd, trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag, defaultAppearance)
+			if err != nil {
+				return err
+			}
 			warnIfFramingCut(cmd.ErrOrStderr(), domain.CameraPlan{Parameters: parameters}, resolution)
 
 			request := domain.FlightRequest{
 				Parameters: parameters,
 				Resolution: resolution,
+				Appearance: appearance,
 				Quality:    quality,
 				Output:     outputFlag,
 				Keep:       keepFlag,
@@ -95,6 +104,11 @@ func NewFlightCommand(
 	cmd.Flags().StringVar(&tiltFlag, "tilt", levelName(defaults.Tilt), "How steeply the camera looks down: low (near the horizon), medium, or high (near vertical)")
 	cmd.Flags().StringVar(&aspectFlag, "aspect", defaults.Aspect.String(), "Shape of the video, WIDTH:HEIGHT: the opening and the closing frame the whole track for it (for example 9:16 vertical, 16:9 horizontal)")
 	cmd.Flags().StringVar(&resolutionFlag, "resolution", formatResolution(defaultResolution), resolutionUsage)
+	cmd.Flags().StringVar(&trailColorFlag, "trail-color", formatColor(defaultAppearance.TrailColor), trailColorUsage)
+	cmd.Flags().StringVar(&trailWidthFlag, "trail-width", strconv.FormatFloat(defaultAppearance.TrailWidthRatio, 'g', -1, 64), trailWidthUsage)
+	cmd.Flags().StringVar(&markerColorFlag, "marker-color", formatColor(defaultAppearance.MarkerColor), markerColorUsage)
+	cmd.Flags().StringVar(&markerRadiusFlag, "marker-radius", strconv.FormatFloat(defaultAppearance.MarkerRadiusRatio, 'g', -1, 64), markerRadiusUsage)
+	cmd.Flags().StringVar(&backgroundColorFlag, "background-color", formatColor(defaultAppearance.BackgroundColor), backgroundColorUsage)
 	cmd.Flags().StringVar(&qualityFlag, "quality", defaultQuality.String(), "Quality of the video: low (fast to make, small), medium (for publishing) or high (for keeping)")
 	cmd.Flags().StringVar(&keepFlag, "keep", "", "Directory to keep the plan, the slice and the frames in, and to reuse them from on a later run (default: a temporary directory, removed at the end)")
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "Replace the video file, and any stale intermediate under --keep, if they already exist")

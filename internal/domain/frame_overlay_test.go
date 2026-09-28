@@ -10,25 +10,45 @@ import (
 
 var overlayTuning = RenderTuning{TrailLiftMeters: 0.3, DepthBiasMeters: 1, DepthBiasRatio: 0.002}
 
+// overlayAppearance is the tool's appearance of before this feature let it be
+// chosen: an orange trail, a red marker with a white ring, a dark background.
+var overlayAppearance = Appearance{
+	TrailColor:        RGB{R: 0xFF, G: 0xB0, B: 0x00},
+	TrailWidthRatio:   0.005,
+	MarkerColor:       RGB{R: 0xE5, G: 0x25, B: 0x2A},
+	MarkerRadiusRatio: 0.012,
+	BackgroundColor:   RGB{R: 0x20, G: 0x26, B: 0x2E},
+}
+
 // overlayOn is an overlay on an empty image of 200 × 120 pixels, over terrain
 // nowhere (so nothing hides anything): a camera 100 m above the plane looking
 // straight down, with its top to the north.
 func overlayOn(resolution Resolution, cam camera) overlay {
+	return overlayWith(resolution, cam, overlayAppearance)
+}
+
+// overlayWith is overlayOn with a chosen appearance.
+func overlayWith(resolution Resolution, cam camera, appearance Appearance) overlay {
 	depth := make([]float32, resolution.Pixels())
 	for i := range depth {
 		depth[i] = float32(math.Inf(1))
 	}
-	return overlay{image: NewFrameImage(resolution), camera: cam, depth: depth, tuning: overlayTuning}
+	return overlay{image: NewFrameImage(resolution, appearance.BackgroundColor), camera: cam, depth: depth, tuning: overlayTuning, appearance: appearance}
 }
 
 func lookingDown(resolution Resolution) camera { return newCamera(0, 90, 100, resolution, 45) }
 
 // changed lists the pixels that are not the background.
 func changed(image FrameImage) [][2]int {
+	return changedFrom(image, overlayAppearance.BackgroundColor)
+}
+
+// changedFrom lists the pixels that are not background.
+func changedFrom(image FrameImage, background RGB) [][2]int {
 	var pixels [][2]int
 	for y := 0; y < image.Resolution.Height; y++ {
 		for x := 0; x < image.Resolution.Width; x++ {
-			if image.At(x, y) != BackgroundColor {
+			if image.At(x, y) != background {
 				pixels = append(pixels, [2]int{x, y})
 			}
 		}
@@ -73,11 +93,31 @@ func Test_overlay_drawMarker(t *testing.T) {
 
 		// then: the radius is 1.2% of the height (3.6 px), and at least 4
 		pixels := changed(o.image)
-		radius := math.Max(MarkerMinRadius, MarkerRadiusRatio*300)
+		radius := math.Max(MarkerMinRadius, overlayAppearance.MarkerRadiusRatio*300)
 		assert.InDelta(t, math.Pi*radius*radius, float64(len(pixels)), 0.25*math.Pi*radius*radius)
-		assert.Equal(t, MarkerColor, o.image.At(199, 149))
+		assert.Equal(t, overlayAppearance.MarkerColor, o.image.At(199, 149))
 		edge := o.image.At(200+int(radius)-1, 150)
-		assert.Greater(t, edge.G, MarkerColor.G, "the ring is whiter than the fill")
+		assert.Greater(t, edge.G, overlayAppearance.MarkerColor.G, "the ring is whiter than the fill")
+	})
+
+	t.Run("should use the color and the radius of the appearance given", func(t *testing.T) {
+		// given
+		bigger := Resolution{Width: 400, Height: 300}
+		red := overlayWith(bigger, lookingDown(bigger), overlayAppearance)
+		blue := overlayWith(bigger, lookingDown(bigger), Appearance{
+			TrailColor: overlayAppearance.TrailColor, TrailWidthRatio: overlayAppearance.TrailWidthRatio,
+			MarkerColor: RGB{R: 0x00, G: 0x00, B: 0xFF}, MarkerRadiusRatio: 0.05,
+			BackgroundColor: overlayAppearance.BackgroundColor,
+		})
+
+		// when
+		red.drawMarker([3]float64{0, 0, 0})
+		blue.drawMarker([3]float64{0, 0, 0})
+
+		// then
+		assert.Equal(t, overlayAppearance.MarkerColor, red.image.At(199, 149))
+		assert.Equal(t, RGB{R: 0x00, G: 0x00, B: 0xFF}, blue.image.At(199, 149))
+		assert.Greater(t, len(changedFrom(blue.image, overlayAppearance.BackgroundColor)), len(changedFrom(red.image, overlayAppearance.BackgroundColor)), "the bigger radius covers more pixels")
 	})
 
 	t.Run("should be hidden by terrain that is nearer than it is", func(t *testing.T) {
@@ -192,12 +232,37 @@ func Test_overlay_drawTrail(t *testing.T) {
 
 		// then: 0.5% of 400 is 2 px, the least it has, so the core covers the two rows on the axis and the
 		// casing adds a pixel at each side
-		assert.Equal(t, TrailColor, o.image.At(200, 199))
-		assert.Equal(t, TrailColor, o.image.At(200, 200))
+		assert.Equal(t, overlayAppearance.TrailColor, o.image.At(200, 199))
+		assert.Equal(t, overlayAppearance.TrailColor, o.image.At(200, 200))
 		assert.Equal(t, TrailCasingColor, o.image.At(200, 198))
 		assert.Equal(t, TrailCasingColor, o.image.At(200, 201))
-		assert.Equal(t, BackgroundColor, o.image.At(200, 196))
-		assert.Equal(t, BackgroundColor, o.image.At(200, 203))
+		assert.Equal(t, overlayAppearance.BackgroundColor, o.image.At(200, 196))
+		assert.Equal(t, overlayAppearance.BackgroundColor, o.image.At(200, 203))
+	})
+
+	t.Run("should use the color and the width of the appearance given", func(t *testing.T) {
+		// given: a line 100 pixels long along the middle row
+		bigger := Resolution{Width: 400, Height: 400}
+		big := lookingDown(bigger)
+		green := overlayWith(bigger, big, Appearance{
+			TrailColor: RGB{R: 0x00, G: 0xFF, B: 0x00}, TrailWidthRatio: 0.02,
+			MarkerColor: overlayAppearance.MarkerColor, MarkerRadiusRatio: overlayAppearance.MarkerRadiusRatio,
+			BackgroundColor: overlayAppearance.BackgroundColor,
+		})
+		step := 100 * 100 / big.focal
+
+		// when
+		green.drawTrail([][3]float64{{-step / 2, 0, 0}, {step / 2, 0, 0}})
+
+		// then: 2% of 400 is 8 px wide, much more than the 0.5% (2 px) of the default appearance
+		assert.Equal(t, RGB{R: 0x00, G: 0xFF, B: 0x00}, green.image.At(200, 199))
+		var coreRows int
+		for y := 0; y < 400; y++ {
+			if green.image.At(200, y) == (RGB{R: 0x00, G: 0xFF, B: 0x00}) {
+				coreRows++
+			}
+		}
+		assert.Greater(t, coreRows, 2)
 	})
 
 	t.Run("should be wider on a taller image", func(t *testing.T) {
@@ -211,7 +276,7 @@ func Test_overlay_drawTrail(t *testing.T) {
 			o.drawTrail([][3]float64{{-step / 2, 0, 0}, {step / 2, 0, 0}})
 			var core int
 			for y := 0; y < res.Height; y++ {
-				if o.image.At(res.Width/2, y) == TrailColor {
+				if o.image.At(res.Width/2, y) == overlayAppearance.TrailColor {
 					core++
 				}
 			}
@@ -261,7 +326,7 @@ func Test_overlay_drawTrail(t *testing.T) {
 		o.drawMarker([3]float64{0, 0, 0})
 
 		// then
-		assert.Equal(t, MarkerColor, o.image.At(100, 60))
+		assert.Equal(t, overlayAppearance.MarkerColor, o.image.At(100, 60))
 	})
 
 	t.Run("should hide the part of the trail that terrain nearer to the camera hides", func(t *testing.T) {

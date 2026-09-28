@@ -34,6 +34,10 @@ func (d *fakeDecoder) Decode(_ string, data []byte) (TileImage, error) {
 	return d.images[key], nil
 }
 
+// testBackground is the background used by tests that do not care which one,
+// the tool's color of before this feature let it be chosen.
+var testBackground = RGB{R: 0x20, G: 0x26, B: 0x2E}
+
 // solidImage is a 4 × 4 tile of one color, with the given alpha.
 func solidImage(r, g, b, a uint8) TileImage {
 	pix := make([]uint8, 4*16)
@@ -62,7 +66,7 @@ func oneSet(decoder *fakeDecoder, cache int64, tiles ...string) *imagery {
 		}
 		set.Tiles = append(set.Tiles, Tile{ID: TileID{Level: 1, X: x, Y: 0}, Data: []byte(name)})
 	}
-	return newImagery([]TileSet{set}, decoder, cache)
+	return newImagery([]TileSet{set}, decoder, cache, testBackground)
 }
 
 func Test_mercator(t *testing.T) {
@@ -121,7 +125,7 @@ func Test_imagery_find(t *testing.T) {
 		Source: GeoDataSource{Name: "b"}, Detail: DetailLevel{Chosen: 1},
 		Tiles: []Tile{{ID: TileID{Level: 1, X: 0, Y: 0}, Data: []byte("b00")}, {ID: TileID{Level: 1, X: 1, Y: 0}, Data: []byte("b10")}},
 	}
-	im := newImagery([]TileSet{first, second}, newFakeDecoder(), 1<<20)
+	im := newImagery([]TileSet{first, second}, newFakeDecoder(), 1<<20, testBackground)
 
 	t.Run("should be the tile that holds the position", func(t *testing.T) {
 		// given / when
@@ -153,7 +157,7 @@ func Test_imagery_find(t *testing.T) {
 
 	t.Run("should have no image where every base map lacks the tile, or knows nothing of it", func(t *testing.T) {
 		// given
-		onlyMissing := newImagery([]TileSet{first}, newFakeDecoder(), 1<<20)
+		onlyMissing := newImagery([]TileSet{first}, newFakeDecoder(), 1<<20, testBackground)
 
 		// when
 		_, lacking := onlyMissing.find(0.75, 0.25)
@@ -176,7 +180,7 @@ func Test_imagery_find(t *testing.T) {
 func Test_tileTexture(t *testing.T) {
 	t.Run("should have the tile as its first level and a level at half the size after each", func(t *testing.T) {
 		// given / when
-		texture := newTileTexture(solidImage(10, 20, 30, 255))
+		texture := newTileTexture(solidImage(10, 20, 30, 255), testBackground)
 
 		// then
 		require.Len(t, texture.levels, 3)
@@ -195,7 +199,7 @@ func Test_tileTexture(t *testing.T) {
 		set(1, 1, 41)
 
 		// when
-		texture := newTileTexture(image)
+		texture := newTileTexture(image, testBackground)
 
 		// then: (10 + 20 + 30 + 41 + 2) >> 2 = 25
 		assert.Equal(t, uint8(25), texture.levels[1].pix[0])
@@ -204,18 +208,32 @@ func Test_tileTexture(t *testing.T) {
 
 	t.Run("should put a transparent pixel over the background and mix a half transparent one", func(t *testing.T) {
 		// given
-		transparent := newTileTexture(solidImage(200, 100, 50, 0))
-		half := newTileTexture(solidImage(200, 100, 50, 128))
+		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
+		transparent := newTileTexture(solidImage(200, 100, 50, 0), background)
+		half := newTileTexture(solidImage(200, 100, 50, 128), background)
 
 		// when
 		r0, g0, b0 := transparent.levels[0].at(0, 0)
 		r1, g1, b1 := half.levels[0].at(0, 0)
 
 		// then
-		assert.Equal(t, [3]float64{float64(BackgroundColor.R), float64(BackgroundColor.G), float64(BackgroundColor.B)}, [3]float64{r0, g0, b0})
-		assert.Equal(t, float64((200*128+int(BackgroundColor.R)*127+127)/255), r1)
-		assert.Equal(t, float64((100*128+int(BackgroundColor.G)*127+127)/255), g1)
-		assert.Equal(t, float64((50*128+int(BackgroundColor.B)*127+127)/255), b1)
+		assert.Equal(t, [3]float64{float64(background.R), float64(background.G), float64(background.B)}, [3]float64{r0, g0, b0})
+		assert.Equal(t, float64((200*128+int(background.R)*127+127)/255), r1)
+		assert.Equal(t, float64((100*128+int(background.G)*127+127)/255), g1)
+		assert.Equal(t, float64((50*128+int(background.B)*127+127)/255), b1)
+	})
+
+	t.Run("should mix a partly transparent pixel with a different result for a different background", func(t *testing.T) {
+		// given
+		dark := newTileTexture(solidImage(200, 100, 50, 128), RGB{R: 0x20, G: 0x26, B: 0x2E})
+		light := newTileTexture(solidImage(200, 100, 50, 128), RGB{R: 0xFF, G: 0xFF, B: 0xFF})
+
+		// when
+		darkR, darkG, darkB := dark.levels[0].at(0, 0)
+		lightR, lightG, lightB := light.levels[0].at(0, 0)
+
+		// then
+		assert.NotEqual(t, [3]float64{darkR, darkG, darkB}, [3]float64{lightR, lightG, lightB})
 	})
 }
 
@@ -255,7 +273,7 @@ func Test_sampler_color(t *testing.T) {
 		decoder.images["checker"] = image
 		set := TileSet{Source: GeoDataSource{Name: "map"}, Format: "png", Detail: DetailLevel{Chosen: 1},
 			Tiles: []Tile{{ID: TileID{Level: 1, X: 0, Y: 0}, Data: []byte("checker")}}}
-		im := newImagery([]TileSet{set}, decoder, 1<<20)
+		im := newImagery([]TileSet{set}, decoder, 1<<20, testBackground)
 		lat, lon := geoOf(0.1875, 0.1875) // the center of the texel of column 1 and row 1, a black one
 
 		// when: a pixel that covers dozens of texels, then one that covers a fraction of one
@@ -282,7 +300,7 @@ func Test_sampler_color(t *testing.T) {
 		decoder.images["halves"] = image
 		set := TileSet{Source: GeoDataSource{Name: "map"}, Format: "png", Detail: DetailLevel{Chosen: 1},
 			Tiles: []Tile{{ID: TileID{Level: 1, X: 0, Y: 0}, Data: []byte("halves")}}}
-		im := newImagery([]TileSet{set}, decoder, 1<<20)
+		im := newImagery([]TileSet{set}, decoder, 1<<20, testBackground)
 		sampler := im.newSampler(1)
 		lat, lon := geoOf(0.25/8*3, 0.2) // texel column 1, the black half, in the world of 8 texels
 

@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,16 +16,19 @@ import (
 // camera plan and the slice made for it and draws every frame of the flight into
 // a directory (FrameService.DrawFrames), numbered as the plan numbers them so the
 // stage that follows can join them without ambiguity. defaultResolution is the
-// resolution used when the user chooses none.
+// resolution used when the user chooses none, and defaultAppearance the trail,
+// marker and background it is drawn with (008-frame-appearance).
 func NewRenderAllCommand(
 	cameraPlanService application.CameraPlanService,
 	geoSliceService application.GeoSliceService,
 	frameService application.FrameService,
 	defaultResolution domain.Resolution,
+	defaultAppearance domain.Appearance,
 	options ...RenderOption,
 ) *cobra.Command {
 	settings := newRenderSettings(options)
 	var outputFlag, resolutionFlag string
+	var trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag string
 	var overwriteFlag bool
 
 	cmd := &cobra.Command{
@@ -49,14 +53,23 @@ func NewRenderAllCommand(
 			if err != nil {
 				return err
 			}
+			appearance, err := parseAppearance(cmd, trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag, defaultAppearance)
+			if err != nil {
+				return err
+			}
 
-			return runRenderAll(cmd, settings, cameraPlanService, geoSliceService, frameService, args[0], args[1], outputFlag, overwriteFlag, resolution)
+			return runRenderAll(cmd, settings, cameraPlanService, geoSliceService, frameService, args[0], args[1], outputFlag, overwriteFlag, resolution, appearance)
 		},
 	}
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return newUsageError(err) })
 
 	cmd.Flags().StringVar(&outputFlag, "output", "", "Directory to write the frames to (required); it is created if it does not exist")
 	cmd.Flags().StringVar(&resolutionFlag, "resolution", formatResolution(defaultResolution), resolutionUsage)
+	cmd.Flags().StringVar(&trailColorFlag, "trail-color", formatColor(defaultAppearance.TrailColor), trailColorUsage)
+	cmd.Flags().StringVar(&trailWidthFlag, "trail-width", strconv.FormatFloat(defaultAppearance.TrailWidthRatio, 'g', -1, 64), trailWidthUsage)
+	cmd.Flags().StringVar(&markerColorFlag, "marker-color", formatColor(defaultAppearance.MarkerColor), markerColorUsage)
+	cmd.Flags().StringVar(&markerRadiusFlag, "marker-radius", strconv.FormatFloat(defaultAppearance.MarkerRadiusRatio, 'g', -1, 64), markerRadiusUsage)
+	cmd.Flags().StringVar(&backgroundColorFlag, "background-color", formatColor(defaultAppearance.BackgroundColor), backgroundColorUsage)
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "Draw every frame again, replacing the ones already there, and remove the frames of a previous flight that this plan has no number for")
 
 	return cmd
@@ -71,6 +84,7 @@ func runRenderAll(
 	planPath, slicePath, directory string,
 	overwrite bool,
 	resolution domain.Resolution,
+	appearance domain.Appearance,
 ) error {
 	plan, err := cameraPlanService.Load(planPath)
 	if err != nil {
@@ -91,6 +105,7 @@ func runRenderAll(
 	summary, err := frameService.DrawFrames(ctx, plan, slice, domain.FrameSetRequest{
 		Directory:  directory,
 		Resolution: resolution,
+		Appearance: appearance,
 		Overwrite:  overwrite,
 	}, printer.report)
 	printer.finish()

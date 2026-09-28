@@ -245,6 +245,18 @@ func Test_ExitCode(t *testing.T) {
 		assert.NotEqual(t, cli.ExitCode(domain.ErrFlightInterrupted), cli.ExitCode(domain.ErrVideoInterrupted))
 	})
 
+	t.Run("should map ErrInvalidColor to 52", func(t *testing.T) {
+		assert.Equal(t, 52, cli.ExitCode(domain.ErrInvalidColor))
+	})
+
+	t.Run("should map ErrInvalidTrailWidth to 53", func(t *testing.T) {
+		assert.Equal(t, 53, cli.ExitCode(domain.ErrInvalidTrailWidth))
+	})
+
+	t.Run("should map ErrInvalidMarkerRadius to 54", func(t *testing.T) {
+		assert.Equal(t, 54, cli.ExitCode(domain.ErrInvalidMarkerRadius))
+	})
+
 	t.Run("should map a wrapped sixth-stage error to its code", func(t *testing.T) {
 		// given
 		err := fmt.Errorf("%w: 4 missing (12-15)", domain.ErrFrameSequenceInvalid)

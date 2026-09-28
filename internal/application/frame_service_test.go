@@ -102,7 +102,7 @@ func Test_frameService_DrawFrame(t *testing.T) {
 		// given
 		m := newFrameMocks(t)
 		request := domain.SingleFrameRequest{Number: 2, Path: "/tmp/frame.png", Resolution: frameResolution, Overwrite: true}
-		wantMark := domain.FrameMark{SetID: domain.NewFrameSetID(plan, slice, frameResolution, m.tuning), PlanID: plan.ID()}
+		wantMark := domain.FrameMark{SetID: domain.NewFrameSetID(plan, slice, frameResolution, m.tuning, domain.Appearance{}), PlanID: plan.ID()}
 		var exported domain.FrameImage
 		m.exporter.EXPECT().Export(gomock.Any(), wantMark, "/tmp/frame.png", true).
 			DoAndReturn(func(image domain.FrameImage, _ domain.FrameMark, _ string, _ bool) error {
@@ -118,7 +118,7 @@ func Test_frameService_DrawFrame(t *testing.T) {
 		assert.Equal(t, frameResolution, exported.Resolution)
 		assert.Len(t, exported.Pix, 3*64*36)
 
-		scene, sceneErr := domain.NewScene(slice, m.decoder, m.tuning)
+		scene, sceneErr := domain.NewScene(slice, m.decoder, m.tuning, domain.Appearance{})
 		require.NoError(t, sceneErr)
 		want, _, renderErr := scene.Render(context.Background(), plan, 2, frameResolution)
 		require.NoError(t, renderErr)
@@ -126,6 +126,35 @@ func Test_frameService_DrawFrame(t *testing.T) {
 
 		other, _, _ := scene.Render(context.Background(), plan, 0, frameResolution)
 		assert.NotEqual(t, other.Pix, exported.Pix, "and not another frame")
+	})
+
+	t.Run("should pass the request's appearance to the scene and to the mark, unaltered", func(t *testing.T) {
+		// given
+		orange := builddomain.NewAppearanceBuilder().Build()
+		green := builddomain.NewAppearanceBuilder().WithTrailColor(domain.RGB{R: 0x00, G: 0xFF, B: 0x00}).Build()
+
+		export := func(appearance domain.Appearance) (domain.FrameImage, domain.FrameMark) {
+			m := newFrameMocks(t)
+			var image domain.FrameImage
+			var mark domain.FrameMark
+			m.exporter.EXPECT().Export(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(i domain.FrameImage, mk domain.FrameMark, _ string, _ bool) error {
+					image, mark = i, mk
+					return nil
+				})
+
+			_, err := m.service.DrawFrame(context.Background(), plan, slice, domain.SingleFrameRequest{Number: 1, Path: "/tmp/f.png", Resolution: frameResolution, Appearance: appearance})
+			require.NoError(t, err)
+			return image, mark
+		}
+
+		// when
+		orangeImage, orangeMark := export(orange)
+		greenImage, greenMark := export(green)
+
+		// then
+		assert.NotEqual(t, orangeImage.Pix, greenImage.Pix)
+		assert.NotEqual(t, orangeMark.SetID, greenMark.SetID)
 	})
 
 	t.Run("should say it drew one frame, at the resolution, and how long it took", func(t *testing.T) {
@@ -230,7 +259,7 @@ func Test_frameService_DrawFrames(t *testing.T) {
 		// given
 		m := newFrameMocks(t)
 		m.emptyDirectory()
-		wantMark := domain.FrameMark{SetID: domain.NewFrameSetID(plan, slice, frameResolution, m.tuning), PlanID: plan.ID()}
+		wantMark := domain.FrameMark{SetID: domain.NewFrameSetID(plan, slice, frameResolution, m.tuning, domain.Appearance{}), PlanID: plan.ID()}
 		saved := map[int]domain.FrameImage{}
 		var order []int
 		m.repository.EXPECT().Save("/tmp/frames", gomock.Any(), wantMark, gomock.Any()).Times(3).
@@ -246,7 +275,7 @@ func Test_frameService_DrawFrames(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		assert.Equal(t, []int{0, 1, 2}, order)
-		scene, sceneErr := domain.NewScene(slice, m.decoder, m.tuning)
+		scene, sceneErr := domain.NewScene(slice, m.decoder, m.tuning, domain.Appearance{})
 		require.NoError(t, sceneErr)
 		for index, image := range saved {
 			want, _, renderErr := scene.Render(context.Background(), plan, index, frameResolution)
@@ -411,7 +440,7 @@ func Test_frameService_DrawFrames_Resuming(t *testing.T) {
 
 	// directoryWith is a directory that holds the given frames of the set of plan, slice and resolution.
 	directoryWith := func(m frameMocks, indexes ...int) domain.FrameDirectory {
-		id := domain.NewFrameSetID(plan, slice, frameResolution, m.tuning)
+		id := domain.NewFrameSetID(plan, slice, frameResolution, m.tuning, domain.Appearance{})
 		builder := builddomain.NewFrameDirectoryBuilder()
 		for _, index := range indexes {
 			builder.WithOursFrame(index, id)
@@ -463,7 +492,7 @@ func Test_frameService_DrawFrames_Resuming(t *testing.T) {
 		repository := mockdomain.NewMockFrameRepository(mockCtrl)
 		service := application.NewFrameService(mockdomain.NewMockTileDecoder(mockCtrl), repository, mockdomain.NewMockFrameExporter(mockCtrl),
 			builddomain.NewRenderTuningBuilder().WithWorkers(2).Build(), builddomain.NewSliceTuningBuilder().Build())
-		id := domain.NewFrameSetID(plan, slice, frameResolution, builddomain.NewRenderTuningBuilder().WithWorkers(2).Build())
+		id := domain.NewFrameSetID(plan, slice, frameResolution, builddomain.NewRenderTuningBuilder().WithWorkers(2).Build(), domain.Appearance{})
 		repository.EXPECT().Inspect(gomock.Any(), gomock.Any()).Return(builddomain.NewFrameDirectoryBuilder().WithOursFrames(0, 4, id).Build(), nil)
 
 		// when
@@ -619,6 +648,46 @@ func Test_frameService_DrawFrames_Protection(t *testing.T) {
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrFrameDestinationExists)
+	})
+}
+
+func Test_frameService_DrawFrames_Appearance(t *testing.T) {
+	plan := framesPlan(3)
+	slice := forPlan(framesSlice(), plan)
+	orange := builddomain.NewAppearanceBuilder().Build()
+	green := builddomain.NewAppearanceBuilder().WithTrailColor(domain.RGB{R: 0x00, G: 0xFF, B: 0x00}).Build()
+
+	t.Run("should refuse, as any other set, a directory that holds frames of the same plan/slice/resolution but a different appearance, without overwrite", func(t *testing.T) {
+		// given
+		mockCtrl := gomock.NewController(t)
+		repository := mockdomain.NewMockFrameRepository(mockCtrl)
+		service := application.NewFrameService(mockdomain.NewMockTileDecoder(mockCtrl), repository, mockdomain.NewMockFrameExporter(mockCtrl),
+			builddomain.NewRenderTuningBuilder().WithWorkers(2).Build(), builddomain.NewSliceTuningBuilder().Build())
+		tuning := builddomain.NewRenderTuningBuilder().WithWorkers(2).Build()
+		orangeID := domain.NewFrameSetID(plan, slice, frameResolution, tuning, orange)
+		repository.EXPECT().Inspect(gomock.Any(), gomock.Any()).Return(builddomain.NewFrameDirectoryBuilder().WithOursFrames(0, 2, orangeID).Build(), nil)
+
+		// when: asking for the green appearance now, over a directory drawn in orange
+		summary, err := service.DrawFrames(context.Background(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/frames", Resolution: frameResolution, Appearance: green}, nil)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrFrameSetConflict)
+		assert.Equal(t, 0, summary.Drawn)
+	})
+
+	t.Run("should keep the frames already there when the appearance asked for is the same as before", func(t *testing.T) {
+		// given
+		m := newFrameMocks(t)
+		id := domain.NewFrameSetID(plan, slice, frameResolution, m.tuning, orange)
+		m.repository.EXPECT().Inspect(gomock.Any(), gomock.Any()).Return(builddomain.NewFrameDirectoryBuilder().WithOursFrames(0, 2, id).Build(), nil)
+
+		// when
+		summary, err := m.service.DrawFrames(context.Background(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/frames", Resolution: frameResolution, Appearance: orange}, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, 3, summary.Kept)
+		assert.Equal(t, 0, summary.Drawn)
 	})
 }
 
