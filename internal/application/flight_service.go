@@ -139,6 +139,7 @@ func (s *flightService) Fly(ctx context.Context, reader io.Reader, request domai
 	renderSummary, err := s.frameService.DrawFrames(ctx, plan, slice, domain.FrameSetRequest{
 		Directory:  framesDirectory,
 		Resolution: request.Resolution,
+		Appearance: request.Appearance,
 		Overwrite:  request.Overwrite,
 	}, func(p domain.RenderProgress) {
 		if progress != nil {

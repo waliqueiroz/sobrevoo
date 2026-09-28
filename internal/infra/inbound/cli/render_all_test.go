@@ -19,7 +19,7 @@ import (
 func executeRenderAllCommand(t *testing.T, m renderCommandMocks, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
-	cmd := cli.NewRenderAllCommand(m.planService, m.sliceService, m.frameService, defaultResolution)
+	cmd := cli.NewRenderAllCommand(m.planService, m.sliceService, m.frameService, defaultResolution, defaultAppearance)
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
@@ -85,7 +85,7 @@ func Test_RenderAllCommand_Execute(t *testing.T) {
 			m.planService.EXPECT().Load("plan.json").Return(plan, nil),
 			m.sliceService.EXPECT().Load("slice.zip").Return(slice, nil),
 			m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{
-				Directory: "/tmp/q", Resolution: defaultResolution, Overwrite: false,
+				Directory: "/tmp/q", Resolution: defaultResolution, Appearance: defaultAppearance, Overwrite: false,
 			}, gomock.Any()).Return(domain.RenderSummary{
 				Requested: 60, Drawn: 60, Resolution: defaultResolution, Elapsed: 31*time.Minute + 7*time.Second,
 			}, nil),
@@ -219,7 +219,7 @@ func Test_RenderAllCommand_Resolution(t *testing.T) {
 		want := domain.Resolution{Width: 3840, Height: 2160}
 		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
 		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
-		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/q", Resolution: want}, gomock.Any()).
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/q", Resolution: want, Appearance: defaultAppearance}, gomock.Any()).
 			Return(domain.RenderSummary{Requested: 60, Drawn: 60, Resolution: want}, nil)
 
 		// when
@@ -253,7 +253,7 @@ func Test_RenderAllCommand_Overwrite(t *testing.T) {
 		m := newRenderCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
 		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
-		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/q", Resolution: defaultResolution, Overwrite: true}, gomock.Any()).
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/q", Resolution: defaultResolution, Appearance: defaultAppearance, Overwrite: true}, gomock.Any()).
 			Return(domain.RenderSummary{Requested: 60, Drawn: 60, Resolution: defaultResolution}, nil)
 
 		// when
@@ -310,6 +310,72 @@ func Test_RenderAllCommand_Overwrite(t *testing.T) {
 		assert.Equal(t, 37, cli.ExitCode(err))
 		assert.ErrorContains(t, err, "use --overwrite to replace them, or another --output")
 		assert.Empty(t, stdout)
+	})
+}
+
+func Test_RenderAllCommand_Appearance(t *testing.T) {
+	plan := planOfFrames(60)
+	slice := builddomain.NewGeoSliceBuilder().Build()
+
+	t.Run("should draw with the default appearance when no appearance flag is given", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t)
+		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
+		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/q", Resolution: defaultResolution, Appearance: defaultAppearance}, gomock.Any()).
+			Return(domain.RenderSummary{Requested: 60, Drawn: 60}, nil)
+
+		// when
+		_, _, err := executeRenderAllCommand(t, m, "plan.json", "slice.zip", "--output", "/tmp/q")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should draw with the five appearance values given, all at once", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t)
+		want := domain.Appearance{
+			TrailColor: domain.RGB{R: 0x00, G: 0xFF, B: 0x00}, TrailWidthRatio: 0.02,
+			MarkerColor: domain.RGB{R: 0x00, G: 0x00, B: 0xFF}, MarkerRadiusRatio: 0.05,
+			BackgroundColor: domain.RGB{R: 0xFF, G: 0xFF, B: 0xFF},
+		}
+		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
+		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{Directory: "/tmp/q", Resolution: defaultResolution, Appearance: want}, gomock.Any()).
+			Return(domain.RenderSummary{Requested: 60, Drawn: 60}, nil)
+
+		// when
+		_, _, err := executeRenderAllCommand(t, m, "plan.json", "slice.zip", "--output", "/tmp/q",
+			"--trail-color", "#00FF00", "--trail-width", "0.02", "--marker-color", "#0000FF", "--marker-radius", "0.05", "--background-color", "#FFFFFF")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should refuse a malformed color before reading anything, with the same error as render frame", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t) // no expectations: any call to a service fails the test
+
+		// when
+		stdout, _, err := executeRenderAllCommand(t, m, "plan.json", "slice.zip", "--output", "/tmp/q", "--marker-color", "blue")
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidColor)
+		assert.Equal(t, 52, cli.ExitCode(err))
+		assert.Empty(t, stdout)
+	})
+
+	t.Run("should refuse a marker radius outside the documented range, with the same error as render frame", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t)
+
+		// when
+		_, _, err := executeRenderAllCommand(t, m, "plan.json", "slice.zip", "--output", "/tmp/q", "--marker-radius", "0.5")
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidMarkerRadius)
+		assert.Equal(t, 54, cli.ExitCode(err))
 	})
 }
 

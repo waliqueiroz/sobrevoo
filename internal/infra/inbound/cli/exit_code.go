@@ -116,6 +116,12 @@ func ExitCode(err error) int {
 		return 50
 	case errors.Is(err, domain.ErrFlightInterrupted):
 		return 51
+	case errors.Is(err, domain.ErrInvalidColor):
+		return 52
+	case errors.Is(err, domain.ErrInvalidTrailWidth):
+		return 53
+	case errors.Is(err, domain.ErrInvalidMarkerRadius):
+		return 54
 	default:
 		// Anything else (file-open I/O errors, malformed-but-recognized
 		// content, CLI usage errors not already handled by Cobra itself) is

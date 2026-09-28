@@ -116,7 +116,21 @@ func Test_Load(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, config.RenderDefaults{Width: 1080, Height: 1920}, cfg.RenderDefaults)
+		assert.Equal(t, 1080, cfg.RenderDefaults.Width)
+		assert.Equal(t, 1920, cfg.RenderDefaults.Height)
+	})
+
+	t.Run("should default the appearance to the tool's orange trail, red marker and dark background", func(t *testing.T) {
+		// when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, "#FFB000", cfg.RenderDefaults.TrailColor)
+		assert.Equal(t, 0.005, cfg.RenderDefaults.TrailWidthRatio)
+		assert.Equal(t, "#E5252A", cfg.RenderDefaults.MarkerColor)
+		assert.Equal(t, 0.012, cfg.RenderDefaults.MarkerRadiusRatio)
+		assert.Equal(t, "#20262E", cfg.RenderDefaults.BackgroundColor)
 	})
 }
 

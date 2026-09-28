@@ -77,7 +77,7 @@ func Test_flightService_Fly(t *testing.T) {
 			m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil),
 			m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { removed = true; return nil }, nil),
 			m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{
-				Directory: "/tmp/sobrevoo-fly-1", Resolution: flightRequest().Resolution,
+				Directory: "/tmp/sobrevoo-fly-1", Resolution: flightRequest().Resolution, Appearance: flightRequest().Appearance,
 			}, gomock.Any()).Return(domain.RenderSummary{Requested: 20, Drawn: 20}, nil),
 			m.videoService.EXPECT().Assemble(gomock.Any(), plan, domain.VideoRequest{
 				Directory: "/tmp/sobrevoo-fly-1", Output: "/tmp/flight.mp4", Quality: domain.VideoQualityMedium,
@@ -97,6 +97,33 @@ func Test_flightService_Fly(t *testing.T) {
 		assert.GreaterOrEqual(t, int64(summary.Elapsed), int64(0))
 		assert.False(t, summary.PlanReused)
 		assert.False(t, summary.SliceReused)
+	})
+
+	t.Run("should pass the request's appearance to the frames, unaltered", func(t *testing.T) {
+		// given
+		m := newFlightMocks(t)
+		green := builddomain.NewAppearanceBuilder().WithTrailColor(domain.RGB{R: 0x00, G: 0xFF, B: 0x00}).Build()
+		request := builddomain.NewFlightRequestBuilder().WithAppearance(green).Build()
+		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
+		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
+		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
+		var got domain.Appearance
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ domain.CameraPlan, _ domain.GeoSlice, r domain.FrameSetRequest, _ func(domain.RenderProgress)) (domain.RenderSummary, error) {
+				got = r.Appearance
+				return domain.RenderSummary{Requested: 20, Drawn: 20}, nil
+			})
+		m.videoService.EXPECT().Assemble(gomock.Any(), plan, gomock.Any(), gomock.Any()).
+			Return(domain.VideoSummary{Frames: 20}, nil)
+
+		// when
+		_, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, green, got)
 	})
 
 	t.Run("should say what the run did in the summary: the render summary and the video summary", func(t *testing.T) {
@@ -720,5 +747,35 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		assert.True(t, summary.PlanReused)
 		assert.True(t, summary.SliceReused)
 		assert.Equal(t, domain.VideoQualityHigh, videoRequest.Quality)
+	})
+
+	t.Run("should reuse the plan and the slice when only the appearance changed, and pass the new appearance to the frames", func(t *testing.T) {
+		// given: the plan and slice under --keep still match; only the
+		// appearance differs from a previous run — FR-009
+		m := newFlightMocks(t)
+		green := builddomain.NewAppearanceBuilder().WithTrailColor(domain.RGB{R: 0x00, G: 0xFF, B: 0x00}).Build()
+		request := builddomain.NewFlightRequestBuilder().WithKeep("/tmp/kept").WithAppearance(green).Build()
+		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
+		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
+		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		m.workspace.EXPECT().EnsureDirectory("/tmp/kept").Return(nil)
+		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(plan, nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
+		var frameRequest domain.FrameSetRequest
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ domain.CameraPlan, _ domain.GeoSlice, r domain.FrameSetRequest, _ func(domain.RenderProgress)) (domain.RenderSummary, error) {
+				frameRequest = r
+				return domain.RenderSummary{Drawn: 20}, nil
+			})
+		m.videoService.EXPECT().Assemble(gomock.Any(), plan, gomock.Any(), gomock.Any()).Return(domain.VideoSummary{}, nil)
+
+		// when
+		summary, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.True(t, summary.PlanReused)
+		assert.True(t, summary.SliceReused)
+		assert.Equal(t, green, frameRequest.Appearance)
 	})
 }

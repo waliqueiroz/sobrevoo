@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Sete features estão implementadas até agora:
+Relive/Strava). Oito features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -30,8 +30,13 @@ instala; e `specs/007-full-flight-pipeline/` encadeia as seis etapas
 anteriores atrás de um único comando (`fly`), do arquivo de trajeto direto ao
 vídeo, com os mesmos parâmetros, recusa cedo (destino e codificador antes de
 qualquer etapa, cobertura logo após o plano) e, opcionalmente, um diretório
-onde guardar e reaproveitar o plano, o recorte e os quadros entre execuções.
-Ainda não há sobreposição de texto ou estatísticas, nem áudio.
+onde guardar e reaproveitar o plano, o recorte e os quadros entre execuções;
+e `specs/008-frame-appearance/` torna ajustável, por flag, a cor e a
+espessura do traçado, a cor e o raio do marcador, e a cor do fundo — os
+cinco valores que antes eram fixos no código —, nos mesmos comandos que já
+desenham quadros (`render frame`, `render all` e `fly`), com os valores de
+sempre como padrão e passando a fazer parte da identidade do conjunto de
+quadros. Ainda não há sobreposição de texto ou estatísticas, nem áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -54,7 +59,7 @@ go run ./cmd/sobrevoo inspect path/to/track.gpx --simplification=low --smoothing
 go run ./cmd/sobrevoo plan path/to/track.gpx --duration 45 --distance high --aspect 9:16 --export plan.json
 go run ./cmd/sobrevoo geodata slice plan.json --export slice.zip
 go run ./cmd/sobrevoo geodata elevation --lat -23.5505 --lon -46.6333
-go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png
+go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png --trail-color "#00FF00" --marker-radius 0.03
 go run ./cmd/sobrevoo render all plan.json slice.zip --output frames/ --resolution 1280x720
 go run ./cmd/sobrevoo video plan.json frames/ --output flight.mp4 --quality medium   # precisa do ffmpeg instalado
 go run ./cmd/sobrevoo fly path/to/track.gpx --output flight.mp4 --duration 45 --keep intermediarios/   # as seis etapas num só comando
@@ -79,8 +84,12 @@ adapter.
   de dados: `SliceTuning`, `SliceRegion(s)`, `DetailLevel`, `Tile`, `TileSet`,
   `ElevationGrid`, `ElevationReading`, `Coordinate`, `GeoSlice`,
   `SliceSummary`, e os do desenho dos quadros: `Scene`, `Resolution`,
-  `RenderTuning`, `FrameImage`, `FrameStats`, `FrameSetID`, `FrameDirectory`,
-  `RenderSummary`, e os da montagem do vídeo: `FrameMark`, `VideoQuality`,
+  `RenderTuning`, `Appearance` (a cor/espessura do traçado, a cor/raio do
+  marcador e a cor do fundo — etapa 8; `NoMapColors`/`NoElevationColors`/
+  `TrailCasingColor`/`MarkerRingColor`, em `render_tuning.go`, continuam
+  fixos, fora de `Appearance`, por serem o significado da imagem, não
+  estilo), `FrameImage`, `FrameStats`, `FrameSetID`,
+  `FrameDirectory`, `RenderSummary`, e os da montagem do vídeo: `FrameMark`, `VideoQuality`,
   `VideoRequest`, `VideoProgress`, `EncodeJob`, `EncoderInfo`, `VideoSummary`,
   e os do comando único: `FlightRequest`, `FlightStage`, `FlightProgress`,
   `FlightSummary`), construtores
@@ -127,7 +136,9 @@ adapter.
   `ErrFramesDoNotMatchPlan`, `ErrFramesWithoutPlanID`, `ErrFrameFileInvalid`,
   `ErrEncoderUnavailable`, `ErrVideoDestinationExists`,
   `ErrVideoDestinationInvalid`, `ErrVideoInterrupted`,
-  `ErrVideoEncodingFailed`; e o do comando único: `ErrFlightInterrupted`), e
+  `ErrVideoEncodingFailed`; o do comando único: `ErrFlightInterrupted`; e os
+  da aparência: `ErrInvalidColor`, `ErrInvalidTrailWidth`,
+  `ErrInvalidMarkerRadius`), e
   as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
   `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`,
@@ -186,8 +197,12 @@ adapter.
   existe, conforme o Princípio VIII da constituição). O pacote `config`
   tem tipos próprios (`config.Level`, `config.CameraTuning`,
   `config.PlanDefaults`, `config.SliceTuning`, `config.RenderTuning`,
-  `config.RenderDefaults`, `config.VideoDefaults`) e **não importa o domínio**; quem os mapeia para os
-  tipos de domínio é o composition root (`cmd/sobrevoo/config_mapping.go`).
+  `config.RenderDefaults` — resolução e, desde a etapa 8, também a aparência
+  padrão (cor/espessura do traçado, cor/raio do marcador, cor do fundo, como
+  texto hexadecimal) —, `config.VideoDefaults`) e **não importa o
+  domínio**; quem os mapeia para os
+  tipos de domínio é o composition root (`cmd/sobrevoo/config_mapping.go`,
+  função `domainAppearance` para a aparência).
 - **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
   traduz erros sentinela do domínio em códigos de saída de processo
   (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
@@ -196,7 +211,9 @@ adapter.
   `specs/004-geo-data-slice/contracts/cli.md` e
   `specs/005-frame-rendering/contracts/cli.md` e
   `specs/006-video-assembly/contracts/cli.md` e
-  `specs/007-full-flight-pipeline/contracts/cli.md` para o mapeamento exato.
+  `specs/007-full-flight-pipeline/contracts/cli.md` e
+  `specs/008-frame-appearance/contracts/appearance-flags.md` para o
+  mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso
@@ -289,6 +306,40 @@ isso, os quadros da primeira execução nunca bateriam com os de uma segunda.
 Interrupção (`Ctrl+C`/`SIGTERM`) sempre sai com o código próprio do comando
 único (`ErrFlightInterrupted`), nunca o de uma etapa — a única exceção
 deliberada à regra geral de "mesmo erro que o comando individual".
+
+### A aparência dos quadros (etapa 8)
+
+`--trail-color`, `--trail-width`, `--marker-color`, `--marker-radius` e
+`--background-color` (`specs/008-frame-appearance/`) existem, com o mesmo
+nome e o mesmo efeito, em `render frame`, `render all` e `fly` — um único
+parser compartilhado, `parseAppearance` (`internal/infra/inbound/cli/
+appearance.go`), garante isso por construção. As cores são `#RRGGBB`
+(`domain.ParseColor`, erro `ErrInvalidColor`); a espessura do traçado e o
+raio do marcador continuam sendo uma **proporção da altura do quadro** —
+como o desenho já calculava antes, só que agora ajustável —, validada contra
+um intervalo (`domain.NewAppearance`, `ErrInvalidTrailWidth`/
+`ErrInvalidMarkerRadius`); o piso mínimo em pixels que evita o traçado/
+marcador sumirem numa resolução pequena (`TrailMinWidth`, `MarkerMinRadius`)
+não muda. `domain.Appearance` **não** é um campo de `RenderTuning` (que
+continua resolvido uma vez, por processo, pela configuração): é um valor por
+chamada, como `Resolution` já é — entra em `SingleFrameRequest`,
+`FrameSetRequest` e `FlightRequest`, e percorre `Scene`/`overlay`/`imagery`/
+`NewFrameImage` até o pixel. A aparência escolhida participa da identidade
+do conjunto de quadros: `NewFrameSetID` inclui `Appearance.Fingerprint()` no
+hash, ao lado do de `RenderTuning` — sem precisar de um `RenderVersion`
+novo, porque estender o hash já garante, sozinho, que uma aparência
+diferente (inclusive a de antes desta etapa, que nunca escreveu esse
+segmento) nunca bate com a de agora. Por isso o reaproveitamento de `render
+all` retomado e de `fly --keep` não precisou de nenhuma lógica nova: o
+mecanismo que já decide reaproveitar-ou-redesenhar por `FrameSetID` passou a
+enxergar aparência diferente de graça. O hachurado de "sem mapa" e o xadrez
+de "sem elevação" (`NoMapColors`, `NoElevationColors`) não são ajustáveis —
+são o significado da imagem, não estilo — e continuam fixos em
+`render_tuning.go`, junto com `TrailCasingColor`/`MarkerRingColor` (a casca
+do traçado e o anel do marcador, que também não são ajustáveis). Sem nenhuma
+flag informada, o resultado é pixel a pixel igual ao de antes desta etapa —
+os cinco valores de hoje viraram os padrões de `config.RenderDefaults`, no
+lugar de `var` fixas do domínio.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

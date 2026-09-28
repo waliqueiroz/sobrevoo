@@ -26,7 +26,7 @@ var aMark = domain.FrameMark{SetID: anID, PlanID: aPlanID}
 
 // patternFrame is a frame of 6 × 4 pixels, each of a color of its own.
 func patternFrame() domain.FrameImage {
-	image := domain.NewFrameImage(domain.Resolution{Width: 6, Height: 4})
+	image := domain.NewFrameImage(domain.Resolution{Width: 6, Height: 4}, domain.RGB{})
 	for y := 0; y < 4; y++ {
 		for x := 0; x < 6; x++ {
 			image.Set(x, y, domain.RGB{R: uint8(10 * x), G: uint8(40 * y), B: uint8(7*x + 3*y)})

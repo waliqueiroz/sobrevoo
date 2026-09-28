@@ -63,6 +63,11 @@ func run() int {
 		fmt.Fprintln(os.Stderr, err)
 		return 4
 	}
+	defaultAppearance, err := domainAppearance(cfg.RenderDefaults)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 4
+	}
 	tileDecoder := tiledecoder.NewRaster()
 	frameExporter := pngfile.NewFrameExporter()
 	frameRepository := pngfile.NewFrameRepository()
@@ -84,8 +89,8 @@ func run() int {
 	geoDataCommand.AddCommand(cli.NewGeoDataElevationCommand(geoDataService))
 
 	renderCommand := cli.NewRenderCommand()
-	renderCommand.AddCommand(cli.NewRenderFrameCommand(cameraPlanService, geoSliceService, frameService, defaultResolution))
-	renderCommand.AddCommand(cli.NewRenderAllCommand(cameraPlanService, geoSliceService, frameService, defaultResolution))
+	renderCommand.AddCommand(cli.NewRenderFrameCommand(cameraPlanService, geoSliceService, frameService, defaultResolution, defaultAppearance))
+	renderCommand.AddCommand(cli.NewRenderAllCommand(cameraPlanService, geoSliceService, frameService, defaultResolution, defaultAppearance))
 
 	root := cli.NewRootCommand()
 	root.AddCommand(cli.NewInspectCommand(trackService, domainLevel(cfg.DefaultLevel)))
@@ -93,7 +98,7 @@ func run() int {
 	root.AddCommand(geoDataCommand)
 	root.AddCommand(renderCommand)
 	root.AddCommand(cli.NewVideoCommand(cameraPlanService, videoService, domainVideoQuality(cfg.VideoDefaults.Quality)))
-	root.AddCommand(cli.NewFlightCommand(flightService, domainPlanParameters(cfg.PlanDefaults), defaultResolution, domainVideoQuality(cfg.VideoDefaults.Quality)))
+	root.AddCommand(cli.NewFlightCommand(flightService, domainPlanParameters(cfg.PlanDefaults), defaultResolution, defaultAppearance, domainVideoQuality(cfg.VideoDefaults.Quality)))
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

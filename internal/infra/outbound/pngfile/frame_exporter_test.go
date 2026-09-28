@@ -24,7 +24,7 @@ var frameMark = domain.FrameMark{SetID: setID, PlanID: planID}
 
 // drawnFrame is a small frame whose pixels tell where they are.
 func drawnFrame() domain.FrameImage {
-	frame := domain.NewFrameImage(domain.Resolution{Width: 8, Height: 6})
+	frame := domain.NewFrameImage(domain.Resolution{Width: 8, Height: 6}, domain.RGB{})
 	for y := 0; y < 6; y++ {
 		for x := 0; x < 8; x++ {
 			frame.Set(x, y, domain.RGB{R: uint8(30 * x), G: uint8(40 * y), B: 99})

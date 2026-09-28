@@ -17,14 +17,15 @@ const bandRows = 16
 // it is safe for use by many goroutines at once: all that changes in it is the
 // cache of decoded tiles, which changes no result.
 type Scene struct {
-	surfaces []*surface
-	imagery  *imagery
-	tuning   RenderTuning
+	surfaces   []*surface
+	imagery    *imagery
+	tuning     RenderTuning
+	appearance Appearance
 }
 
 // NewScene prepares a slice for drawing. It fails with ErrNoElevationData when
 // no sample of the slice has a value: there would be no terrain to draw.
-func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning) (*Scene, error) {
+func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning, appearance Appearance) (*Scene, error) {
 	lowest := math.Inf(1)
 	for _, grid := range slice.Elevation {
 		if minimum, _, ok := grid.Range(); ok {
@@ -35,7 +36,11 @@ func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning) (*Scene,
 		return nil, fmt.Errorf("%w: no elevation sample has a value", ErrNoElevationData)
 	}
 
-	scene := &Scene{imagery: newImagery(slice.TileSets, decoder, tuning.TileCacheBytes), tuning: tuning}
+	scene := &Scene{
+		imagery:    newImagery(slice.TileSets, decoder, tuning.TileCacheBytes, appearance.BackgroundColor),
+		tuning:     tuning,
+		appearance: appearance,
+	}
 	for _, grid := range slice.Elevation {
 		scene.surfaces = append(scene.surfaces, newSurface(grid, lowest))
 	}
@@ -73,7 +78,7 @@ func (s *Scene) Render(ctx context.Context, plan CameraPlan, index int, resoluti
 	height := cameraHeight(ground, plane, frame, s.tuning)
 	cam := newCamera(frame.Heading, frame.Tilt, height, resolution, s.tuning.VerticalFOVDegrees)
 
-	image := NewFrameImage(resolution)
+	image := NewFrameImage(resolution, s.appearance.BackgroundColor)
 	depth := make([]float32, resolution.Pixels())
 
 	stats, err := s.drawTerrain(ctx, ground, plane, cam, image, depth)
@@ -81,7 +86,7 @@ func (s *Scene) Render(ctx context.Context, plan CameraPlan, index int, resoluti
 		return FrameImage{}, FrameStats{}, err
 	}
 
-	over := overlay{image: image, camera: cam, depth: depth, tuning: s.tuning}
+	over := overlay{image: image, camera: cam, depth: depth, tuning: s.tuning, appearance: s.appearance}
 	trail := make([][3]float64, index+1)
 	for i := range trail {
 		trail[i] = s.onGround(ground, plane, plan.Frames[i].MarkerLatitude, plan.Frames[i].MarkerLongitude)

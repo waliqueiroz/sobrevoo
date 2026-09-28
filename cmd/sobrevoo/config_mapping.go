@@ -104,6 +104,25 @@ func domainRenderResolution(d config.RenderDefaults) (domain.Resolution, error) 
 	return domain.NewResolution(d.Width, d.Height)
 }
 
+// domainAppearance is the appearance a frame is drawn with when the user
+// chooses none, parsed and checked as any appearance is (008-frame-appearance).
+func domainAppearance(d config.RenderDefaults) (domain.Appearance, error) {
+	trailColor, err := domain.ParseColor(d.TrailColor)
+	if err != nil {
+		return domain.Appearance{}, err
+	}
+	markerColor, err := domain.ParseColor(d.MarkerColor)
+	if err != nil {
+		return domain.Appearance{}, err
+	}
+	backgroundColor, err := domain.ParseColor(d.BackgroundColor)
+	if err != nil {
+		return domain.Appearance{}, err
+	}
+
+	return domain.NewAppearance(trailColor, d.TrailWidthRatio, markerColor, d.MarkerRadiusRatio, backgroundColor)
+}
+
 // domainVideoQuality is the quality of the video the user gets when they choose
 // none.
 func domainVideoQuality(level config.Level) domain.VideoQuality {

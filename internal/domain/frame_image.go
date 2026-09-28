@@ -7,11 +7,11 @@ type FrameImage struct {
 	Pix        []uint8
 }
 
-// NewFrameImage makes an image of the resolution filled with BackgroundColor.
-func NewFrameImage(resolution Resolution) FrameImage {
+// NewFrameImage makes an image of the resolution filled with background.
+func NewFrameImage(resolution Resolution, background RGB) FrameImage {
 	image := FrameImage{Resolution: resolution, Pix: make([]uint8, 3*resolution.Pixels())}
 	for i := 0; i < len(image.Pix); i += 3 {
-		image.Pix[i], image.Pix[i+1], image.Pix[i+2] = BackgroundColor.R, BackgroundColor.G, BackgroundColor.B
+		image.Pix[i], image.Pix[i+1], image.Pix[i+2] = background.R, background.G, background.B
 	}
 	return image
 }

@@ -110,10 +110,19 @@ type RenderTuning struct {
 	Workers                  int
 }
 
-// RenderDefaults is the resolution of the images when the user does not
-// choose one: 1080 × 1920, vertical.
+// RenderDefaults is what a frame is drawn with when the user does not choose
+// otherwise: the resolution of the images (1080 × 1920, vertical) and the
+// appearance of the trail, the marker and the background (008-frame-
+// appearance). Colors are hexadecimal RGB text ("#RRGGBB"); the composition
+// root parses and validates them into domain.Appearance.
 type RenderDefaults struct {
 	Width, Height int
+
+	TrailColor        string
+	TrailWidthRatio   float64
+	MarkerColor       string
+	MarkerRadiusRatio float64
+	BackgroundColor   string
 }
 
 // VideoDefaults is what the video is made with when the user does not choose:
@@ -207,9 +216,14 @@ func Load() (Config, error) {
 		SliceTuning:          sliceTuning(),
 		PlanDefaults:         PlanDefaults{FrameRate: 30, Distance: LevelMedium, Tilt: LevelMedium, AspectWidth: 9, AspectHeight: 16},
 		RenderTuning:         renderTuning(),
-		RenderDefaults:       RenderDefaults{Width: 1080, Height: 1920},
-		VideoDefaults:        VideoDefaults{Quality: LevelMedium},
-		FFmpegBinary:         "ffmpeg",
+		RenderDefaults: RenderDefaults{
+			Width: 1080, Height: 1920,
+			TrailColor: "#FFB000", TrailWidthRatio: 0.005,
+			MarkerColor: "#E5252A", MarkerRadiusRatio: 0.012,
+			BackgroundColor: "#20262E",
+		},
+		VideoDefaults: VideoDefaults{Quality: LevelMedium},
+		FFmpegBinary:  "ffmpeg",
 	}, nil
 }
 

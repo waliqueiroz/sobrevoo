@@ -123,6 +123,65 @@ func Test_domainRenderResolution(t *testing.T) {
 	})
 }
 
+func Test_domainAppearance(t *testing.T) {
+	t.Run("should map the default appearance to the tool's orange trail, red marker and dark background", func(t *testing.T) {
+		// given
+		cfg, err := config.Load()
+		require.NoError(t, err)
+
+		// when
+		appearance, err := domainAppearance(cfg.RenderDefaults)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, builddomain.NewAppearanceBuilder().Build(), appearance)
+	})
+
+	t.Run("should propagate an invalid trail color", func(t *testing.T) {
+		// given
+		defaults := config.RenderDefaults{TrailColor: "orange", MarkerColor: "#E5252A", BackgroundColor: "#20262E", TrailWidthRatio: 0.005, MarkerRadiusRatio: 0.012}
+
+		// when
+		_, err := domainAppearance(defaults)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidColor)
+	})
+
+	t.Run("should propagate an invalid marker color", func(t *testing.T) {
+		// given
+		defaults := config.RenderDefaults{TrailColor: "#FFB000", MarkerColor: "not-a-color", BackgroundColor: "#20262E", TrailWidthRatio: 0.005, MarkerRadiusRatio: 0.012}
+
+		// when
+		_, err := domainAppearance(defaults)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidColor)
+	})
+
+	t.Run("should propagate an invalid background color", func(t *testing.T) {
+		// given
+		defaults := config.RenderDefaults{TrailColor: "#FFB000", MarkerColor: "#E5252A", BackgroundColor: "nope", TrailWidthRatio: 0.005, MarkerRadiusRatio: 0.012}
+
+		// when
+		_, err := domainAppearance(defaults)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidColor)
+	})
+
+	t.Run("should propagate an out-of-range trail width ratio", func(t *testing.T) {
+		// given
+		defaults := config.RenderDefaults{TrailColor: "#FFB000", MarkerColor: "#E5252A", BackgroundColor: "#20262E", TrailWidthRatio: 1, MarkerRadiusRatio: 0.012}
+
+		// when
+		_, err := domainAppearance(defaults)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidTrailWidth)
+	})
+}
+
 func Test_domainVideoQuality(t *testing.T) {
 	t.Run("should map the low level to the low quality", func(t *testing.T) {
 		// given / when / then

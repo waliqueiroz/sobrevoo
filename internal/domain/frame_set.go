@@ -66,27 +66,30 @@ type FrameMark struct {
 }
 
 // NewFrameMark is the mark of the frames of plan drawn from slice at
-// resolution: the set they belong to and the identification of the plan.
-func NewFrameMark(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning) FrameMark {
+// resolution, with appearance: the set they belong to and the identification
+// of the plan.
+func NewFrameMark(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance) FrameMark {
 	return FrameMark{
-		SetID:  NewFrameSetID(plan, slice, resolution, tuning),
+		SetID:  NewFrameSetID(plan, slice, resolution, tuning, appearance),
 		PlanID: plan.ID(),
 	}
 }
 
 // FrameSetID identifies a set of frames: those drawn from the same plan, the
-// same slice file, at the same resolution, by the same version of the drawing
-// and with the same tuning. It goes inside every image, so frames of another
-// set are told from the ones a directory may keep.
+// same slice file, at the same resolution, by the same version of the
+// drawing, and with the same tuning and appearance. It goes inside every
+// image, so frames of another set are told from the ones a directory may
+// keep.
 type FrameSetID string
 
-// NewFrameSetID is the SHA-256, in lowercase hexadecimal, of the plan's ID, the
-// slice's ContentID, the resolution, the tuning's fingerprint and RenderVersion.
-func NewFrameSetID(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning) FrameSetID {
-	return newFrameSetID(RenderVersion, plan, slice, resolution, tuning)
+// NewFrameSetID is the SHA-256, in lowercase hexadecimal, of the plan's ID,
+// the slice's ContentID, the resolution, the tuning's fingerprint, the
+// appearance's fingerprint and RenderVersion.
+func NewFrameSetID(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance) FrameSetID {
+	return newFrameSetID(RenderVersion, plan, slice, resolution, tuning, appearance)
 }
 
-func newFrameSetID(version int, plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning) FrameSetID {
+func newFrameSetID(version int, plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance) FrameSetID {
 	hash := sha256.New()
 	writeText := func(text string) {
 		var size [8]byte
@@ -102,6 +105,7 @@ func newFrameSetID(version int, plan CameraPlan, slice GeoSlice, resolution Reso
 	writeText(strconv.Itoa(resolution.Width))
 	writeText(strconv.Itoa(resolution.Height))
 	writeText(tuning.Fingerprint())
+	writeText(appearance.Fingerprint())
 
 	return FrameSetID(hex.EncodeToString(hash.Sum(nil)))
 }
@@ -160,6 +164,7 @@ type SingleFrameRequest struct {
 	Number     int
 	Path       string
 	Resolution Resolution
+	Appearance Appearance
 	Overwrite  bool
 }
 
@@ -167,6 +172,7 @@ type SingleFrameRequest struct {
 type FrameSetRequest struct {
 	Directory  string
 	Resolution Resolution
+	Appearance Appearance
 	Overwrite  bool
 }
 

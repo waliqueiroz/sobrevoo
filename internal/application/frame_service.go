@@ -72,7 +72,7 @@ func (s *frameService) DrawFrame(ctx context.Context, plan domain.CameraPlan, sl
 		return finish(err)
 	}
 
-	scene, err := domain.NewScene(slice, s.decoder, s.renderTuning)
+	scene, err := domain.NewScene(slice, s.decoder, s.renderTuning, request.Appearance)
 	if err != nil {
 		return finish(err)
 	}
@@ -82,7 +82,7 @@ func (s *frameService) DrawFrame(ctx context.Context, plan domain.CameraPlan, sl
 		return finish(interruption(ctx, &summary, err))
 	}
 
-	mark := domain.NewFrameMark(plan, slice, request.Resolution, s.renderTuning)
+	mark := domain.NewFrameMark(plan, slice, request.Resolution, s.renderTuning, request.Appearance)
 	if err := s.exporter.Export(image, mark, request.Path, request.Overwrite); err != nil {
 		return finish(err)
 	}
@@ -108,7 +108,7 @@ func (s *frameService) DrawFrames(ctx context.Context, plan domain.CameraPlan, s
 		return finish(err)
 	}
 
-	mark := domain.NewFrameMark(plan, slice, request.Resolution, s.renderTuning)
+	mark := domain.NewFrameMark(plan, slice, request.Resolution, s.renderTuning, request.Appearance)
 	work, err := directory.Plan(mark.SetID, len(plan.Frames), request.Overwrite)
 	if err != nil {
 		return finish(err)
@@ -127,7 +127,7 @@ func (s *frameService) DrawFrames(ctx context.Context, plan domain.CameraPlan, s
 	if len(work.Draw) == 0 {
 		return finish(nil)
 	}
-	scene, err := domain.NewScene(slice, s.decoder, s.renderTuning)
+	scene, err := domain.NewScene(slice, s.decoder, s.renderTuning, request.Appearance)
 	if err != nil {
 		return finish(err)
 	}
