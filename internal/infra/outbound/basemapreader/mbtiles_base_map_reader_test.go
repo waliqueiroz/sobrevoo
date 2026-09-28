@@ -136,6 +136,33 @@ func Test_MBTiles_ReadTiles(t *testing.T) {
 		assert.Len(t, read.Missing, 1)
 	})
 
+	t.Run("should read tiles from a file given by a relative path", func(t *testing.T) {
+		// given
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "map.mbtiles"), helper.MBTilesWithTiles(spec), 0o644))
+		t.Chdir(dir)
+
+		// when
+		read, err := basemapreader.NewMBTiles().ReadTiles("map.mbtiles", 12, []domain.TileID{{Level: 12, X: 1516, Y: 2323}})
+
+		// then
+		require.NoError(t, err)
+		assert.Len(t, read.Tiles, 1)
+	})
+
+	t.Run("should read tiles from a file whose path has a space", func(t *testing.T) {
+		// given
+		path := filepath.Join(t.TempDir(), "my map.mbtiles")
+		require.NoError(t, os.WriteFile(path, helper.MBTilesWithTiles(spec), 0o644))
+
+		// when
+		read, err := basemapreader.NewMBTiles().ReadTiles(path, 12, []domain.TileID{{Level: 12, X: 1516, Y: 2323}})
+
+		// then
+		require.NoError(t, err)
+		assert.Len(t, read.Tiles, 1)
+	})
+
 	t.Run("should report the image format of the metadata, png by default", func(t *testing.T) {
 		// given
 		jpeg := spec
