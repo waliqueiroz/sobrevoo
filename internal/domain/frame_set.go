@@ -66,11 +66,11 @@ type FrameMark struct {
 }
 
 // NewFrameMark is the mark of the frames of plan drawn from slice at
-// resolution, with appearance: the set they belong to and the identification
-// of the plan.
-func NewFrameMark(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance) FrameMark {
+// resolution, with appearance and overlay: the set they belong to and the
+// identification of the plan.
+func NewFrameMark(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance, overlay OverlayConfig) FrameMark {
 	return FrameMark{
-		SetID:  NewFrameSetID(plan, slice, resolution, tuning, appearance),
+		SetID:  NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay),
 		PlanID: plan.ID(),
 	}
 }
@@ -84,12 +84,12 @@ type FrameSetID string
 
 // NewFrameSetID is the SHA-256, in lowercase hexadecimal, of the plan's ID,
 // the slice's ContentID, the resolution, the tuning's fingerprint, the
-// appearance's fingerprint and RenderVersion.
-func NewFrameSetID(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance) FrameSetID {
-	return newFrameSetID(RenderVersion, plan, slice, resolution, tuning, appearance)
+// appearance's fingerprint, the overlay's fingerprint and RenderVersion.
+func NewFrameSetID(plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance, overlay OverlayConfig) FrameSetID {
+	return newFrameSetID(RenderVersion, plan, slice, resolution, tuning, appearance, overlay)
 }
 
-func newFrameSetID(version int, plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance) FrameSetID {
+func newFrameSetID(version int, plan CameraPlan, slice GeoSlice, resolution Resolution, tuning RenderTuning, appearance Appearance, overlay OverlayConfig) FrameSetID {
 	hash := sha256.New()
 	writeText := func(text string) {
 		var size [8]byte
@@ -106,6 +106,7 @@ func newFrameSetID(version int, plan CameraPlan, slice GeoSlice, resolution Reso
 	writeText(strconv.Itoa(resolution.Height))
 	writeText(tuning.Fingerprint())
 	writeText(appearance.Fingerprint())
+	writeText(overlay.Fingerprint())
 
 	return FrameSetID(hex.EncodeToString(hash.Sum(nil)))
 }
@@ -165,6 +166,7 @@ type SingleFrameRequest struct {
 	Path       string
 	Resolution Resolution
 	Appearance Appearance
+	Overlay    OverlayConfig
 	Overwrite  bool
 }
 
@@ -173,6 +175,7 @@ type FrameSetRequest struct {
 	Directory  string
 	Resolution Resolution
 	Appearance Appearance
+	Overlay    OverlayConfig
 	Overwrite  bool
 }
 

@@ -20,6 +20,7 @@ import (
 
 var defaultResolution = domain.Resolution{Width: 1080, Height: 1920}
 var defaultAppearance = builddomain.NewAppearanceBuilder().Build()
+var defaultOverlay = builddomain.NewOverlayConfigBuilder().Build()
 
 type renderCommandMocks struct {
 	planService  *mockapplication.MockCameraPlanService
@@ -51,7 +52,7 @@ func planOfFrames(n int) domain.CameraPlan {
 func executeRenderFrameCommand(t *testing.T, m renderCommandMocks, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
-	cmd := cli.NewRenderFrameCommand(m.planService, m.sliceService, m.frameService, defaultResolution, defaultAppearance)
+	cmd := cli.NewRenderFrameCommand(m.planService, m.sliceService, m.frameService, defaultResolution, defaultAppearance, defaultOverlay)
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
@@ -123,7 +124,7 @@ func Test_RenderFrameCommand_Execute(t *testing.T) {
 			m.planService.EXPECT().Load("plan.json").Return(plan, nil),
 			m.sliceService.EXPECT().Load("slice.zip").Return(slice, nil),
 			m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{
-				Number: 300, Path: "/tmp/q.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overwrite: false,
+				Number: 300, Path: "/tmp/q.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overlay: defaultOverlay, Overwrite: false,
 			}).Return(domain.RenderSummary{Requested: 1, Drawn: 1, Resolution: defaultResolution, Elapsed: 2 * time.Second}, nil),
 		)
 
@@ -348,7 +349,7 @@ func Test_RenderFrameCommand_Resolution(t *testing.T) {
 		want := domain.Resolution{Width: 960, Height: 540}
 		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
 		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
-		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: want, Appearance: defaultAppearance}).
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: want, Appearance: defaultAppearance, Overlay: defaultOverlay}).
 			Return(domain.RenderSummary{Drawn: 1, Resolution: want}, nil)
 
 		// when
@@ -388,7 +389,7 @@ func Test_RenderFrameCommand_Overwrite(t *testing.T) {
 		m := newRenderCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
 		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
-		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overwrite: true}).
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overlay: defaultOverlay, Overwrite: true}).
 			Return(domain.RenderSummary{Drawn: 1, Resolution: defaultResolution}, nil)
 
 		// when
@@ -425,7 +426,7 @@ func Test_RenderFrameCommand_Appearance(t *testing.T) {
 		m := newRenderCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
 		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
-		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance}).
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overlay: defaultOverlay}).
 			Return(domain.RenderSummary{Drawn: 1}, nil)
 
 		// when
@@ -445,7 +446,7 @@ func Test_RenderFrameCommand_Appearance(t *testing.T) {
 		}
 		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
 		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
-		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: want}).
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: want, Overlay: defaultOverlay}).
 			Return(domain.RenderSummary{Drawn: 1}, nil)
 
 		// when
@@ -540,5 +541,70 @@ func Test_RenderFrameCommand_Appearance(t *testing.T) {
 		// then
 		assert.ErrorIs(t, err, domain.ErrInvalidMarkerRadius)
 		assert.Equal(t, 54, cli.ExitCode(err))
+	})
+}
+
+func Test_RenderFrameCommand_Overlay(t *testing.T) {
+	plan := planOfFrames(1260)
+	slice := builddomain.NewGeoSliceBuilder().Build()
+
+	t.Run("should draw with the default overlay configuration when no overlay flag is given", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t)
+		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
+		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overlay: defaultOverlay}).
+			Return(domain.RenderSummary{Drawn: 1}, nil)
+
+		// when
+		_, _, err := executeRenderFrameCommand(t, m, "plan.json", "slice.zip", "--number", "3", "--output", "f.png")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should turn every block off with --overlays=false", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t)
+		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
+		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overlay: domain.OverlayConfig{}}).
+			Return(domain.RenderSummary{Drawn: 1}, nil)
+
+		// when
+		_, _, err := executeRenderFrameCommand(t, m, "plan.json", "slice.zip", "--number", "3", "--output", "f.png", "--overlays=false")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should turn on only the blocks named in --overlay-blocks", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t)
+		want, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{domain.OverlayBlockDistance, domain.OverlayBlockTime})
+		require.NoError(t, err)
+		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
+		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overlay: want}).
+			Return(domain.RenderSummary{Drawn: 1}, nil)
+
+		// when
+		_, _, err = executeRenderFrameCommand(t, m, "plan.json", "slice.zip", "--number", "3", "--output", "f.png", "--overlay-blocks=distance,time")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should refuse an unknown overlay block with ErrInvalidOverlayBlock before calling the frame service", func(t *testing.T) {
+		// given: no service has an expectation, so any call fails the test
+		m := newRenderCommandMocks(t)
+
+		// when
+		stdout, _, err := executeRenderFrameCommand(t, m, "plan.json", "slice.zip", "--number", "3", "--output", "f.png", "--overlay-blocks=altitude")
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidOverlayBlock)
+		assert.Equal(t, 55, cli.ExitCode(err))
+		assert.Empty(t, stdout)
 	})
 }

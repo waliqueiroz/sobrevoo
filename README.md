@@ -54,6 +54,7 @@ sobrevoo fly <trajeto.gpx> --output <voo.mp4>
              [--aspect <L:A>] [--resolution <LxA>]
              [--trail-color <#RRGGBB>] [--trail-width <proporção>] [--marker-color <#RRGGBB>]
              [--marker-radius <proporção>] [--background-color <#RRGGBB>]
+             [--overlays=false] [--overlay-blocks <lista>]
              [--quality low|medium|high] [--keep <diretório>] [--overwrite]
 ```
 
@@ -95,6 +96,8 @@ Total time: 00:33:00
 | `--marker-color` | `#RRGGBB` | `#E5252A` | Cor do marcador |
 | `--marker-radius` | proporção da altura do quadro, `0.001` a `0.1` | `0.012` | Raio do marcador |
 | `--background-color` | `#RRGGBB` | `#20262E` | Cor do fundo (fora do recorte, acima do horizonte) |
+| `--overlays` | `true`/`false` | `true` | Se as sobreposições de tela (distância, elevação, tempo, perfil) são desenhadas |
+| `--overlay-blocks` | lista separada por vírgula de `distance`, `elevation`, `time`, `profile` | os quatro | Quais blocos aparecem, quando `--overlays` não é `false` |
 | `--quality` | `low`, `medium`, `high` | `medium` | Qualidade da codificação: `low` (rápido e pequeno, para conferir), `medium` (para publicar), `high` (para guardar) |
 | `--keep` | diretório | — | Guarda `plan.json`, `slice.zip` e `frames/` nesse diretório em vez de num temporário, e reaproveita o que ainda vale numa execução seguinte |
 | `--overwrite` | — | — | Substitui o vídeo de destino, e qualquer intermediário desatualizado sob `--keep`, se já existirem |
@@ -117,9 +120,10 @@ na mão com os mesmos valores.
   --export`/`render all --output` já produzem — abríveis com as ferramentas
   de sempre. Uma execução seguinte, com o mesmo trajeto e os mesmos valores,
   reaproveita o que ainda vale em vez de refazer — a aparência escolhida
-  também faz parte dessa identidade: mudar só ela reaproveita o plano e o
-  recorte (que não dependem de aparência) e refaz só os quadros e o vídeo.
-  Atenção: repetir o mesmo
+  também faz parte dessa identidade — e a configuração de sobreposição
+  também: mudar só uma delas reaproveita o plano e o recorte (que não
+  dependem de aparência nem de sobreposição) e refaz só os quadros e o
+  vídeo. Atenção: repetir o mesmo
   `--output` numa segunda execução exige `--overwrite` para o vídeo — e
   `--overwrite` também refaz os quadros do zero, mesmo que o conjunto já
   bata (é a mesma regra de `render all --overwrite`, sem exceção para
@@ -132,7 +136,9 @@ na mão com os mesmos valores.
   e o mesmo código de saída que o comando individual dessa etapa já usa,
   documentados em `specs/007-full-flight-pipeline/contracts/cli.md`; os das
   cinco flags de aparência, em
-  `specs/008-frame-appearance/contracts/appearance-flags.md`.
+  `specs/008-frame-appearance/contracts/appearance-flags.md`; os das duas
+  flags de sobreposição, em
+  `specs/009-frame-overlays/contracts/overlay-flags.md`.
 
 Por baixo do capô, `fly` encadeia seis comandos independentes — cada um
 também disponível sozinho, para inspecionar um resultado intermediário,
@@ -341,11 +347,13 @@ cobertura de relevo, `26` coordenada inválida; documentados em
 sobrevoo render frame <plano.json> <recorte.zip> --number <n> --output <quadro.png>
                        [--resolution LxA] [--trail-color <#RRGGBB>] [--trail-width <proporção>]
                        [--marker-color <#RRGGBB>] [--marker-radius <proporção>]
-                       [--background-color <#RRGGBB>] [--overwrite]
+                       [--background-color <#RRGGBB>]
+                       [--overlays=false] [--overlay-blocks <lista>] [--overwrite]
 sobrevoo render all   <plano.json> <recorte.zip> --output <diretório>
                        [--resolution LxA] [--trail-color <#RRGGBB>] [--trail-width <proporção>]
                        [--marker-color <#RRGGBB>] [--marker-radius <proporção>]
-                       [--background-color <#RRGGBB>] [--overwrite]
+                       [--background-color <#RRGGBB>]
+                       [--overlays=false] [--overlay-blocks <lista>] [--overwrite]
 ```
 
 A partir do plano exportado por `plan --export` e do recorte exportado por
@@ -353,12 +361,17 @@ A partir do plano exportado por `plan --export` e do recorte exportado por
 cada quadro: o relevo do terreno em perspectiva, vestido com as peças do mapa
 base, o traçado do trajeto até o ponto em que o marcador está e o marcador da
 atividade — com a cor, a espessura e o raio escolhidos (ou os de sempre, se
-nenhum for informado). `render frame` desenha um só, pelo número, para
-conferir o enquadramento e a aparência antes de gastar tempo com o voo
-inteiro — o quadro que ele desenha é idêntico, byte a byte, ao mesmo quadro
-dentro de `render all`/`fly` com os mesmos valores; `render all` desenha
-todos, em `frame_000000.png`, `frame_000001.png`, ..., na ordem do plano, com
-o progresso na tela e um resumo ao final.
+nenhum for informado) —, e, por cima de tudo isso, fixas na tela (não coladas
+no terreno): a distância percorrida, a elevação do trajeto e o ganho
+acumulado no ponto do marcador, o tempo decorrido da atividade e um perfil de
+elevação do trajeto inteiro com um marcador que avança com o voo — ligadas
+por padrão, desligáveis por inteiro ou por bloco. `render frame` desenha um
+só, pelo número, para conferir o enquadramento, a aparência e a sobreposição
+antes de gastar tempo com o voo inteiro — o quadro que ele desenha é
+idêntico, byte a byte, ao mesmo quadro dentro de `render all`/`fly` com os
+mesmos valores; `render all` desenha todos, em `frame_000000.png`,
+`frame_000001.png`, ..., na ordem do plano, com o progresso na tela e um
+resumo ao final.
 
 ```console
 $ sobrevoo render frame plano.json recorte.zip --number 300 --output conferir.png
@@ -385,6 +398,8 @@ Destination: quadros/ (frame_000000.png to frame_001259.png)
 | `--marker-color` | `#RRGGBB` | `#E5252A` | Cor do marcador |
 | `--marker-radius` | proporção da altura do quadro, `0.001` a `0.1` | `0.012` | Raio do marcador |
 | `--background-color` | `#RRGGBB` | `#20262E` | Cor do fundo (fora do recorte, acima do horizonte, e por baixo de uma peça de mapa parcialmente transparente) |
+| `--overlays` | `true`/`false` | `true` | Se as sobreposições de tela (distância, elevação, tempo, perfil) são desenhadas |
+| `--overlay-blocks` | lista separada por vírgula de `distance`, `elevation`, `time`, `profile` | os quatro | Quais blocos aparecem, quando `--overlays` não é `false` |
 | `--overwrite` | — | — | `frame`: substitui o arquivo se já existir. `all`: redesenha todos os quadros, mesmo os já prontos, e remove os de um voo anterior que sobrarem |
 
 - **Sem inventar dado**: onde falta uma peça de mapa, o quadro mostra uma
@@ -392,13 +407,20 @@ Destination: quadros/ (frame_000000.png to frame_001259.png)
   marcações são fixas, não ajustáveis por nenhuma flag de aparência, porque
   são o significado da imagem, não um estilo. O resumo conta os quadros
   afetados.
-- **Determinismo**: o mesmo plano, o mesmo recorte, a mesma resolução e a
-  mesma aparência dão sempre as mesmas imagens, byte a byte, seja qual for a
-  ordem ou o número de quadros por execução, em qualquer processador.
+- **Determinismo**: o mesmo plano, o mesmo recorte, a mesma resolução, a
+  mesma aparência e a mesma configuração de sobreposição dão sempre as
+  mesmas imagens, byte a byte, seja qual for a ordem ou o número de quadros
+  por execução, em qualquer processador — o texto das sobreposições usa uma
+  fonte embutida na própria ferramenta, nunca uma do sistema.
 - **Retomada e proteção**: `render all` continua de onde parou (é só repetir
   o comando; `Ctrl+C` encerra sem deixar imagem pela metade) e só redesenha
-  os quadros que faltam. Um diretório com quadros de **outro** voo, resolução
-  **ou aparência** é recusado, para não misturar; `--overwrite` refaz tudo.
+  os quadros que faltam. Um diretório com quadros de **outro** voo,
+  resolução, aparência **ou configuração de sobreposição** é recusado, para
+  não misturar; `--overwrite` refaz tudo.
+- **Sem reler nada**: os valores das sobreposições vêm inteiramente do
+  plano e do recorte informados — nenhuma leitura nova do trajeto GPS nem
+  dos dados geográficos registrados; ao final do voo, eles coincidem
+  exatamente com o que `inspect` relata para o mesmo trajeto.
 - **Só mapa em imagem**: peças de mapa base em imagem (PNG, JPG, WebP). Peças
   vetoriais (`pbf`) são recusadas com mensagem clara; desenhá-las fica para
   uma etapa futura.
@@ -413,9 +435,11 @@ vetoriais no recorte, `32` sem dado de elevação, `33` número de quadro fora
 do intervalo, `34` resolução inválida, `35` destino inválido, `36` destino
 já existe, `37` diretório com quadros de outro conjunto, `38` execução
 interrompida, `52` cor mal formada, `53` espessura do traçado fora do
-intervalo, `54` raio do marcador fora do intervalo; documentados em
-`specs/005-frame-rendering/contracts/cli.md` e
-`specs/008-frame-appearance/contracts/appearance-flags.md`.
+intervalo, `54` raio do marcador fora do intervalo, `55` bloco de
+sobreposição desconhecido; documentados em
+`specs/005-frame-rendering/contracts/cli.md`,
+`specs/008-frame-appearance/contracts/appearance-flags.md` e
+`specs/009-frame-overlays/contracts/overlay-flags.md`.
 
 ### `video`: montar o vídeo do voo
 

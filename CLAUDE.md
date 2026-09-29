@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Oito features estão implementadas até agora:
+Relive/Strava). Nove features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -31,12 +31,22 @@ anteriores atrás de um único comando (`fly`), do arquivo de trajeto direto ao
 vídeo, com os mesmos parâmetros, recusa cedo (destino e codificador antes de
 qualquer etapa, cobertura logo após o plano) e, opcionalmente, um diretório
 onde guardar e reaproveitar o plano, o recorte e os quadros entre execuções;
-e `specs/008-frame-appearance/` torna ajustável, por flag, a cor e a
+`specs/008-frame-appearance/` torna ajustável, por flag, a cor e a
 espessura do traçado, a cor e o raio do marcador, e a cor do fundo — os
 cinco valores que antes eram fixos no código —, nos mesmos comandos que já
 desenham quadros (`render frame`, `render all` e `fly`), com os valores de
 sempre como padrão e passando a fazer parte da identidade do conjunto de
-quadros. Ainda não há sobreposição de texto ou estatísticas, nem áudio.
+quadros; e `specs/009-frame-overlays/` desenha, fixos na tela (não colados
+no terreno), a distância percorrida, a elevação do trajeto e o ganho
+acumulado no ponto do marcador, o tempo decorrido da atividade e um perfil
+de elevação do trajeto inteiro com um marcador que avança com o voo —
+ligados por padrão, desligáveis por inteiro ou por bloco
+(`--overlays`/`--overlay-blocks`, nos mesmos três comandos), com uma fonte
+embutida na ferramenta e sem nenhuma leitura nova do trajeto GPS ou dos
+dados geográficos registrados: o plano de câmera passou a guardar, por
+quadro, o instante real da atividade e a elevação do trajeto no ponto do
+marcador (`format_version` 2; um plano da versão 1 é recusado, pedindo para
+ser gerado de novo). Ainda não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -59,7 +69,7 @@ go run ./cmd/sobrevoo inspect path/to/track.gpx --simplification=low --smoothing
 go run ./cmd/sobrevoo plan path/to/track.gpx --duration 45 --distance high --aspect 9:16 --export plan.json
 go run ./cmd/sobrevoo geodata slice plan.json --export slice.zip
 go run ./cmd/sobrevoo geodata elevation --lat -23.5505 --lon -46.6333
-go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png --trail-color "#00FF00" --marker-radius 0.03
+go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png --trail-color "#00FF00" --marker-radius 0.03 --overlay-blocks distance,time
 go run ./cmd/sobrevoo render all plan.json slice.zip --output frames/ --resolution 1280x720
 go run ./cmd/sobrevoo video plan.json frames/ --output flight.mp4 --quality medium   # precisa do ffmpeg instalado
 go run ./cmd/sobrevoo fly path/to/track.gpx --output flight.mp4 --duration 45 --keep intermediarios/   # as seis etapas num só comando
@@ -92,13 +102,20 @@ adapter.
   `FrameDirectory`, `RenderSummary`, e os da montagem do vídeo: `FrameMark`, `VideoQuality`,
   `VideoRequest`, `VideoProgress`, `EncodeJob`, `EncoderInfo`, `VideoSummary`,
   e os do comando único: `FlightRequest`, `FlightStage`, `FlightProgress`,
-  `FlightSummary`), construtores
+  `FlightSummary`, e os da sobreposição de tela (etapa 9): `OverlayConfig`,
+  `OverlayBlock` e `ElevationProfile` — o perfil de elevação pré-computado
+  de um trajeto, consultado por distância (`ElevationProfile.At`), a mesma
+  técnica de busca por bracket que `PlanarRoute.PointAt` já usa; `CameraFrame`
+  ganhou `ActivityElapsed`, `TrackElevation` e `TrackElevationGain`, e
+  `CameraPlan`/`PlanSummary` ganharam `ElevationAvailable`), construtores
   que carregam regra de negócio (`NewGeoDataSource`, `NewTrackSummary`,
   `NewCameraPlan`, que calcula o resumo a partir dos quadros, `NewGeoSlice`,
-  que calcula o resumo do recorte e o põe em ordem, `NewCoordinate`), e métodos de
+  que calcula o resumo do recorte e o põe em ordem, `NewCoordinate`,
+  `NewOverlayConfig`), e métodos de
   entidade que carregam o comportamento de cada uma: `TrackPoint.DistanceTo`
   (Haversine, com o "wrap" do antimeridiano), `Route` (`Length`, `Duration`,
-  `BoundingBox`, `ElevationGain`, `Coverage`, `ReorderByTime` e os `Discard*`),
+  `BoundingBox`, `ElevationGain`, `Coverage`, `ReorderByTime`, os `Discard*`,
+  `TimeAt` e `ElevationProfile` — etapa 9),
   `Track.Clean`, `TreatedTrack.PlanCamera`, `PlanParameters`
   (`MinimumDuration`, `DefaultDuration`), `CameraTuning.FollowDistance`,
   `LocalPlane`, `PlanarRoute` (`HeadingAt`, `OverviewView`, ...), `CameraView`
@@ -138,7 +155,8 @@ adapter.
   `ErrVideoDestinationInvalid`, `ErrVideoInterrupted`,
   `ErrVideoEncodingFailed`; o do comando único: `ErrFlightInterrupted`; e os
   da aparência: `ErrInvalidColor`, `ErrInvalidTrailWidth`,
-  `ErrInvalidMarkerRadius`), e
+  `ErrInvalidMarkerRadius`; e o da sobreposição de tela:
+  `ErrInvalidOverlayBlock`), e
   as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
   `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`,
@@ -199,10 +217,12 @@ adapter.
   `config.PlanDefaults`, `config.SliceTuning`, `config.RenderTuning`,
   `config.RenderDefaults` — resolução e, desde a etapa 8, também a aparência
   padrão (cor/espessura do traçado, cor/raio do marcador, cor do fundo, como
-  texto hexadecimal) —, `config.VideoDefaults`) e **não importa o
-  domínio**; quem os mapeia para os
+  texto hexadecimal) e, desde a etapa 9, a configuração de sobreposição
+  padrão (`OverlaysEnabled`, `OverlayBlocks`) —, `config.VideoDefaults`) e
+  **não importa o domínio**; quem os mapeia para os
   tipos de domínio é o composition root (`cmd/sobrevoo/config_mapping.go`,
-  função `domainAppearance` para a aparência).
+  função `domainAppearance` para a aparência e `domainOverlayConfig` para a
+  sobreposição).
 - **`internal/infra/inbound/cli`** — o(s) comando(s) Cobra, e o lugar que
   traduz erros sentinela do domínio em códigos de saída de processo
   (`exit_code.go`); ver `specs/001-gps-track-processing/contracts/cli.md` e
@@ -212,7 +232,8 @@ adapter.
   `specs/005-frame-rendering/contracts/cli.md` e
   `specs/006-video-assembly/contracts/cli.md` e
   `specs/007-full-flight-pipeline/contracts/cli.md` e
-  `specs/008-frame-appearance/contracts/appearance-flags.md` para o
+  `specs/008-frame-appearance/contracts/appearance-flags.md` e
+  `specs/009-frame-overlays/contracts/overlay-flags.md` para o
   mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
@@ -340,6 +361,63 @@ do traçado e o anel do marcador, que também não são ajustáveis). Sem nenhum
 flag informada, o resultado é pixel a pixel igual ao de antes desta etapa —
 os cinco valores de hoje viraram os padrões de `config.RenderDefaults`, no
 lugar de `var` fixas do domínio.
+
+### As sobreposições de tela (etapa 9)
+
+`--overlays` e `--overlay-blocks` (`specs/009-frame-overlays/`) existem, com
+o mesmo nome e o mesmo efeito, em `render frame`, `render all` e `fly` — o
+mesmo `parseOverlay` compartilhado (`internal/infra/inbound/cli/overlay.go`)
+que `appearance.go` já estabeleceu para a aparência garante isso por
+construção. Os quatro blocos (`OverlayBlockDistance`, `OverlayBlockElevation`,
+`OverlayBlockTime`, `OverlayBlockProfile`) vêm ligados por padrão; desligar
+`--overlays` desliga todos, mesmo com `--overlay-blocks` também informado
+(`domain.NewOverlayConfig`, `ErrInvalidOverlayBlock` para um nome
+desconhecido). O desenho em si é código de domínio puro
+(`internal/domain/frame_screen_overlay.go`, tipo não exportado
+`screenOverlay` — não confundir com `overlay`, de `frame_overlay.go`, que
+desenha o traçado e o marcador colados no terreno): `Scene.Render` o chama
+por último, depois do traçado e do marcador, sempre por cima, sem nenhum
+teste de profundidade. O texto usa uma fonte bitmap embutida
+(`golang.org/x/image/font/inconsolata`, já uma dependência transitiva do
+módulo — nenhuma nova) para não depender de nenhuma fonte do sistema
+(FR-008); cada glifo é ampliado por replicação inteira de pixel, nunca por
+interpolação, e a mistura alfa reaproveita a mesma fórmula que
+`overlay.blend` já usa — mantendo o determinismo byte a byte entre
+arquiteturas que a etapa 5 exige. Cada bloco desenha sobre uma placa
+semitransparente de cor fixa (`OverlayPanelColor`/`OverlayPanelOpacity`, em
+`render_tuning.go`, junto de `OverlayMarginRatio` — a margem de segurança
+nas quatro bordas, como fração do menor lado do quadro) para continuar
+legível sobre qualquer fundo, sem nunca amostrar o pixel por baixo.
+
+Os valores exibidos vêm exclusivamente do plano de câmera e do recorte —
+nenhuma leitura nova do trajeto GPS nem dos dados geográficos registrados
+(FR-005): o plano passou a guardar, por quadro, `ActivityElapsed` (o instante
+real da atividade), `TrackElevation` (a elevação bruta do trajeto no ponto do
+marcador) e `TrackElevationGain` (o ganho acumulado até ali). O ganho
+acumulado é a parte delicada (`research.md` item 7): calculá-lo por uma soma
+corrente entre quadros consecutivos subestimaria o total verdadeiro sempre
+que um trecho de sobe-desce coubesse inteiro entre dois quadros vizinhos —
+por isso `TreatedTrack.PlanCamera` pré-computa o ganho acumulado **por ponto
+do trajeto tratado** (`Route.ElevationProfile`, guardando cada soma parcial,
+não só o total) e só então interpola por distância
+(`ElevationProfile.At`), garantindo que o último quadro bata, bit a bit, com
+`Route.ElevationGain()` — o mesmo valor que `inspect` relata (FR-014). A
+interpolação usa a forma segura `(1-t)*a + t*b`, nunca `a+t*(b-a)`, porque
+só a primeira garante um resultado exato em `t=1` em ponto flutuante.
+`CameraPlan.ID()` não inclui os três campos novos nem `ElevationAvailable`:
+são funções determinísticas do que já entra no hash, incluí-los só forçaria
+uma migração de identidade sem nenhum ganho de correção. O formato do plano
+exportado sobe de `format_version` 1 para 2 — um plano da versão 1 é
+recusado com `ErrPlanFormatVersionUnsupported` e uma mensagem que orienta a
+gerar o plano de novo (FR-007), antes mesmo de checar se os campos novos
+estão presentes.
+
+A configuração de sobreposição escolhida participa da identidade do
+conjunto de quadros do mesmo jeito que a aparência já participa: `NewFrameSetID`
+inclui `OverlayConfig.Fingerprint()` no hash, ao lado do de `Appearance` —
+sem precisar de um `RenderVersion` novo, e sem nenhuma lógica nova de
+reaproveitamento em `render all`/`fly --keep`, que já decide
+reaproveitar-ou-redesenhar por `FrameSetID`.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

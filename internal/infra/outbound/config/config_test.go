@@ -132,6 +132,16 @@ func Test_Load(t *testing.T) {
 		assert.Equal(t, 0.012, cfg.RenderDefaults.MarkerRadiusRatio)
 		assert.Equal(t, "#20262E", cfg.RenderDefaults.BackgroundColor)
 	})
+
+	t.Run("should default the screen overlays to enabled, with the four blocks", func(t *testing.T) {
+		// when
+		cfg, err := config.Load()
+
+		// then
+		require.NoError(t, err)
+		assert.True(t, cfg.RenderDefaults.OverlaysEnabled)
+		assert.ElementsMatch(t, []string{"distance", "elevation", "time", "profile"}, cfg.RenderDefaults.OverlayBlocks)
+	})
 }
 
 func Test_Load_Video(t *testing.T) {

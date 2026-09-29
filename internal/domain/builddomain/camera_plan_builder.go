@@ -7,12 +7,13 @@ import (
 )
 
 type CameraPlanBuilder struct {
-	parameters    domain.PlanParameters
-	durationMode  domain.DurationMode
-	timeReference domain.TimeReference
-	reason        string
-	frames        []domain.CameraFrame
-	spans         []domain.SmoothedSpan
+	parameters         domain.PlanParameters
+	durationMode       domain.DurationMode
+	timeReference      domain.TimeReference
+	reason             string
+	frames             []domain.CameraFrame
+	spans              []domain.SmoothedSpan
+	elevationAvailable bool
 }
 
 func NewCameraPlanBuilder() *CameraPlanBuilder {
@@ -25,6 +26,7 @@ func NewCameraPlanBuilder() *CameraPlanBuilder {
 			NewCameraFrameBuilder().WithIndex(1).WithPhase(domain.PhaseFollowing).Build(),
 			NewCameraFrameBuilder().WithIndex(2).WithPhase(domain.PhaseClosing).Build(),
 		},
+		elevationAvailable: true,
 	}
 }
 
@@ -54,6 +56,11 @@ func (b *CameraPlanBuilder) WithSmoothedSpans(spans ...domain.SmoothedSpan) *Cam
 	return b
 }
 
+func (b *CameraPlanBuilder) WithElevationAvailable(available bool) *CameraPlanBuilder {
+	b.elevationAvailable = available
+	return b
+}
+
 func (b *CameraPlanBuilder) Build() domain.CameraPlan {
-	return domain.NewCameraPlan(b.parameters, b.durationMode, b.timeReference, b.reason, b.frames, b.spans)
+	return domain.NewCameraPlan(b.parameters, b.durationMode, b.timeReference, b.reason, b.frames, b.spans, b.elevationAvailable)
 }

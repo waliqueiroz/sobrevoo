@@ -98,6 +98,13 @@ func tuningWithWorkers(workers int) domain.RenderTuning {
 // chosen.
 var sceneAppearance = builddomain.NewAppearanceBuilder().Build()
 
+// sceneOverlay is disabled: the zero value of domain.OverlayConfig, so
+// existing pixel assertions (about the terrain, the trail, the marker) are
+// never touched by a screen overlay block — tests of the overlay itself
+// live in frame_screen_overlay_test.go, and Test_Scene_Render_ScreenOverlay
+// below is the one exception that turns it on.
+var sceneOverlay domain.OverlayConfig
+
 func rowIsAll(image domain.FrameImage, y int, c domain.RGB) bool {
 	for x := 0; x < image.Resolution.Width; x++ {
 		if image.At(x, y) != c {
@@ -117,7 +124,7 @@ func Test_NewScene(t *testing.T) {
 		slice := sceneSlice(3, 0.001, values, worldTile())
 
 		// when
-		_, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(1), sceneAppearance)
+		_, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(1), sceneAppearance, sceneOverlay)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrNoElevationData)
@@ -133,7 +140,7 @@ func Test_Scene_Render(t *testing.T) {
 
 	t.Run("should draw an image of the resolution asked for, the sky above and the terrain below", func(t *testing.T) {
 		// given
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
 
@@ -152,10 +159,10 @@ func Test_Scene_Render(t *testing.T) {
 	t.Run("should draw a different image for a different appearance", func(t *testing.T) {
 		// given
 		plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
-		orange, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		orange, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		white, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2),
-			builddomain.NewAppearanceBuilder().WithBackgroundColor(domain.RGB{R: 0xFF, G: 0xFF, B: 0xFF}).Build())
+			builddomain.NewAppearanceBuilder().WithBackgroundColor(domain.RGB{R: 0xFF, G: 0xFF, B: 0xFF}).Build(), sceneOverlay)
 		require.NoError(t, err)
 
 		// when
@@ -171,9 +178,9 @@ func Test_Scene_Render(t *testing.T) {
 	t.Run("should draw the same image, byte by byte, for the same appearance twice", func(t *testing.T) {
 		// given
 		plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
-		first, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		first, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
-		second, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		second, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 
 		// when
@@ -188,7 +195,7 @@ func Test_Scene_Render(t *testing.T) {
 
 	t.Run("should never put sky under ground in a column", func(t *testing.T) {
 		// given
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
 
@@ -211,7 +218,7 @@ func Test_Scene_Render(t *testing.T) {
 
 	t.Run("should draw the marker where the camera looks at it, and none when it is behind the camera", func(t *testing.T) {
 		// given: the marker is 400 m ahead of the camera, on the ground
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		ahead := planOf(0, 45, 300, southOfCenter, [2]float64{-0.0004, 0}, 3)
 		behind := planOf(180, 45, 300, southOfCenter, [2]float64{-0.0004, 0}, 3)
@@ -240,7 +247,7 @@ func Test_Scene_Render(t *testing.T) {
 
 	t.Run("should turn the picture around with the heading of the frame", func(t *testing.T) {
 		// given: a plain that is the same in every direction, and a camera at the middle of it
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		north := planOf(0, 45, 300, center, center, 2)
 		south := planOf(180, 45, 300, center, center, 2)
@@ -257,7 +264,7 @@ func Test_Scene_Render(t *testing.T) {
 
 	t.Run("should refuse a frame that is not in the plan", func(t *testing.T) {
 		// given
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(1), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(1), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		plan := planOf(0, 45, 300, center, center, 3)
 
@@ -273,7 +280,7 @@ func Test_Scene_Render(t *testing.T) {
 	t.Run("should see the same fraction of ground at any resolution of the same shape", func(t *testing.T) {
 		// given: a plain of 100 km, so the ground reaches almost to the horizon
 		slice := sceneSlice(100, 0.01, flat(100, 100), worldTile())
-		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		plan := planOf(0, 20, 300, center, center, 2)
 		firstGround := func(resolution domain.Resolution) float64 {
@@ -313,7 +320,7 @@ func roughScene(t *testing.T, workers int) (*domain.Scene, domain.CameraPlan) {
 	}
 	decoder.EXPECT().Decode("png", gomock.Any()).Return(domain.NewTileImage(4, 4, pix), nil).AnyTimes()
 
-	scene, err := domain.NewScene(slice, decoder, tuningWithWorkers(workers), sceneAppearance)
+	scene, err := domain.NewScene(slice, decoder, tuningWithWorkers(workers), sceneAppearance, sceneOverlay)
 	require.NoError(t, err)
 
 	frames := make([]domain.CameraFrame, 6)
@@ -395,6 +402,56 @@ func Test_Scene_Render_Determinism(t *testing.T) {
 	})
 }
 
+// Test_Scene_Render_ScreenOverlay is the one test of this file that turns
+// the screen overlay on — every other test keeps sceneOverlay disabled, so
+// its pixel assertions about the terrain, the trail and the marker are
+// never touched by an overlay block (009-frame-overlays). The overlay's own
+// behavior is tested directly in frame_screen_overlay_test.go.
+func Test_Scene_Render_ScreenOverlay(t *testing.T) {
+	plain := func() domain.GeoSlice { return sceneSlice(40, 0.0005, flat(40, 100), worldTile()) }
+	southOfCenter := [2]float64{-0.004, 0}
+	behindCamera := [2]float64{-0.008, 0}
+
+	full, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{domain.OverlayBlockDistance, domain.OverlayBlockElevation, domain.OverlayBlockTime, domain.OverlayBlockProfile})
+	require.NoError(t, err)
+
+	sceneWith := func(overlay domain.OverlayConfig) *domain.Scene {
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, overlay)
+		require.NoError(t, err)
+		return scene
+	}
+
+	t.Run("should draw a different image for a different overlay configuration, same plan, slice, resolution and appearance", func(t *testing.T) {
+		// given
+		plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
+		off, on := sceneWith(domain.OverlayConfig{}), sceneWith(full)
+
+		// when
+		offImage, _, err1 := off.Render(context.Background(), plan, 1, smallFrame)
+		onImage, _, err2 := on.Render(context.Background(), plan, 1, smallFrame)
+
+		// then
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		assert.NotEqual(t, offImage.Pix, onImage.Pix)
+	})
+
+	t.Run("should draw the same image every time for the same overlay configuration", func(t *testing.T) {
+		// given
+		plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
+		first, second := sceneWith(full), sceneWith(full)
+
+		// when
+		firstImage, _, err1 := first.Render(context.Background(), plan, 1, smallFrame)
+		secondImage, _, err2 := second.Render(context.Background(), plan, 1, smallFrame)
+
+		// then
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		assert.Equal(t, firstImage.Pix, secondImage.Pix)
+	})
+}
+
 func Test_Scene_Render_Stopping(t *testing.T) {
 	t.Run("should draw nothing when the context is already done", func(t *testing.T) {
 		// given
@@ -418,7 +475,7 @@ func Test_Scene_Render_Stopping(t *testing.T) {
 			cancel()
 			return solidTile(mapColor), nil
 		}).AnyTimes()
-		scene, err := domain.NewScene(sceneSlice(40, 0.0005, flat(40, 100), worldTile()), decoder, tuningWithWorkers(1), sceneAppearance)
+		scene, err := domain.NewScene(sceneSlice(40, 0.0005, flat(40, 100), worldTile()), decoder, tuningWithWorkers(1), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		plan := planOf(0, 45, 300, [2]float64{0, 0}, [2]float64{0, 0}, 2)
 
@@ -434,7 +491,7 @@ func Test_Scene_Render_Stopping(t *testing.T) {
 		// given
 		decoder := mockdomain.NewMockTileDecoder(gomock.NewController(t))
 		decoder.EXPECT().Decode("png", gomock.Any()).Return(domain.TileImage{}, errors.New("not a PNG")).AnyTimes()
-		scene, err := domain.NewScene(sceneSlice(40, 0.0005, flat(40, 100), worldTile()), decoder, tuningWithWorkers(3), sceneAppearance)
+		scene, err := domain.NewScene(sceneSlice(40, 0.0005, flat(40, 100), worldTile()), decoder, tuningWithWorkers(3), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		plan := planOf(0, 45, 300, [2]float64{0, 0}, [2]float64{0, 0}, 2)
 
@@ -518,7 +575,7 @@ func Test_Scene_Render_MissingData(t *testing.T) {
 	view := func(marker [2]float64) domain.CameraPlan { return planOf(0, 45, 300, southOfCenter, marker, 2) }
 	render := func(t *testing.T, slice domain.GeoSlice, decoder domain.TileDecoder, plan domain.CameraPlan) (domain.FrameImage, domain.FrameStats) {
 		t.Helper()
-		scene, err := domain.NewScene(slice, decoder, tuningWithWorkers(3), sceneAppearance)
+		scene, err := domain.NewScene(slice, decoder, tuningWithWorkers(3), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		image, stats, err := scene.Render(context.Background(), plan, 1, smallFrame)
 		require.NoError(t, err)
@@ -679,7 +736,7 @@ func Test_Scene_Render_MissingData(t *testing.T) {
 		slice := holeSlice(0, withHoleBlock(flat(40, 100)), worldTileSet(nil))
 		plan := view(behindCamera)
 		draw := func(workers int) (domain.FrameImage, domain.FrameStats) {
-			scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(workers), sceneAppearance)
+			scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(workers), sceneAppearance, sceneOverlay)
 			require.NoError(t, err)
 			image, stats, err := scene.Render(context.Background(), plan, 1, smallFrame)
 			require.NoError(t, err)
@@ -718,7 +775,7 @@ func Test_Scene_Render_Resolution(t *testing.T) {
 
 	t.Run("should put the marker at the same relative place in two resolutions of the same shape", func(t *testing.T) {
 		// given
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 
 		// when
@@ -736,7 +793,7 @@ func Test_Scene_Render_Resolution(t *testing.T) {
 
 	t.Run("should see the same stretch of ground from top to bottom at any width, and more of it to the sides on a wider image", func(t *testing.T) {
 		// given
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 		behind := planOf(0, 45, 300, southOfCenter, [2]float64{-0.008, 0}, 2)
 
@@ -754,7 +811,7 @@ func Test_Scene_Render_Resolution(t *testing.T) {
 
 	t.Run("should draw a portrait and an ultrawide image", func(t *testing.T) {
 		// given
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 
 		// when
@@ -786,7 +843,7 @@ func Test_Scene_Render_Resolution(t *testing.T) {
 
 	t.Run("should draw at the default resolution", func(t *testing.T) {
 		// given
-		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(4), sceneAppearance)
+		scene, err := domain.NewScene(plain(), solidDecoder(t, mapColor), tuningWithWorkers(4), sceneAppearance, sceneOverlay)
 		require.NoError(t, err)
 
 		// when

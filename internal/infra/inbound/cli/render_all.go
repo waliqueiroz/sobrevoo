@@ -24,11 +24,14 @@ func NewRenderAllCommand(
 	frameService application.FrameService,
 	defaultResolution domain.Resolution,
 	defaultAppearance domain.Appearance,
+	defaultOverlay domain.OverlayConfig,
 	options ...RenderOption,
 ) *cobra.Command {
 	settings := newRenderSettings(options)
 	var outputFlag, resolutionFlag string
 	var trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag string
+	var overlaysFlag bool
+	var overlayBlocksFlag string
 	var overwriteFlag bool
 
 	cmd := &cobra.Command{
@@ -57,8 +60,12 @@ func NewRenderAllCommand(
 			if err != nil {
 				return err
 			}
+			overlay, err := parseOverlay(cmd, overlaysFlag, overlayBlocksFlag, defaultOverlay)
+			if err != nil {
+				return err
+			}
 
-			return runRenderAll(cmd, settings, cameraPlanService, geoSliceService, frameService, args[0], args[1], outputFlag, overwriteFlag, resolution, appearance)
+			return runRenderAll(cmd, settings, cameraPlanService, geoSliceService, frameService, args[0], args[1], outputFlag, overwriteFlag, resolution, appearance, overlay)
 		},
 	}
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return newUsageError(err) })
@@ -70,6 +77,8 @@ func NewRenderAllCommand(
 	cmd.Flags().StringVar(&markerColorFlag, "marker-color", formatColor(defaultAppearance.MarkerColor), markerColorUsage)
 	cmd.Flags().StringVar(&markerRadiusFlag, "marker-radius", strconv.FormatFloat(defaultAppearance.MarkerRadiusRatio, 'g', -1, 64), markerRadiusUsage)
 	cmd.Flags().StringVar(&backgroundColorFlag, "background-color", formatColor(defaultAppearance.BackgroundColor), backgroundColorUsage)
+	cmd.Flags().BoolVar(&overlaysFlag, "overlays", defaultOverlay.Enabled, overlaysUsage)
+	cmd.Flags().StringVar(&overlayBlocksFlag, "overlay-blocks", formatOverlayBlocks(defaultOverlay), overlayBlocksUsage)
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "Draw every frame again, replacing the ones already there, and remove the frames of a previous flight that this plan has no number for")
 
 	return cmd
@@ -85,6 +94,7 @@ func runRenderAll(
 	overwrite bool,
 	resolution domain.Resolution,
 	appearance domain.Appearance,
+	overlay domain.OverlayConfig,
 ) error {
 	plan, err := cameraPlanService.Load(planPath)
 	if err != nil {
@@ -106,6 +116,7 @@ func runRenderAll(
 		Directory:  directory,
 		Resolution: resolution,
 		Appearance: appearance,
+		Overlay:    overlay,
 		Overwrite:  overwrite,
 	}, printer.report)
 	printer.finish()

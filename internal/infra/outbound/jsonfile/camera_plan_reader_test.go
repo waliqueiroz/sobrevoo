@@ -39,6 +39,8 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		assert.Equal(t, domain.TimeReferenceClock, plan.TimeReference)
 		assert.Equal(t, domain.DurationModeAutomatic, plan.Summary.DurationMode)
 		assert.Equal(t, 3, plan.Summary.FrameCount)
+		assert.True(t, plan.ElevationAvailable)
+		assert.True(t, plan.Summary.ElevationAvailable)
 
 		second := plan.Frames[1]
 		assert.Equal(t, 1, second.Index)
@@ -49,6 +51,9 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		assert.InDelta(t, 111.0, second.MarkerDistance, 1e-9)
 		assert.InDelta(t, 600.0, second.CameraToMarkerDistance, 1e-9)
 		assert.InDelta(t, float64(time.Second/30), float64(second.Time), float64(time.Millisecond))
+		assert.InDelta(t, 22.2, second.ActivityElapsed.Seconds(), 1e-9)
+		assert.InDelta(t, 771.1, second.TrackElevation, 1e-9)
+		assert.InDelta(t, 11.1, second.TrackElevationGain, 1e-9)
 		assert.Equal(t, 400.0, plan.Summary.MaxCameraAltitude)
 		assert.NoError(t, plan.Validate())
 	})
@@ -71,6 +76,8 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		assert.Equal(t, original.TimeFallbackReason, plan.TimeFallbackReason)
 		assert.Equal(t, original.Summary.DurationMode, plan.Summary.DurationMode)
 		assert.Equal(t, original.Summary.SmoothedSpans, plan.Summary.SmoothedSpans)
+		assert.Equal(t, original.ElevationAvailable, plan.ElevationAvailable)
+		assert.Equal(t, original.Summary.ElevationAvailable, plan.Summary.ElevationAvailable)
 		for i, frame := range original.Frames {
 			got := plan.Frames[i]
 			assert.Equal(t, frame.Index, got.Index)
@@ -85,6 +92,9 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 			assert.InDelta(t, frame.MarkerLongitude, got.MarkerLongitude, 1e-7)
 			assert.InDelta(t, frame.MarkerDistance, got.MarkerDistance, 1e-3)
 			assert.InDelta(t, frame.CameraToMarkerDistance, got.CameraToMarkerDistance, 1e-3)
+			assert.InDelta(t, frame.ActivityElapsed.Seconds(), got.ActivityElapsed.Seconds(), 1e-9)
+			assert.InDelta(t, frame.TrackElevation, got.TrackElevation, 1e-3)
+			assert.InDelta(t, frame.TrackElevationGain, got.TrackElevationGain, 1e-3)
 		}
 	})
 
@@ -102,14 +112,28 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 
 	t.Run("should refuse a format version it does not know, saying which it found and which it accepts", func(t *testing.T) {
 		// given
-		path := writePlanFile(t, helper.PlanFileWithVersion(2))
+		path := writePlanFile(t, helper.PlanFileWithVersion(3))
 
 		// when
 		_, err := jsonfile.NewCameraPlanReader().Read(path)
 
 		// then
 		require.ErrorIs(t, err, domain.ErrPlanFormatVersionUnsupported)
-		assert.ErrorContains(t, err, "found 2, accepted: 1")
+		assert.ErrorContains(t, err, "found 3, accepted: 2")
+	})
+
+	t.Run("should refuse a plan of the previous format version, telling the user to generate it again", func(t *testing.T) {
+		// given: a plan made before this stage, without the per-frame
+		// activity time and track elevation (009-frame-overlays FR-007)
+		path := writePlanFile(t, helper.PlanFileWithVersion(1))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFormatVersionUnsupported)
+		assert.ErrorContains(t, err, "found 1, accepted: 2")
+		assert.ErrorContains(t, err, "generate the plan again")
 	})
 
 	t.Run("should refuse a file without a format version", func(t *testing.T) {
@@ -191,6 +215,54 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		// then
 		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
 		assert.ErrorContains(t, err, "frames[1].camera_to_marker_m")
+	})
+
+	t.Run("should name a frame missing activity_time_s", func(t *testing.T) {
+		// given
+		path := writePlanFile(t, helper.PlanFileWithoutFrameField("activity_time_s"))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].activity_time_s")
+	})
+
+	t.Run("should name a marker missing elevation_m", func(t *testing.T) {
+		// given
+		path := writePlanFile(t, helper.PlanFileWithoutMarkerField("elevation_m"))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].marker.elevation_m")
+	})
+
+	t.Run("should name a marker missing gain_m", func(t *testing.T) {
+		// given
+		path := writePlanFile(t, helper.PlanFileWithoutMarkerField("gain_m"))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].marker.gain_m")
+	})
+
+	t.Run("should name a summary missing elevation_available", func(t *testing.T) {
+		// given
+		path := writePlanFile(t, helper.PlanFileWithoutSummaryField("elevation_available"))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "summary.elevation_available")
 	})
 
 	t.Run("should read the aspect ratio of the plan", func(t *testing.T) {

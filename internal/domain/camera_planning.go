@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 )
 
 const (
@@ -51,7 +52,12 @@ func (t TreatedTrack) PlanCamera(parameters PlanParameters, tuning CameraTuning)
 		return CameraPlan{}, fmt.Errorf("%w: %s leaves no frames to follow the track", ErrDurationTooShort, duration)
 	}
 
-	planner := cameraPlanner{plane: plane, route: route, parameters: parameters, tuning: tuning}
+	elevationProfile, elevationAvailable := t.Route.ElevationProfile(route.Distances)
+	var elevation *ElevationProfile
+	if elevationAvailable {
+		elevation = &elevationProfile
+	}
+	planner := cameraPlanner{plane: plane, route: route, trackRoute: t.Route, elevation: elevation, parameters: parameters, tuning: tuning}
 
 	// The marker's pace is planned on the cleaned route; its position is
 	// then placed at the same fraction of the treated route's length.
@@ -100,13 +106,21 @@ func (t TreatedTrack) PlanCamera(parameters PlanParameters, tuning CameraTuning)
 		frames[i] = planner.frame(i, phase, view, marker, distance)
 	}
 
-	return NewCameraPlan(parameters, mode, timeline.Reference, timeline.FallbackReason, frames, spans), nil
+	return NewCameraPlan(parameters, mode, timeline.Reference, timeline.FallbackReason, frames, spans, elevationAvailable), nil
 }
 
 // cameraPlanner holds what planning a camera flight needs while it runs.
 type cameraPlanner struct {
-	plane      LocalPlane
-	route      PlanarRoute
+	plane LocalPlane
+	route PlanarRoute
+	// trackRoute is the treated route before it was projected onto the
+	// plane — the one whose points still carry elevation and time — used to
+	// compute ActivityElapsed. elevation is the pre-computed elevation
+	// profile of the same route, along the same distances as route.
+	// Distances; nil when the route has no elevation data
+	// (009-frame-overlays research.md item 8).
+	trackRoute Route
+	elevation  *ElevationProfile
 	parameters PlanParameters
 	tuning     CameraTuning
 }
@@ -224,6 +238,15 @@ func (c cameraPlanner) frame(index int, phase Phase, view CameraView, marker Pla
 	markerLat, markerLon := c.plane.Unproject(marker)
 	toMarker := math.Sqrt(math.Pow(pose.Position.X-marker.X, 2) + math.Pow(pose.Position.Y-marker.Y, 2) + pose.Altitude*pose.Altitude)
 
+	var activityElapsed time.Duration
+	if elapsed, ok := c.trackRoute.TimeAt(c.route.Distances, markerDistance); ok {
+		activityElapsed = elapsed
+	}
+	var trackElevation, trackElevationGain float64
+	if c.elevation != nil {
+		trackElevation, trackElevationGain = c.elevation.At(markerDistance)
+	}
+
 	return CameraFrame{
 		Index:                  index,
 		Time:                   frameTime(index, c.parameters.FrameRate),
@@ -237,6 +260,9 @@ func (c cameraPlanner) frame(index int, phase Phase, view CameraView, marker Pla
 		MarkerLongitude:        quantizeLongitude(markerLon),
 		MarkerDistance:         quantize(markerDistance, lengthStep),
 		CameraToMarkerDistance: quantize(toMarker, lengthStep),
+		ActivityElapsed:        activityElapsed,
+		TrackElevation:         quantize(trackElevation, lengthStep),
+		TrackElevationGain:     quantize(trackElevationGain, lengthStep),
 	}
 }
 

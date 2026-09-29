@@ -120,10 +120,11 @@ func Test_NewFrameSetID(t *testing.T) {
 	resolution := domain.Resolution{Width: 1920, Height: 1080}
 	tuning := builddomain.NewRenderTuningBuilder().Build()
 	appearance := builddomain.NewAppearanceBuilder().Build()
+	overlay := builddomain.NewOverlayConfigBuilder().Build()
 
 	t.Run("should be 64 lowercase hexadecimal characters", func(t *testing.T) {
 		// given / when
-		id := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance)
+		id := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay)
 
 		// then
 		assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{64}$`), string(id))
@@ -135,7 +136,7 @@ func Test_NewFrameSetID(t *testing.T) {
 		sameSlice := builddomain.NewGeoSliceBuilder().WithContentID("content-a").Build()
 
 		// when / then
-		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance), domain.NewFrameSetID(samePlan, sameSlice, resolution, tuning, appearance))
+		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay), domain.NewFrameSetID(samePlan, sameSlice, resolution, tuning, appearance, overlay))
 	})
 
 	t.Run("should differ when the plan differs", func(t *testing.T) {
@@ -147,7 +148,7 @@ func Test_NewFrameSetID(t *testing.T) {
 		).Build()
 
 		// when / then
-		assert.NotEqual(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance), domain.NewFrameSetID(other, slice, resolution, tuning, appearance))
+		assert.NotEqual(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay), domain.NewFrameSetID(other, slice, resolution, tuning, appearance, overlay))
 	})
 
 	t.Run("should differ when the slice file differs", func(t *testing.T) {
@@ -155,22 +156,22 @@ func Test_NewFrameSetID(t *testing.T) {
 		other := builddomain.NewGeoSliceBuilder().WithContentID("content-b").Build()
 
 		// when / then
-		assert.NotEqual(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance), domain.NewFrameSetID(plan, other, resolution, tuning, appearance))
+		assert.NotEqual(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay), domain.NewFrameSetID(plan, other, resolution, tuning, appearance, overlay))
 	})
 
 	t.Run("should differ when the width or the height differs", func(t *testing.T) {
 		// given
-		base := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance)
+		base := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay)
 
 		// when / then
-		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 1280, Height: 1080}, tuning, appearance))
-		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 1920, Height: 720}, tuning, appearance))
+		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 1280, Height: 1080}, tuning, appearance, overlay))
+		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 1920, Height: 720}, tuning, appearance, overlay))
 	})
 
 	t.Run("should not mix the width with the height", func(t *testing.T) {
 		// given / when
-		first := domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 1000, Height: 2000}, tuning, appearance)
-		second := domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 2000, Height: 1000}, tuning, appearance)
+		first := domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 1000, Height: 2000}, tuning, appearance, overlay)
+		second := domain.NewFrameSetID(plan, slice, domain.Resolution{Width: 2000, Height: 1000}, tuning, appearance, overlay)
 
 		// then
 		assert.NotEqual(t, first, second)
@@ -178,33 +179,44 @@ func Test_NewFrameSetID(t *testing.T) {
 
 	t.Run("should differ when a tuning that changes the look differs, but not for one that does not", func(t *testing.T) {
 		// given
-		base := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance)
+		base := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay)
 		looks := builddomain.NewRenderTuningBuilder().WithVerticalFOVDegrees(60).Build()
 		speed := builddomain.NewRenderTuningBuilder().WithWorkers(1).WithTileCacheBytes(1 << 20).Build()
 
 		// when / then
-		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, resolution, looks, appearance))
-		assert.Equal(t, base, domain.NewFrameSetID(plan, slice, resolution, speed, appearance))
+		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, resolution, looks, appearance, overlay))
+		assert.Equal(t, base, domain.NewFrameSetID(plan, slice, resolution, speed, appearance, overlay))
 	})
 
 	t.Run("should differ when the appearance differs, but not for the same appearance twice", func(t *testing.T) {
 		// given
-		base := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance)
+		base := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay)
 		otherAppearance := builddomain.NewAppearanceBuilder().WithTrailColor(domain.RGB{R: 0x00, G: 0xFF, B: 0x00}).Build()
 		sameAppearance := builddomain.NewAppearanceBuilder().Build()
 
 		// when / then
-		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, resolution, tuning, otherAppearance))
-		assert.Equal(t, base, domain.NewFrameSetID(plan, slice, resolution, tuning, sameAppearance))
+		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, resolution, tuning, otherAppearance, overlay))
+		assert.Equal(t, base, domain.NewFrameSetID(plan, slice, resolution, tuning, sameAppearance, overlay))
+	})
+
+	t.Run("should differ when the overlay configuration differs, but not for the same one twice", func(t *testing.T) {
+		// given
+		base := domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay)
+		otherOverlay := builddomain.NewOverlayConfigBuilder().WithoutProfile().Build()
+		sameOverlay := builddomain.NewOverlayConfigBuilder().Build()
+
+		// when / then
+		assert.NotEqual(t, base, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, otherOverlay))
+		assert.Equal(t, base, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, sameOverlay))
 	})
 
 	t.Run("should differ when the version of the drawing differs", func(t *testing.T) {
 		// given
-		current := domain.NewFrameSetIDForVersion(domain.RenderVersion, plan, slice, resolution, tuning, appearance)
-		next := domain.NewFrameSetIDForVersion(domain.RenderVersion+1, plan, slice, resolution, tuning, appearance)
+		current := domain.NewFrameSetIDForVersion(domain.RenderVersion, plan, slice, resolution, tuning, appearance, overlay)
+		next := domain.NewFrameSetIDForVersion(domain.RenderVersion+1, plan, slice, resolution, tuning, appearance, overlay)
 
 		// when / then
-		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance), current)
+		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay), current)
 		assert.NotEqual(t, current, next)
 	})
 }
@@ -215,18 +227,19 @@ func Test_NewFrameMark(t *testing.T) {
 	resolution := domain.Resolution{Width: 1920, Height: 1080}
 	tuning := builddomain.NewRenderTuningBuilder().Build()
 	appearance := builddomain.NewAppearanceBuilder().Build()
+	overlay := builddomain.NewOverlayConfigBuilder().Build()
 
 	t.Run("should carry the set of the frames", func(t *testing.T) {
 		// given / when
-		mark := domain.NewFrameMark(plan, slice, resolution, tuning, appearance)
+		mark := domain.NewFrameMark(plan, slice, resolution, tuning, appearance, overlay)
 
 		// then
-		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance), mark.SetID)
+		assert.Equal(t, domain.NewFrameSetID(plan, slice, resolution, tuning, appearance, overlay), mark.SetID)
 	})
 
 	t.Run("should carry the identification of the plan, in 64 lowercase hexadecimal characters", func(t *testing.T) {
 		// given / when
-		mark := domain.NewFrameMark(plan, slice, resolution, tuning, appearance)
+		mark := domain.NewFrameMark(plan, slice, resolution, tuning, appearance, overlay)
 
 		// then
 		assert.Equal(t, plan.ID(), mark.PlanID)
@@ -238,8 +251,8 @@ func Test_NewFrameMark(t *testing.T) {
 		samePlan := builddomain.NewCameraPlanBuilder().Build()
 
 		// when
-		first := domain.NewFrameMark(plan, slice, resolution, tuning, appearance)
-		second := domain.NewFrameMark(samePlan, slice, resolution, tuning, appearance)
+		first := domain.NewFrameMark(plan, slice, resolution, tuning, appearance, overlay)
+		second := domain.NewFrameMark(samePlan, slice, resolution, tuning, appearance, overlay)
 
 		// then
 		assert.Equal(t, first, second)
@@ -254,8 +267,8 @@ func Test_NewFrameMark(t *testing.T) {
 		).Build()
 
 		// when
-		first := domain.NewFrameMark(plan, slice, resolution, tuning, appearance)
-		second := domain.NewFrameMark(other, slice, resolution, tuning, appearance)
+		first := domain.NewFrameMark(plan, slice, resolution, tuning, appearance, overlay)
+		second := domain.NewFrameMark(other, slice, resolution, tuning, appearance, overlay)
 
 		// then
 		assert.NotEqual(t, first.PlanID, second.PlanID)
@@ -264,8 +277,8 @@ func Test_NewFrameMark(t *testing.T) {
 
 	t.Run("should change the set, and not the plan identification, when only the resolution changes", func(t *testing.T) {
 		// given / when
-		first := domain.NewFrameMark(plan, slice, resolution, tuning, appearance)
-		second := domain.NewFrameMark(plan, slice, domain.Resolution{Width: 1280, Height: 720}, tuning, appearance)
+		first := domain.NewFrameMark(plan, slice, resolution, tuning, appearance, overlay)
+		second := domain.NewFrameMark(plan, slice, domain.Resolution{Width: 1280, Height: 720}, tuning, appearance, overlay)
 
 		// then
 		assert.Equal(t, first.PlanID, second.PlanID)

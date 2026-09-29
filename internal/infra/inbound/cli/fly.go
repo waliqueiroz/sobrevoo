@@ -20,7 +20,8 @@ import (
 // other command or intermediate file (the seventh stage). defaults are the
 // plan parameters, defaultResolution the frame resolution, defaultAppearance
 // the trail/marker/background the frames are drawn with (008-frame-
-// appearance) and defaultQuality the video quality used when the
+// appearance), defaultOverlay the screen overlay configuration (009-frame-
+// overlays) and defaultQuality the video quality used when the
 // corresponding flag is not given — the same defaults "plan", "render all"
 // and "video" already use.
 func NewFlightCommand(
@@ -28,6 +29,7 @@ func NewFlightCommand(
 	defaults domain.PlanParameters,
 	defaultResolution domain.Resolution,
 	defaultAppearance domain.Appearance,
+	defaultOverlay domain.OverlayConfig,
 	defaultQuality domain.VideoQuality,
 	options ...RenderOption,
 ) *cobra.Command {
@@ -35,6 +37,8 @@ func NewFlightCommand(
 	var outputFlag, qualityFlag, resolutionFlag, keepFlag string
 	var durationFlag, fpsFlag, distanceFlag, tiltFlag, aspectFlag string
 	var trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag string
+	var overlaysFlag bool
+	var overlayBlocksFlag string
 	var overwriteFlag bool
 
 	cmd := &cobra.Command{
@@ -80,12 +84,17 @@ func NewFlightCommand(
 			if err != nil {
 				return err
 			}
+			overlay, err := parseOverlay(cmd, overlaysFlag, overlayBlocksFlag, defaultOverlay)
+			if err != nil {
+				return err
+			}
 			warnIfFramingCut(cmd.ErrOrStderr(), domain.CameraPlan{Parameters: parameters}, resolution)
 
 			request := domain.FlightRequest{
 				Parameters: parameters,
 				Resolution: resolution,
 				Appearance: appearance,
+				Overlay:    overlay,
 				Quality:    quality,
 				Output:     outputFlag,
 				Keep:       keepFlag,
@@ -109,6 +118,8 @@ func NewFlightCommand(
 	cmd.Flags().StringVar(&markerColorFlag, "marker-color", formatColor(defaultAppearance.MarkerColor), markerColorUsage)
 	cmd.Flags().StringVar(&markerRadiusFlag, "marker-radius", strconv.FormatFloat(defaultAppearance.MarkerRadiusRatio, 'g', -1, 64), markerRadiusUsage)
 	cmd.Flags().StringVar(&backgroundColorFlag, "background-color", formatColor(defaultAppearance.BackgroundColor), backgroundColorUsage)
+	cmd.Flags().BoolVar(&overlaysFlag, "overlays", defaultOverlay.Enabled, overlaysUsage)
+	cmd.Flags().StringVar(&overlayBlocksFlag, "overlay-blocks", formatOverlayBlocks(defaultOverlay), overlayBlocksUsage)
 	cmd.Flags().StringVar(&qualityFlag, "quality", defaultQuality.String(), "Quality of the video: low (fast to make, small), medium (for publishing) or high (for keeping)")
 	cmd.Flags().StringVar(&keepFlag, "keep", "", "Directory to keep the plan, the slice and the frames in, and to reuse them from on a later run (default: a temporary directory, removed at the end)")
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "Replace the video file, and any stale intermediate under --keep, if they already exist")

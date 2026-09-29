@@ -235,6 +235,10 @@ var (
 	// single command always exits with its own code for an interruption, never
 	// the stage's.
 	ErrFlightInterrupted = errors.New("flight interrupted")
+
+	// ErrInvalidOverlayBlock reports an overlay block name that is not one of
+	// the four documented ones.
+	ErrInvalidOverlayBlock = errors.New("invalid overlay block")
 )
 
 // AreaNotCoveredError is the error for an area that the registered geo data

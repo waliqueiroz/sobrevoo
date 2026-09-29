@@ -19,7 +19,7 @@ import (
 
 // flightDefaults is the same shape of defaults "plan"/"render all"/"video"
 // already use.
-func flightDefaults() (domain.PlanParameters, domain.Resolution, domain.Appearance, domain.VideoQuality) {
+func flightDefaults() (domain.PlanParameters, domain.Resolution, domain.Appearance, domain.OverlayConfig, domain.VideoQuality) {
 	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium, Aspect: domain.AspectRatio{Width: 9, Height: 16}},
 		domain.Resolution{Width: 1080, Height: 1920},
 		domain.Appearance{
@@ -27,6 +27,7 @@ func flightDefaults() (domain.PlanParameters, domain.Resolution, domain.Appearan
 			MarkerColor: domain.RGB{R: 0xE5, G: 0x25, B: 0x2A}, MarkerRadiusRatio: 0.012,
 			BackgroundColor: domain.RGB{R: 0x20, G: 0x26, B: 0x2E},
 		},
+		domain.OverlayConfig{Enabled: true, Distance: true, Elevation: true, Time: true, Profile: true},
 		domain.VideoQualityMedium
 }
 
@@ -38,8 +39,8 @@ func newFlightCommandMocks(t *testing.T) *mockapplication.MockFlightService {
 func executeFlyCommand(t *testing.T, flightService *mockapplication.MockFlightService, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
-	parameters, resolution, appearance, quality := flightDefaults()
-	cmd := cli.NewFlightCommand(flightService, parameters, resolution, appearance, quality)
+	parameters, resolution, appearance, overlay, quality := flightDefaults()
+	cmd := cli.NewFlightCommand(flightService, parameters, resolution, appearance, overlay, quality)
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)
@@ -162,7 +163,7 @@ func Test_FlightCommand_Parameters(t *testing.T) {
 	t.Run("should use the given defaults when no parameter flag is given", func(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
-		parameters, _, _, _ := flightDefaults()
+		parameters, _, _, _, _ := flightDefaults()
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
 			return x.(domain.FlightRequest).Parameters == parameters
 		}), gomock.Any()).Return(aFlight(), nil)
@@ -190,9 +191,10 @@ func Test_FlightCommand_Parameters(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), domain.FlightRequest{
-			Parameters: func() domain.PlanParameters { p, _, _, _ := flightDefaults(); return p }(),
+			Parameters: func() domain.PlanParameters { p, _, _, _, _ := flightDefaults(); return p }(),
 			Resolution: domain.Resolution{Width: 640, Height: 360},
-			Appearance: func() domain.Appearance { _, _, a, _ := flightDefaults(); return a }(),
+			Appearance: func() domain.Appearance { _, _, a, _, _ := flightDefaults(); return a }(),
+			Overlay:    func() domain.OverlayConfig { _, _, _, o, _ := flightDefaults(); return o }(),
 			Quality:    domain.VideoQualityMedium,
 			Output:     "flight.mp4",
 		}, gomock.Any()).Return(aFlight(), nil)
@@ -248,7 +250,7 @@ func Test_FlightCommand_Appearance(t *testing.T) {
 	t.Run("should use the given defaults when no appearance flag is given", func(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
-		_, _, appearance, _ := flightDefaults()
+		_, _, appearance, _, _ := flightDefaults()
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
 			return x.(domain.FlightRequest).Appearance == appearance
 		}), gomock.Any()).Return(aFlight(), nil)
@@ -305,13 +307,58 @@ func Test_FlightCommand_Appearance(t *testing.T) {
 	})
 }
 
+func Test_FlightCommand_Overlay(t *testing.T) {
+	t.Run("should use the given defaults when no overlay flag is given", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		_, _, _, overlay, _ := flightDefaults()
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
+			return x.(domain.FlightRequest).Overlay == overlay
+		}), gomock.Any()).Return(aFlight(), nil)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should turn on only the blocks named in --overlay-blocks, passed to the request", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		want, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{domain.OverlayBlockTime})
+		require.NoError(t, err)
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
+			return x.(domain.FlightRequest).Overlay == want
+		}), gomock.Any()).Return(aFlight(), nil)
+
+		// when
+		_, _, err = executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--overlay-blocks=time")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should refuse an unknown overlay block with the same error render frame already gives, without flying anything", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--overlay-blocks", "altitude")
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidOverlayBlock)
+		assert.Equal(t, 55, cli.ExitCode(err))
+	})
+}
+
 func Test_FlightCommand_Execute(t *testing.T) {
 	t.Run("should open the track file and fly it, with the default parameters, resolution and quality, without overwriting", func(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
-		parameters, resolution, appearance, quality := flightDefaults()
+		parameters, resolution, appearance, overlay, quality := flightDefaults()
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), domain.FlightRequest{
-			Parameters: parameters, Resolution: resolution, Appearance: appearance, Quality: quality, Output: "flight.mp4", Overwrite: false,
+			Parameters: parameters, Resolution: resolution, Appearance: appearance, Overlay: overlay, Quality: quality, Output: "flight.mp4", Overwrite: false,
 		}, gomock.Any()).Return(aFlight(), nil)
 
 		// when

@@ -88,6 +88,18 @@ func Test_NewCameraPlan(t *testing.T) {
 		assert.Zero(t, plan.Summary.MaxCameraAltitude)
 		assert.Zero(t, plan.Summary.FrameCount)
 	})
+
+	t.Run("should copy elevationAvailable into the plan and into the summary", func(t *testing.T) {
+		// given / when
+		with := builddomain.NewCameraPlanBuilder().WithElevationAvailable(true).Build()
+		without := builddomain.NewCameraPlanBuilder().WithElevationAvailable(false).Build()
+
+		// then
+		assert.True(t, with.ElevationAvailable)
+		assert.True(t, with.Summary.ElevationAvailable)
+		assert.False(t, without.ElevationAvailable)
+		assert.False(t, without.Summary.ElevationAvailable)
+	})
 }
 
 func Test_CameraPlan_Validate(t *testing.T) {
@@ -354,5 +366,31 @@ func Test_CameraPlan_ID(t *testing.T) {
 
 		// when / then
 		assert.Equal(t, plan.ID(), other.ID())
+	})
+
+	t.Run("should not depend on ActivityElapsed, TrackElevation or TrackElevationGain, which are pure functions of what already identifies the plan (research.md item 9)", func(t *testing.T) {
+		// given
+		plan := planWith(func(f *domain.CameraFrame) {
+			f.ActivityElapsed = 0
+			f.TrackElevation = 0
+			f.TrackElevationGain = 0
+		})
+		other := planWith(func(f *domain.CameraFrame) {
+			f.ActivityElapsed = 90 * time.Second
+			f.TrackElevation = 842.5
+			f.TrackElevationGain = 120.3
+		})
+
+		// when / then
+		assert.Equal(t, plan.ID(), other.ID())
+	})
+
+	t.Run("should not depend on ElevationAvailable", func(t *testing.T) {
+		// given
+		with := builddomain.NewCameraPlanBuilder().WithElevationAvailable(true).Build()
+		without := builddomain.NewCameraPlanBuilder().WithElevationAvailable(false).Build()
+
+		// when / then
+		assert.Equal(t, with.ID(), without.ID())
 	})
 }
