@@ -78,6 +78,21 @@ func (b *CameraFrameBuilder) WithCameraToMarkerDistance(distance float64) *Camer
 	return b
 }
 
+func (b *CameraFrameBuilder) WithActivityElapsed(elapsed time.Duration) *CameraFrameBuilder {
+	b.frame.ActivityElapsed = elapsed
+	return b
+}
+
+func (b *CameraFrameBuilder) WithTrackElevation(elevation float64) *CameraFrameBuilder {
+	b.frame.TrackElevation = elevation
+	return b
+}
+
+func (b *CameraFrameBuilder) WithTrackElevationGain(gain float64) *CameraFrameBuilder {
+	b.frame.TrackElevationGain = gain
+	return b
+}
+
 func (b *CameraFrameBuilder) Build() domain.CameraFrame {
 	return b.frame
 }

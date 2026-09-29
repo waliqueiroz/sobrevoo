@@ -140,6 +140,7 @@ func (s *flightService) Fly(ctx context.Context, reader io.Reader, request domai
 		Directory:  framesDirectory,
 		Resolution: request.Resolution,
 		Appearance: request.Appearance,
+		Overlay:    request.Overlay,
 		Overwrite:  request.Overwrite,
 	}, func(p domain.RenderProgress) {
 		if progress != nil {

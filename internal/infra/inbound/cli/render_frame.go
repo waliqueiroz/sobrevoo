@@ -24,9 +24,12 @@ func NewRenderFrameCommand(
 	frameService application.FrameService,
 	defaultResolution domain.Resolution,
 	defaultAppearance domain.Appearance,
+	defaultOverlay domain.OverlayConfig,
 ) *cobra.Command {
 	var numberFlag, outputFlag, resolutionFlag string
 	var trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag string
+	var overlaysFlag bool
+	var overlayBlocksFlag string
 	var overwriteFlag bool
 
 	cmd := &cobra.Command{
@@ -58,8 +61,12 @@ func NewRenderFrameCommand(
 			if err != nil {
 				return err
 			}
+			overlay, err := parseOverlay(cmd, overlaysFlag, overlayBlocksFlag, defaultOverlay)
+			if err != nil {
+				return err
+			}
 
-			return runRenderFrame(cmd, cameraPlanService, geoSliceService, frameService, args[0], args[1], numberFlag, outputFlag, overwriteFlag, resolution, appearance)
+			return runRenderFrame(cmd, cameraPlanService, geoSliceService, frameService, args[0], args[1], numberFlag, outputFlag, overwriteFlag, resolution, appearance, overlay)
 		},
 	}
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return newUsageError(err) })
@@ -72,6 +79,8 @@ func NewRenderFrameCommand(
 	cmd.Flags().StringVar(&markerColorFlag, "marker-color", formatColor(defaultAppearance.MarkerColor), markerColorUsage)
 	cmd.Flags().StringVar(&markerRadiusFlag, "marker-radius", strconv.FormatFloat(defaultAppearance.MarkerRadiusRatio, 'g', -1, 64), markerRadiusUsage)
 	cmd.Flags().StringVar(&backgroundColorFlag, "background-color", formatColor(defaultAppearance.BackgroundColor), backgroundColorUsage)
+	cmd.Flags().BoolVar(&overlaysFlag, "overlays", defaultOverlay.Enabled, overlaysUsage)
+	cmd.Flags().StringVar(&overlayBlocksFlag, "overlay-blocks", formatOverlayBlocks(defaultOverlay), overlayBlocksUsage)
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "Replace the file if it already exists")
 
 	return cmd
@@ -86,6 +95,7 @@ func runRenderFrame(
 	overwrite bool,
 	resolution domain.Resolution,
 	appearance domain.Appearance,
+	overlay domain.OverlayConfig,
 ) error {
 	plan, err := cameraPlanService.Load(planPath)
 	if err != nil {
@@ -112,6 +122,7 @@ func runRenderFrame(
 		Path:       outputPath,
 		Resolution: resolution,
 		Appearance: appearance,
+		Overlay:    overlay,
 		Overwrite:  overwrite,
 	})
 	if err != nil {

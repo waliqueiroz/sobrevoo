@@ -111,10 +111,13 @@ type RenderTuning struct {
 }
 
 // RenderDefaults is what a frame is drawn with when the user does not choose
-// otherwise: the resolution of the images (1080 × 1920, vertical) and the
+// otherwise: the resolution of the images (1080 × 1920, vertical), the
 // appearance of the trail, the marker and the background (008-frame-
-// appearance). Colors are hexadecimal RGB text ("#RRGGBB"); the composition
-// root parses and validates them into domain.Appearance.
+// appearance), and the screen overlay configuration (009-frame-overlays):
+// on by default, with the four blocks named in OverlayBlocks. Colors are
+// hexadecimal RGB text ("#RRGGBB"); the composition root parses and
+// validates them into domain.Appearance, and OverlayBlocks into
+// domain.OverlayConfig.
 type RenderDefaults struct {
 	Width, Height int
 
@@ -123,6 +126,9 @@ type RenderDefaults struct {
 	MarkerColor       string
 	MarkerRadiusRatio float64
 	BackgroundColor   string
+
+	OverlaysEnabled bool
+	OverlayBlocks   []string
 }
 
 // VideoDefaults is what the video is made with when the user does not choose:
@@ -221,6 +227,8 @@ func Load() (Config, error) {
 			TrailColor: "#FFB000", TrailWidthRatio: 0.005,
 			MarkerColor: "#E5252A", MarkerRadiusRatio: 0.012,
 			BackgroundColor: "#20262E",
+			OverlaysEnabled: true,
+			OverlayBlocks:   []string{"distance", "elevation", "time", "profile"},
 		},
 		VideoDefaults: VideoDefaults{Quality: LevelMedium},
 		FFmpegBinary:  "ffmpeg",

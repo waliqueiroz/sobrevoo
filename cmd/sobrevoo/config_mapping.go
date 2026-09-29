@@ -123,6 +123,17 @@ func domainAppearance(d config.RenderDefaults) (domain.Appearance, error) {
 	return domain.NewAppearance(trailColor, d.TrailWidthRatio, markerColor, d.MarkerRadiusRatio, backgroundColor)
 }
 
+// domainOverlayConfig is the screen overlay configuration a frame is drawn
+// with when the user chooses none, parsed and checked as any overlay
+// configuration is (009-frame-overlays).
+func domainOverlayConfig(d config.RenderDefaults) (domain.OverlayConfig, error) {
+	blocks := make([]domain.OverlayBlock, len(d.OverlayBlocks))
+	for i, b := range d.OverlayBlocks {
+		blocks[i] = domain.OverlayBlock(b)
+	}
+	return domain.NewOverlayConfig(d.OverlaysEnabled, blocks)
+}
+
 // domainVideoQuality is the quality of the video the user gets when they choose
 // none.
 func domainVideoQuality(level config.Level) domain.VideoQuality {

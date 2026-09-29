@@ -11,9 +11,13 @@ import (
 )
 
 // planFormatVersion is the version of the exported plan file format
-// (specs/003-camera-path-planning/contracts/plan-file.md). It changes only
-// when a field is removed or changes meaning.
-const planFormatVersion = 1
+// (specs/003-camera-path-planning/contracts/plan-file.md,
+// specs/009-frame-overlays/contracts/plan-file-v2.md). It changes when a
+// field is removed, changes meaning, or — as version 2 does — becomes
+// required where no earlier version wrote it, so an old file is refused as
+// an unsupported version instead of being read as if the new fields were
+// simply absent.
+const planFormatVersion = 2
 
 // number is a JSON number printed with a fixed maximum number of decimal
 // places and no trailing zeros, so the same value always produces the same
@@ -69,6 +73,7 @@ type summaryFile struct {
 	TimeReference      string     `json:"time_reference"`
 	TimeFallbackReason string     `json:"time_fallback_reason"`
 	SmoothedSpans      []spanFile `json:"smoothed_spans"`
+	ElevationAvailable bool       `json:"elevation_available"`
 }
 
 type cameraFile struct {
@@ -81,17 +86,20 @@ type markerFile struct {
 	Latitude  number `json:"lat"`
 	Longitude number `json:"lon"`
 	Distance  number `json:"distance_m"`
+	Elevation number `json:"elevation_m"`
+	Gain      number `json:"gain_m"`
 }
 
 type frameFile struct {
-	Index          int        `json:"index"`
-	TimeSeconds    number     `json:"time_s"`
-	Phase          string     `json:"phase"`
-	Camera         cameraFile `json:"camera"`
-	Heading        number     `json:"heading_deg"`
-	Tilt           number     `json:"tilt_deg"`
-	Marker         markerFile `json:"marker"`
-	CameraToMarker number     `json:"camera_to_marker_m"`
+	Index               int        `json:"index"`
+	TimeSeconds         number     `json:"time_s"`
+	ActivityTimeSeconds number     `json:"activity_time_s"`
+	Phase               string     `json:"phase"`
+	Camera              cameraFile `json:"camera"`
+	Heading             number     `json:"heading_deg"`
+	Tilt                number     `json:"tilt_deg"`
+	Marker              markerFile `json:"marker"`
+	CameraToMarker      number     `json:"camera_to_marker_m"`
 }
 
 // encodePlan renders plan as the plan file: the header (format version,
@@ -127,6 +135,7 @@ func encodePlan(plan domain.CameraPlan) ([]byte, error) {
 		TimeReference:      string(plan.Summary.TimeReference),
 		TimeFallbackReason: plan.TimeFallbackReason,
 		SmoothedSpans:      spans,
+		ElevationAvailable: plan.ElevationAvailable,
 	}, "  ", "  ")
 	if err != nil {
 		return nil, err
@@ -139,14 +148,15 @@ func encodePlan(plan domain.CameraPlan) ([]byte, error) {
 	out.WriteString("  \"frames\": [")
 	for i, frame := range plan.Frames {
 		line, err := json.Marshal(frameFile{
-			Index:          frame.Index,
-			TimeSeconds:    seconds(frame.Time),
-			Phase:          string(frame.Phase),
-			Camera:         cameraFile{coordinate(frame.CameraLatitude), coordinate(frame.CameraLongitude), measure(frame.CameraAltitude)},
-			Heading:        measure(frame.Heading),
-			Tilt:           measure(frame.Tilt),
-			Marker:         markerFile{coordinate(frame.MarkerLatitude), coordinate(frame.MarkerLongitude), measure(frame.MarkerDistance)},
-			CameraToMarker: measure(frame.CameraToMarkerDistance),
+			Index:               frame.Index,
+			TimeSeconds:         seconds(frame.Time),
+			ActivityTimeSeconds: seconds(frame.ActivityElapsed),
+			Phase:               string(frame.Phase),
+			Camera:              cameraFile{coordinate(frame.CameraLatitude), coordinate(frame.CameraLongitude), measure(frame.CameraAltitude)},
+			Heading:             measure(frame.Heading),
+			Tilt:                measure(frame.Tilt),
+			Marker:              markerFile{coordinate(frame.MarkerLatitude), coordinate(frame.MarkerLongitude), measure(frame.MarkerDistance), measure(frame.TrackElevation), measure(frame.TrackElevationGain)},
+			CameraToMarker:      measure(frame.CameraToMarkerDistance),
 		})
 		if err != nil {
 			return nil, err

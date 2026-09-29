@@ -57,7 +57,7 @@ func benchmarkScene(b *testing.B, tilt float64) (*domain.Scene, domain.CameraPla
 		return domain.NewTileImage(256, 256, pix), nil
 	}).AnyTimes()
 
-	scene, err := domain.NewScene(slice, decoder, builddomain.NewRenderTuningBuilder().WithWorkers(runtime.NumCPU()).Build(), builddomain.NewAppearanceBuilder().Build())
+	scene, err := domain.NewScene(slice, decoder, builddomain.NewRenderTuningBuilder().WithWorkers(runtime.NumCPU()).Build(), builddomain.NewAppearanceBuilder().Build(), domain.OverlayConfig{})
 	if err != nil {
 		b.Fatal(err)
 	}

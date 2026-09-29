@@ -33,6 +33,15 @@ var (
 	// (Appearance.MarkerColor).
 	TrailCasingColor = RGB{0x10, 0x10, 0x10}
 	MarkerRingColor  = RGB{0xFF, 0xFF, 0xFF}
+
+	// OverlayPanelColor is the color of the semi-transparent backing plate
+	// every screen overlay block is drawn on, at OverlayPanelOpacity;
+	// OverlayTextColor is the color of the text and of the elevation
+	// profile's line and marker. Fixed, not part of OverlayConfig, so a
+	// block stays legible over any background without sampling it
+	// (009-frame-overlays FR-010, research.md item 5).
+	OverlayPanelColor = RGB{0x00, 0x00, 0x00}
+	OverlayTextColor  = RGB{0xFF, 0xFF, 0xFF}
 )
 
 const (
@@ -49,6 +58,16 @@ const (
 	MarkerMinRadius = 4.0
 	MarkerRingRatio = 0.003
 	MarkerRingMin   = 1.5
+
+	// OverlayMarginRatio is the safe margin every screen overlay block
+	// keeps from the four edges of the frame, as a fraction of the
+	// shorter side (min(width, height)) — so a social network's edge crop
+	// of a vertical video never cuts one (009-frame-overlays FR-009).
+	OverlayMarginRatio = 0.06
+
+	// OverlayPanelOpacity is how opaque OverlayPanelColor is over what is
+	// behind it.
+	OverlayPanelOpacity = 0.55
 )
 
 // RenderTuning holds the heuristic constants of drawing a frame. They are

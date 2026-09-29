@@ -22,7 +22,7 @@ import (
 func executeRenderAllWith(t *testing.T, m renderCommandMocks, options []cli.RenderOption, args ...string) (stdout, stderr string, err error) {
 	t.Helper()
 
-	var cmd *cobra.Command = cli.NewRenderAllCommand(m.planService, m.sliceService, m.frameService, defaultResolution, defaultAppearance, options...)
+	var cmd *cobra.Command = cli.NewRenderAllCommand(m.planService, m.sliceService, m.frameService, defaultResolution, defaultAppearance, defaultOverlay, options...)
 	var out, errOut bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errOut)

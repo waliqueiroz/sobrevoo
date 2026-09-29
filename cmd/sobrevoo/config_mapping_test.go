@@ -182,6 +182,44 @@ func Test_domainAppearance(t *testing.T) {
 	})
 }
 
+func Test_domainOverlayConfig(t *testing.T) {
+	t.Run("should map the default overlay configuration to enabled, with the four blocks", func(t *testing.T) {
+		// given
+		cfg, err := config.Load()
+		require.NoError(t, err)
+
+		// when
+		overlay, err := domainOverlayConfig(cfg.RenderDefaults)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, builddomain.NewOverlayConfigBuilder().Build(), overlay)
+	})
+
+	t.Run("should turn on only the blocks named", func(t *testing.T) {
+		// given
+		defaults := config.RenderDefaults{OverlaysEnabled: true, OverlayBlocks: []string{"distance", "time"}}
+
+		// when
+		overlay, err := domainOverlayConfig(defaults)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, builddomain.NewOverlayConfigBuilder().WithoutElevation().WithoutProfile().Build(), overlay)
+	})
+
+	t.Run("should propagate an unknown block name", func(t *testing.T) {
+		// given
+		defaults := config.RenderDefaults{OverlaysEnabled: true, OverlayBlocks: []string{"altitude"}}
+
+		// when
+		_, err := domainOverlayConfig(defaults)
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrInvalidOverlayBlock)
+	})
+}
+
 func Test_domainVideoQuality(t *testing.T) {
 	t.Run("should map the low level to the low quality", func(t *testing.T) {
 		// given / when / then

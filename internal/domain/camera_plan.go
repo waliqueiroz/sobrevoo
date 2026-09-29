@@ -106,6 +106,22 @@ type CameraFrame struct {
 
 	// CameraToMarkerDistance is the straight-line distance, in meters.
 	CameraToMarkerDistance float64
+
+	// ActivityElapsed is the real time elapsed in the activity, since its
+	// first point, up to the marker's position in this frame — not to be
+	// confused with Time, the video's own playback time. Zero and
+	// meaningless when TimeReference is TimeReferenceDistance (no real
+	// clock to interpolate).
+	ActivityElapsed time.Duration
+
+	// TrackElevation is the track's own elevation (meters), interpolated at
+	// the marker's position. TrackElevationGain is the elevation gained
+	// (meters) from the start of the track up to the marker's position —
+	// never decreasing between frames, and exactly Route.ElevationGain()'s
+	// total at the last frame (009-frame-overlays research.md item 7). Both
+	// zero and meaningless when the plan's ElevationAvailable is false.
+	TrackElevation     float64
+	TrackElevationGain float64
 }
 
 // PlanSummary describes a plan at a glance. It is computed from the frames.
@@ -122,6 +138,9 @@ type PlanSummary struct {
 	MaxCameraDistance float64
 
 	SmoothedSpans []SmoothedSpan
+
+	// ElevationAvailable is copied from CameraPlan.ElevationAvailable.
+	ElevationAvailable bool
 }
 
 // CameraPlan is the complete result of camera planning: where the camera is,
@@ -135,6 +154,12 @@ type CameraPlan struct {
 	TimeFallbackReason string
 	Frames             []CameraFrame
 	Summary            PlanSummary
+
+	// ElevationAvailable says whether the track had elevation at every
+	// point, the same criterion Route.ElevationGain uses — when false,
+	// every frame's TrackElevation and TrackElevationGain are zero and
+	// meaningless (009-frame-overlays FR-016).
+	ElevationAvailable bool
 }
 
 // NewCameraPlan assembles a plan and computes its summary from the frames, so
@@ -146,13 +171,15 @@ func NewCameraPlan(
 	fallbackReason string,
 	frames []CameraFrame,
 	spans []SmoothedSpan,
+	elevationAvailable bool,
 ) CameraPlan {
 	summary := PlanSummary{
-		DurationMode:  durationMode,
-		FrameRate:     parameters.FrameRate,
-		FrameCount:    len(frames),
-		TimeReference: timeReference,
-		SmoothedSpans: append([]SmoothedSpan{}, spans...),
+		DurationMode:       durationMode,
+		FrameRate:          parameters.FrameRate,
+		FrameCount:         len(frames),
+		TimeReference:      timeReference,
+		SmoothedSpans:      append([]SmoothedSpan{}, spans...),
+		ElevationAvailable: elevationAvailable,
 	}
 	if parameters.Duration != nil {
 		summary.Duration = *parameters.Duration
@@ -176,6 +203,7 @@ func NewCameraPlan(
 		TimeFallbackReason: fallbackReason,
 		Frames:             frames,
 		Summary:            summary,
+		ElevationAvailable: elevationAvailable,
 	}
 }
 

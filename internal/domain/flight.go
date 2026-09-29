@@ -18,6 +18,10 @@ type FlightRequest struct {
 	// drawn with (008-frame-appearance).
 	Appearance Appearance
 
+	// Overlay is the screen overlay configuration the frames are drawn with
+	// (009-frame-overlays).
+	Overlay OverlayConfig
+
 	// Quality is the quality of the video.
 	Quality VideoQuality
 

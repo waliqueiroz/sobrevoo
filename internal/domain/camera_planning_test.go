@@ -288,6 +288,82 @@ func Test_PlanCamera(t *testing.T) {
 		// then
 		assert.ErrorIs(t, err, domain.ErrDurationTooShort)
 	})
+
+	t.Run("should populate ActivityElapsed from the real elapsed time at the marker's position, ending exactly at the route's real duration", func(t *testing.T) {
+		// given: a route travelled at a constant 5 m/s
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(10000, 90).WithConstantSpeed(5).Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(40 * time.Second).WithFrameRate(30).Build()
+		expected, ok := (domain.Route{Points: points}).Duration()
+		require.True(t, ok)
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, time.Duration(0), plan.Frames[0].ActivityElapsed)
+		last := len(plan.Frames) - 1
+		assert.Equal(t, expected, plan.Frames[last].ActivityElapsed)
+		for i := 1; i < len(plan.Frames); i++ {
+			assert.GreaterOrEqual(t, plan.Frames[i].ActivityElapsed, plan.Frames[i-1].ActivityElapsed, "frame %d", i)
+		}
+	})
+
+	t.Run("should leave ActivityElapsed zero throughout when the route has no usable time data", func(t *testing.T) {
+		// given: no timestamps at all, so the marker is paced by distance
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(5000, 90).WithoutTime().Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(30 * time.Second).WithFrameRate(30).Build()
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, domain.TimeReferenceDistance, plan.TimeReference)
+		for i, f := range plan.Frames {
+			assert.Equal(t, time.Duration(0), f.ActivityElapsed, "frame %d", i)
+		}
+	})
+
+	t.Run("should leave TrackElevation and TrackElevationGain zero, and ElevationAvailable false, when the route has no elevation data", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(5000, 90).Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(30 * time.Second).WithFrameRate(30).Build()
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		assert.False(t, plan.ElevationAvailable)
+		assert.False(t, plan.Summary.ElevationAvailable)
+		for i, f := range plan.Frames {
+			assert.Equal(t, 0.0, f.TrackElevation, "frame %d", i)
+			assert.Equal(t, 0.0, f.TrackElevationGain, "frame %d", i)
+		}
+	})
+
+	t.Run("should make the last frame's TrackElevationGain match Route.ElevationGain for a non-monotonic profile, and never decrease along the way", func(t *testing.T) {
+		// given: an up-down-up profile — the case a naive frame-to-frame sum
+		// would undercount (research.md item 7)
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(10000, 90).
+			WithElevation(func(d float64) float64 { return 500 + 80*math.Sin(d/450) }).Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(40 * time.Second).WithFrameRate(30).Build()
+		expectedGain, ok := (domain.Route{Points: points}).ElevationGain()
+		require.True(t, ok)
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		require.True(t, plan.ElevationAvailable)
+		last := len(plan.Frames) - 1
+		assert.InDelta(t, expectedGain, plan.Frames[last].TrackElevationGain, 0.0005, "quantized to the plan's own length step")
+		for i := 1; i < len(plan.Frames); i++ {
+			assert.GreaterOrEqual(t, plan.Frames[i].TrackElevationGain, plan.Frames[i-1].TrackElevationGain, "frame %d", i)
+		}
+	})
 }
 
 func Test_PlanCamera_Smoothness(t *testing.T) {

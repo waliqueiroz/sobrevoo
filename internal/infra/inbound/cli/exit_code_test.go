@@ -257,6 +257,10 @@ func Test_ExitCode(t *testing.T) {
 		assert.Equal(t, 54, cli.ExitCode(domain.ErrInvalidMarkerRadius))
 	})
 
+	t.Run("should map ErrInvalidOverlayBlock to 55", func(t *testing.T) {
+		assert.Equal(t, 55, cli.ExitCode(domain.ErrInvalidOverlayBlock))
+	})
+
 	t.Run("should map a wrapped sixth-stage error to its code", func(t *testing.T) {
 		// given
 		err := fmt.Errorf("%w: 4 missing (12-15)", domain.ErrFrameSequenceInvalid)

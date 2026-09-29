@@ -17,15 +17,16 @@ const bandRows = 16
 // it is safe for use by many goroutines at once: all that changes in it is the
 // cache of decoded tiles, which changes no result.
 type Scene struct {
-	surfaces   []*surface
-	imagery    *imagery
-	tuning     RenderTuning
-	appearance Appearance
+	surfaces      []*surface
+	imagery       *imagery
+	tuning        RenderTuning
+	appearance    Appearance
+	overlayConfig OverlayConfig
 }
 
 // NewScene prepares a slice for drawing. It fails with ErrNoElevationData when
 // no sample of the slice has a value: there would be no terrain to draw.
-func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning, appearance Appearance) (*Scene, error) {
+func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning, appearance Appearance, overlay OverlayConfig) (*Scene, error) {
 	lowest := math.Inf(1)
 	for _, grid := range slice.Elevation {
 		if minimum, _, ok := grid.Range(); ok {
@@ -37,9 +38,10 @@ func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning, appearan
 	}
 
 	scene := &Scene{
-		imagery:    newImagery(slice.TileSets, decoder, tuning.TileCacheBytes, appearance.BackgroundColor),
-		tuning:     tuning,
-		appearance: appearance,
+		imagery:       newImagery(slice.TileSets, decoder, tuning.TileCacheBytes, appearance.BackgroundColor),
+		tuning:        tuning,
+		appearance:    appearance,
+		overlayConfig: overlay,
 	}
 	for _, grid := range slice.Elevation {
 		scene.surfaces = append(scene.surfaces, newSurface(grid, lowest))
@@ -93,6 +95,8 @@ func (s *Scene) Render(ctx context.Context, plan CameraPlan, index int, resoluti
 	}
 	over.drawTrail(trail)
 	over.drawMarker(trail[index])
+
+	screenOverlay{image: image, config: s.overlayConfig, appearance: s.appearance}.draw(plan, index)
 
 	return image, stats, nil
 }

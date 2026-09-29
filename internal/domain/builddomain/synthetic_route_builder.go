@@ -20,6 +20,7 @@ type SyntheticRouteBuilder struct {
 	pointCount           int
 	speed                float64
 	laps                 int
+	elevation            func(distance float64) float64
 }
 
 func NewSyntheticRouteBuilder() *SyntheticRouteBuilder {
@@ -108,6 +109,14 @@ func (b *SyntheticRouteBuilder) WithoutTime() *SyntheticRouteBuilder {
 	return b
 }
 
+// WithElevation gives every point an elevation, as a function of the
+// distance travelled to reach it (009-frame-overlays: exercising
+// Route.ElevationProfile through the full PlanCamera pipeline).
+func (b *SyntheticRouteBuilder) WithElevation(elevation func(distance float64) float64) *SyntheticRouteBuilder {
+	b.elevation = elevation
+	return b
+}
+
 func (b *SyntheticRouteBuilder) Build() []domain.TrackPoint {
 	count := b.pointCount
 	if count == 0 {
@@ -126,6 +135,9 @@ func (b *SyntheticRouteBuilder) Build() []domain.TrackPoint {
 		point := NewTrackPointBuilder().WithLatitude(lat).WithLongitude(lon)
 		if b.speed > 0 {
 			point.WithTime(start.Add(time.Duration(distance / b.speed * float64(time.Second))))
+		}
+		if b.elevation != nil {
+			point.WithElevation(b.elevation(distance))
 		}
 		points[i] = point.Build()
 	}

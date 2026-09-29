@@ -47,6 +47,7 @@ type readSummary struct {
 	TimeReference      string     `json:"time_reference"`
 	TimeFallbackReason string     `json:"time_fallback_reason"`
 	SmoothedSpans      []readSpan `json:"smoothed_spans"`
+	ElevationAvailable *bool      `json:"elevation_available"`
 }
 
 type readCamera struct {
@@ -59,17 +60,20 @@ type readMarker struct {
 	Latitude  *float64 `json:"lat"`
 	Longitude *float64 `json:"lon"`
 	Distance  float64  `json:"distance_m"`
+	Elevation *float64 `json:"elevation_m"`
+	Gain      *float64 `json:"gain_m"`
 }
 
 type readFrame struct {
-	Index          int         `json:"index"`
-	TimeSeconds    float64     `json:"time_s"`
-	Phase          string      `json:"phase"`
-	Camera         *readCamera `json:"camera"`
-	Heading        float64     `json:"heading_deg"`
-	Tilt           float64     `json:"tilt_deg"`
-	Marker         *readMarker `json:"marker"`
-	CameraToMarker *float64    `json:"camera_to_marker_m"`
+	Index               int         `json:"index"`
+	TimeSeconds         float64     `json:"time_s"`
+	ActivityTimeSeconds *float64    `json:"activity_time_s"`
+	Phase               string      `json:"phase"`
+	Camera              *readCamera `json:"camera"`
+	Heading             float64     `json:"heading_deg"`
+	Tilt                float64     `json:"tilt_deg"`
+	Marker              *readMarker `json:"marker"`
+	CameraToMarker      *float64    `json:"camera_to_marker_m"`
 }
 
 type readPlan struct {
@@ -96,7 +100,7 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 		return domain.CameraPlan{}, invalidPlanFile("format_version is missing")
 	}
 	if *file.FormatVersion != planFormatVersion {
-		return domain.CameraPlan{}, fmt.Errorf("%w: found %d, accepted: %s", domain.ErrPlanFormatVersionUnsupported, *file.FormatVersion, acceptedPlanFormatVersions)
+		return domain.CameraPlan{}, fmt.Errorf("%w: found %d, accepted: %s; generate the plan again with 'sobrevoo plan'", domain.ErrPlanFormatVersionUnsupported, *file.FormatVersion, acceptedPlanFormatVersions)
 	}
 
 	switch {
@@ -112,6 +116,8 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 		return domain.CameraPlan{}, invalidPlanFile("summary.frame_count is missing")
 	case *file.Summary.FrameCount != len(file.Frames):
 		return domain.CameraPlan{}, invalidPlanFile("summary.frame_count is %d but the file lists %d frames", *file.Summary.FrameCount, len(file.Frames))
+	case file.Summary.ElevationAvailable == nil:
+		return domain.CameraPlan{}, invalidPlanFile("summary.elevation_available is missing")
 	}
 
 	frames := make([]domain.CameraFrame, len(file.Frames))
@@ -123,6 +129,12 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 			return domain.CameraPlan{}, invalidPlanFile("frames[%d].marker is missing", i)
 		case f.CameraToMarker == nil:
 			return domain.CameraPlan{}, invalidPlanFile("frames[%d].camera_to_marker_m is missing", i)
+		case f.ActivityTimeSeconds == nil:
+			return domain.CameraPlan{}, invalidPlanFile("frames[%d].activity_time_s is missing", i)
+		case f.Marker.Elevation == nil:
+			return domain.CameraPlan{}, invalidPlanFile("frames[%d].marker.elevation_m is missing", i)
+		case f.Marker.Gain == nil:
+			return domain.CameraPlan{}, invalidPlanFile("frames[%d].marker.gain_m is missing", i)
 		}
 
 		frames[i] = domain.CameraFrame{
@@ -138,6 +150,9 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 			MarkerLongitude:        *f.Marker.Longitude,
 			MarkerDistance:         f.Marker.Distance,
 			CameraToMarkerDistance: *f.CameraToMarker,
+			ActivityElapsed:        secondsToDuration(*f.ActivityTimeSeconds),
+			TrackElevation:         *f.Marker.Elevation,
+			TrackElevationGain:     *f.Marker.Gain,
 		}
 	}
 
@@ -175,6 +190,7 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 		file.Summary.TimeFallbackReason,
 		frames,
 		spans,
+		*file.Summary.ElevationAvailable,
 	), nil
 }
 
