@@ -483,6 +483,82 @@ func Test_GeoSlice_EnsureMatches(t *testing.T) {
 	})
 }
 
+func Test_GeoSlice_EnsureUsesSelection(t *testing.T) {
+	baseMap := builddomain.NewGeoDataSourceBuilder().WithName("mapa-a").WithType(domain.DataTypeBaseMap).Build()
+	elevation := builddomain.NewGeoDataSourceBuilder().WithName("relevo-a").WithType(domain.DataTypeElevation).Build()
+	slice := builddomain.NewGeoSliceBuilder().
+		WithTileSets(builddomain.NewTileSetBuilder().WithSource(baseMap).Build()).
+		WithElevation(builddomain.NewElevationGridBuilder().WithSource(elevation).Build()).
+		Build()
+
+	t.Run("should accept when neither type is selected", func(t *testing.T) {
+		// when / then
+		assert.NoError(t, slice.EnsureUsesSelection(domain.SourceSelection{}))
+	})
+
+	t.Run("should accept when the requested base map is exactly the one the slice's provenance recorded", func(t *testing.T) {
+		// given
+		name := "mapa-a"
+
+		// when / then
+		assert.NoError(t, slice.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &name}))
+	})
+
+	t.Run("should accept when the requested elevation is exactly the one the slice's provenance recorded", func(t *testing.T) {
+		// given
+		name := "relevo-a"
+
+		// when / then
+		assert.NoError(t, slice.EnsureUsesSelection(domain.SourceSelection{ElevationName: &name}))
+	})
+
+	t.Run("should refuse when the requested base map is different from the one the slice's provenance recorded", func(t *testing.T) {
+		// given
+		name := "mapa-b"
+
+		// when
+		err := slice.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &name})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
+	})
+
+	t.Run("should refuse when the requested elevation is different from the one the slice's provenance recorded", func(t *testing.T) {
+		// given
+		name := "relevo-b"
+
+		// when
+		err := slice.EnsureUsesSelection(domain.SourceSelection{ElevationName: &name})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
+	})
+
+	t.Run("should check the two types independently, refusing only for the one that does not match", func(t *testing.T) {
+		// given
+		baseMapName, elevationName := "mapa-a", "relevo-b"
+
+		// when
+		err := slice.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &baseMapName, ElevationName: &elevationName})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
+		assert.ErrorContains(t, err, "relevo-b")
+	})
+
+	t.Run("should refuse when the requested type has no recorded use at all", func(t *testing.T) {
+		// given
+		empty := builddomain.NewGeoSliceBuilder().WithTileSets().WithElevation().Build()
+		name := "mapa-a"
+
+		// when
+		err := empty.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &name})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
+	})
+}
+
 func Test_GeoSlice_EnsureCovers(t *testing.T) {
 	tuning := builddomain.NewSliceTuningBuilder().Build()
 	plan := planWithMarkerAt(-23.55, -46.63)

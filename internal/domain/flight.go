@@ -22,6 +22,12 @@ type FlightRequest struct {
 	// (009-frame-overlays).
 	Overlay OverlayConfig
 
+	// Selection is the explicit choice of which registered base map and/or
+	// elevation source to use, in place of the automatic selection by area
+	// (010-geo-data-source-control). It affects only the geo data slicing
+	// stage — the camera plan never reads registered geo data.
+	Selection SourceSelection
+
 	// Quality is the quality of the video.
 	Quality VideoQuality
 

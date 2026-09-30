@@ -14,6 +14,8 @@ import (
 // NewGeoDataCheckCommand creates the "geodata check" command, which
 // exposes GeoDataService.CheckCoverage (FR-013 through FR-018).
 func NewGeoDataCheckCommand(geoDataService application.GeoDataService) *cobra.Command {
+	var baseMapFlag, elevationFlag string
+
 	cmd := &cobra.Command{
 		Use:   "check <track-file>",
 		Short: "Check whether a GPS track is covered by the registered geo data",
@@ -28,14 +30,19 @@ func NewGeoDataCheckCommand(geoDataService application.GeoDataService) *cobra.Co
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runGeoDataCheck(cmd, geoDataService, args[0])
+			selection := parseSourceSelection(cmd, baseMapFlag, elevationFlag)
+			return runGeoDataCheck(cmd, geoDataService, args[0], selection)
 		},
 	}
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return newUsageError(err) })
+
+	cmd.Flags().StringVar(&baseMapFlag, "base-map", "", baseMapNameUsage)
+	cmd.Flags().StringVar(&elevationFlag, "elevation", "", elevationNameUsage)
 
 	return cmd
 }
 
-func runGeoDataCheck(cmd *cobra.Command, geoDataService application.GeoDataService, path string) error {
+func runGeoDataCheck(cmd *cobra.Command, geoDataService application.GeoDataService, path string, selection domain.SourceSelection) error {
 	// CheckCoverage needs an io.Reader (same as TrackService.Inspect),
 	// so — same as inspect.go — this adapter is the one that opens the track
 	// file; a
@@ -48,7 +55,7 @@ func runGeoDataCheck(cmd *cobra.Command, geoDataService application.GeoDataServi
 	}
 	defer file.Close()
 
-	output, err := geoDataService.CheckCoverage(file)
+	output, err := geoDataService.CheckCoverage(file, selection)
 	if err != nil {
 		return err
 	}

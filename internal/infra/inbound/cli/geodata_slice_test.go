@@ -88,7 +88,7 @@ func executeSlice(t *testing.T, slice domain.GeoSlice) string {
 	t.Helper()
 	m := newSliceCommandMocks(t)
 	m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
-	m.sliceService.EXPECT().Generate(gomock.Any()).Return(slice, nil)
+	m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(slice, nil)
 
 	stdout, _, err := executeGeoDataSliceCommand(t, m, "plan.json")
 
@@ -115,7 +115,7 @@ func Test_GeoDataSliceCommand_Execute(t *testing.T) {
 			WithTileSets(tileSet).WithElevation(grid).Build()
 		m := newSliceCommandMocks(t)
 		m.planService.EXPECT().Load("plan.json").Return(plan, nil)
-		m.sliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.sliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 
 		// when
 		stdout, _, err := executeGeoDataSliceCommand(t, m, "plan.json")
@@ -286,7 +286,7 @@ func Test_GeoDataSliceCommand_Execute(t *testing.T) {
 		}}
 		m := newSliceCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
-		m.sliceService.EXPECT().Generate(gomock.Any()).Return(domain.GeoSlice{}, notCovered)
+		m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(domain.GeoSlice{}, notCovered)
 
 		// when
 		stdout, _, err := executeGeoDataSliceCommand(t, m, "plan.json")
@@ -297,6 +297,51 @@ func Test_GeoDataSliceCommand_Execute(t *testing.T) {
 		assert.ErrorContains(t, err, "missing elevation")
 		assert.Empty(t, stdout)
 	})
+
+	t.Run("should pass the requested base map and elevation names as a SourceSelection", func(t *testing.T) {
+		// given
+		m := newSliceCommandMocks(t)
+		baseMap, elevation := "mapa-b", "relevo-a"
+		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
+		m.sliceService.EXPECT().
+			Generate(gomock.Any(), domain.SourceSelection{BaseMapName: &baseMap, ElevationName: &elevation}).
+			Return(builddomain.NewGeoSliceBuilder().Build(), nil)
+
+		// when
+		_, _, err := executeGeoDataSliceCommand(t, m, "plan.json", "--base-map", "mapa-b", "--elevation", "relevo-a")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should pass an empty SourceSelection when neither flag is given", func(t *testing.T) {
+		// given
+		m := newSliceCommandMocks(t)
+		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
+		m.sliceService.EXPECT().
+			Generate(gomock.Any(), domain.SourceSelection{}).
+			Return(builddomain.NewGeoSliceBuilder().Build(), nil)
+
+		// when
+		_, _, err := executeGeoDataSliceCommand(t, m, "plan.json")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should map a requested source of the wrong type to exit code 56", func(t *testing.T) {
+		// given
+		m := newSliceCommandMocks(t)
+		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
+		m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(domain.GeoSlice{}, domain.ErrDataSourceTypeMismatch)
+
+		// when
+		_, _, err := executeGeoDataSliceCommand(t, m, "plan.json", "--base-map", "relevo-a")
+
+		// then
+		require.Error(t, err)
+		assert.Equal(t, 56, cli.ExitCode(err))
+	})
 }
 
 func Test_GeoDataSliceCommand_Export(t *testing.T) {
@@ -305,7 +350,7 @@ func Test_GeoDataSliceCommand_Export(t *testing.T) {
 		slice := builddomain.NewGeoSliceBuilder().Build()
 		m := newSliceCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
-		m.sliceService.EXPECT().Generate(gomock.Any()).Return(slice, nil)
+		m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(slice, nil)
 		m.sliceService.EXPECT().Export(slice, "out.zip", false).Return(nil)
 
 		// when
@@ -321,7 +366,7 @@ func Test_GeoDataSliceCommand_Export(t *testing.T) {
 		// given
 		m := newSliceCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
-		m.sliceService.EXPECT().Generate(gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
+		m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
 		m.sliceService.EXPECT().Export(gomock.Any(), "out.zip", true).Return(nil)
 
 		// when
@@ -335,7 +380,7 @@ func Test_GeoDataSliceCommand_Export(t *testing.T) {
 		// given: no Export expectation, so the mock fails the test if it is called
 		m := newSliceCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
-		m.sliceService.EXPECT().Generate(gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
+		m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
 
 		// when
 		stdout, _, err := executeGeoDataSliceCommand(t, m, "plan.json")
@@ -349,7 +394,7 @@ func Test_GeoDataSliceCommand_Export(t *testing.T) {
 		// given
 		m := newSliceCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
-		m.sliceService.EXPECT().Generate(gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
+		m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
 		m.sliceService.EXPECT().Export(gomock.Any(), gomock.Any(), false).Return(domain.ErrSliceDestinationExists)
 
 		// when
@@ -364,7 +409,7 @@ func Test_GeoDataSliceCommand_Export(t *testing.T) {
 		// given
 		m := newSliceCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(domain.CameraPlan{}, nil)
-		m.sliceService.EXPECT().Generate(gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
+		m.sliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(builddomain.NewGeoSliceBuilder().Build(), nil)
 		m.sliceService.EXPECT().Export(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.ErrSliceDestinationInvalid)
 
 		// when

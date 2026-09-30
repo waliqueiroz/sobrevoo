@@ -18,9 +18,13 @@ import (
 // ports.
 type GeoSliceService interface {
 	// Generate gathers the geo data slice of plan from the registered sources
-	// whose files are still there. It refuses, before reading any content, an
-	// area the registered data does not fully cover (ErrAreaNotCovered).
-	Generate(plan domain.CameraPlan) (domain.GeoSlice, error)
+	// whose files are still there, or, when selection names one, exclusively
+	// from the requested source of that type
+	// (010-geo-data-source-control FR-004 through FR-010). It refuses,
+	// before reading any content, a requested name that does not resolve
+	// (ErrDataSourceNotRegistered, ErrDataSourceTypeMismatch) or an area the
+	// resulting candidates do not fully cover (ErrAreaNotCovered).
+	Generate(plan domain.CameraPlan, selection domain.SourceSelection) (domain.GeoSlice, error)
 
 	// Export writes slice to path; unless overwrite is true it refuses a path
 	// that already exists.
@@ -70,7 +74,7 @@ func NewGeoSliceService(
 	}
 }
 
-func (s *geoSliceService) Generate(plan domain.CameraPlan) (domain.GeoSlice, error) {
+func (s *geoSliceService) Generate(plan domain.CameraPlan, selection domain.SourceSelection) (domain.GeoSlice, error) {
 	area := plan.AreaOfInterest(s.sliceTuning)
 
 	sources, err := s.repository.List()
@@ -78,6 +82,10 @@ func (s *geoSliceService) Generate(plan domain.CameraPlan) (domain.GeoSlice, err
 		return domain.GeoSlice{}, err
 	}
 	baseMaps, elevations := partitionAvailableSources(s.fileChecker, sources)
+	baseMaps, elevations, err = selection.Resolve(baseMaps, elevations)
+	if err != nil {
+		return domain.GeoSlice{}, err
+	}
 
 	regions, route := area.Regions(baseMaps, elevations)
 	if report := route.Coverage(baseMaps, elevations); report.Status != domain.CoverageStatusFull {

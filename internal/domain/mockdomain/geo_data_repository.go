@@ -40,6 +40,20 @@ func (m *MockGeoDataRepository) EXPECT() *MockGeoDataRepositoryMockRecorder {
 	return m.recorder
 }
 
+// Clear mocks base method.
+func (m *MockGeoDataRepository) Clear() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Clear")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Clear indicates an expected call of Clear.
+func (mr *MockGeoDataRepositoryMockRecorder) Clear() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockGeoDataRepository)(nil).Clear))
+}
+
 // Delete mocks base method.
 func (m *MockGeoDataRepository) Delete(name string) error {
 	m.ctrl.T.Helper()

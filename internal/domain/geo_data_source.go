@@ -39,6 +39,11 @@ type GeoDataRepository interface {
 	// Delete removes the registered source with the given name. It never
 	// touches the underlying data file on disk (FR-011).
 	Delete(name string) error
+
+	// Clear removes every registered source at once, keeping no entry — even
+	// ones whose file still exists on disk. It never touches any data file
+	// (010-geo-data-source-control FR-001, FR-002).
+	Clear() error
 }
 
 // DataType identifies what a GeoDataSource represents (FR-002).

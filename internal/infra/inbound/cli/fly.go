@@ -39,6 +39,7 @@ func NewFlightCommand(
 	var trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag string
 	var overlaysFlag bool
 	var overlayBlocksFlag string
+	var baseMapFlag, elevationFlag string
 	var overwriteFlag bool
 
 	cmd := &cobra.Command{
@@ -88,6 +89,7 @@ func NewFlightCommand(
 			if err != nil {
 				return err
 			}
+			selection := parseSourceSelection(cmd, baseMapFlag, elevationFlag)
 			warnIfFramingCut(cmd.ErrOrStderr(), domain.CameraPlan{Parameters: parameters}, resolution)
 
 			request := domain.FlightRequest{
@@ -95,6 +97,7 @@ func NewFlightCommand(
 				Resolution: resolution,
 				Appearance: appearance,
 				Overlay:    overlay,
+				Selection:  selection,
 				Quality:    quality,
 				Output:     outputFlag,
 				Keep:       keepFlag,
@@ -120,6 +123,8 @@ func NewFlightCommand(
 	cmd.Flags().StringVar(&backgroundColorFlag, "background-color", formatColor(defaultAppearance.BackgroundColor), backgroundColorUsage)
 	cmd.Flags().BoolVar(&overlaysFlag, "overlays", defaultOverlay.Enabled, overlaysUsage)
 	cmd.Flags().StringVar(&overlayBlocksFlag, "overlay-blocks", formatOverlayBlocks(defaultOverlay), overlayBlocksUsage)
+	cmd.Flags().StringVar(&baseMapFlag, "base-map", "", baseMapNameUsage)
+	cmd.Flags().StringVar(&elevationFlag, "elevation", "", elevationNameUsage)
 	cmd.Flags().StringVar(&qualityFlag, "quality", defaultQuality.String(), "Quality of the video: low (fast to make, small), medium (for publishing) or high (for keeping)")
 	cmd.Flags().StringVar(&keepFlag, "keep", "", "Directory to keep the plan, the slice and the frames in, and to reuse them from on a later run (default: a temporary directory, removed at the end)")
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "Replace the video file, and any stale intermediate under --keep, if they already exist")

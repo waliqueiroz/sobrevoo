@@ -111,9 +111,9 @@ func (s *flightService) Fly(ctx context.Context, reader io.Reader, request domai
 
 	var slice domain.GeoSlice
 	if request.Keep != "" {
-		slice, err = s.reuseSlice(plan, filepath.Join(request.Keep, "slice.zip"), request.Overwrite, &summary)
+		slice, err = s.reuseSlice(plan, request.Selection, filepath.Join(request.Keep, "slice.zip"), request.Overwrite, &summary)
 	} else {
-		slice, err = s.geoSliceService.Generate(plan)
+		slice, err = s.geoSliceService.Generate(plan, request.Selection)
 	}
 	if err != nil {
 		return finish(err)
@@ -190,17 +190,21 @@ func (s *flightService) reusePlan(plan domain.CameraPlan, planPath string, overw
 
 // reuseSlice reuses the slice already at slicePath when it still matches
 // plan (GeoSlice.EnsureMatches, the same check FrameService already makes
-// before drawing). Otherwise it generates a fresh slice — which is where the
-// coverage of the registered geo data is verified, as the first thing
-// GeoSliceService.Generate does (research.md item 3) — and exports it to
-// slicePath, with the same "another set" protection as reusePlan.
-func (s *flightService) reuseSlice(plan domain.CameraPlan, slicePath string, overwrite bool, summary *domain.FlightSummary) (domain.GeoSlice, error) {
-	if existing, err := s.geoSliceService.Load(slicePath); err == nil && existing.EnsureMatches(plan) == nil {
+// before drawing) and was made using selection (GeoSlice.EnsureUsesSelection,
+// 010-geo-data-source-control FR-011): a slice whose recorded provenance
+// uses a different source than requested now — explicit or not — is never
+// reused silently, even when the plan still matches. Otherwise it generates
+// a fresh slice — which is where the coverage of the registered geo data is
+// verified, as the first thing GeoSliceService.Generate does (research.md
+// item 3) — and exports it to slicePath, with the same "another set"
+// protection as reusePlan.
+func (s *flightService) reuseSlice(plan domain.CameraPlan, selection domain.SourceSelection, slicePath string, overwrite bool, summary *domain.FlightSummary) (domain.GeoSlice, error) {
+	if existing, err := s.geoSliceService.Load(slicePath); err == nil && existing.EnsureMatches(plan) == nil && existing.EnsureUsesSelection(selection) == nil {
 		summary.SliceReused = true
 		return existing, nil
 	}
 
-	slice, err := s.geoSliceService.Generate(plan)
+	slice, err := s.geoSliceService.Generate(plan, selection)
 	if err != nil {
 		return domain.GeoSlice{}, err
 	}

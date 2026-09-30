@@ -42,6 +42,11 @@ func (b *FlightRequestBuilder) WithOverlay(overlay domain.OverlayConfig) *Flight
 	return b
 }
 
+func (b *FlightRequestBuilder) WithSelection(selection domain.SourceSelection) *FlightRequestBuilder {
+	b.request.Selection = selection
+	return b
+}
+
 func (b *FlightRequestBuilder) WithQuality(quality domain.VideoQuality) *FlightRequestBuilder {
 	b.request.Quality = quality
 	return b

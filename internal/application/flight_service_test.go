@@ -54,7 +54,7 @@ func readyToFly(m flightMocks, plan domain.CameraPlan, slice domain.GeoSlice) {
 	m.videoService.EXPECT().CheckDestination("/tmp/flight.mp4", false).Return(nil)
 	m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 	m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-	m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+	m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 	m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 	m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
 		Return(domain.RenderSummary{Requested: len(plan.Frames), Drawn: len(plan.Frames)}, nil)
@@ -74,7 +74,7 @@ func Test_flightService_Fly(t *testing.T) {
 			m.videoService.EXPECT().CheckDestination("/tmp/flight.mp4", false).Return(nil),
 			m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil),
 			m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil),
-			m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil),
+			m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil),
 			m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { removed = true; return nil }, nil),
 			m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, domain.FrameSetRequest{
 				Directory: "/tmp/sobrevoo-fly-1", Resolution: flightRequest().Resolution, Appearance: flightRequest().Appearance, Overlay: flightRequest().Overlay,
@@ -107,7 +107,7 @@ func Test_flightService_Fly(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		var got domain.Appearance
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
@@ -135,7 +135,7 @@ func Test_flightService_Fly(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		var got domain.OverlayConfig
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
@@ -154,13 +154,36 @@ func Test_flightService_Fly(t *testing.T) {
 		assert.Equal(t, full, got)
 	})
 
+	t.Run("should pass the request's source selection to GeoSliceService.Generate, unaltered", func(t *testing.T) {
+		// given
+		m := newFlightMocks(t)
+		name := "mapa-b"
+		selection := domain.SourceSelection{BaseMapName: &name}
+		request := builddomain.NewFlightRequestBuilder().WithSelection(selection).Build()
+		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
+		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
+		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		m.geoSliceService.EXPECT().Generate(plan, selection).Return(slice, nil)
+		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
+			Return(domain.RenderSummary{Requested: 20, Drawn: 20}, nil)
+		m.videoService.EXPECT().Assemble(gomock.Any(), plan, gomock.Any(), gomock.Any()).
+			Return(domain.VideoSummary{Frames: 20}, nil)
+
+		// when
+		_, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
+	})
+
 	t.Run("should say what the run did in the summary: the render summary and the video summary", func(t *testing.T) {
 		// given
 		m := newFlightMocks(t)
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
 			Return(domain.RenderSummary{Requested: 20, Drawn: 20, Resolution: flightRequest().Resolution}, nil)
@@ -222,7 +245,7 @@ func Test_flightService_Fly(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(domain.GeoSlice{}, &domain.AreaNotCoveredError{})
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(domain.GeoSlice{}, &domain.AreaNotCoveredError{})
 
 		// when
 		_, err := m.service.Fly(context.Background(), strings.NewReader("track"), flightRequest(), nil)
@@ -238,7 +261,7 @@ func Test_flightService_Fly(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("", nil, failure)
 
 		// when
@@ -255,7 +278,7 @@ func Test_flightService_Fly(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { removed = true; return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
 			Return(domain.RenderSummary{}, domain.ErrNoElevationData)
@@ -275,7 +298,7 @@ func Test_flightService_Fly(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { removed = true; return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
 			Return(domain.RenderSummary{Requested: 20, Drawn: 20}, nil)
@@ -296,7 +319,7 @@ func Test_flightService_Fly(t *testing.T) {
 		reader := strings.NewReader("a track")
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).Return(domain.RenderSummary{}, nil)
 		m.videoService.EXPECT().Assemble(gomock.Any(), plan, gomock.Any(), gomock.Any()).Return(domain.VideoSummary{}, nil)
@@ -321,7 +344,7 @@ func Test_flightService_Fly(t *testing.T) {
 		request.Parameters = builddomain.NewPlanParametersBuilder().WithFrameRate(24).Build()
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).Return(domain.RenderSummary{}, nil)
 		m.videoService.EXPECT().Assemble(gomock.Any(), plan, gomock.Any(), gomock.Any()).Return(domain.VideoSummary{}, nil)
@@ -348,7 +371,7 @@ func Test_flightService_Fly(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		var frameRequest domain.FrameSetRequest
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
@@ -383,7 +406,7 @@ func Test_flightService_Fly_Interruption(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
 			Return(domain.RenderSummary{Drawn: 7, Interrupted: true}, domain.ErrRenderInterrupted)
@@ -404,7 +427,7 @@ func Test_flightService_Fly_Interruption(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
 			Return(domain.RenderSummary{Drawn: 20}, nil)
@@ -516,7 +539,7 @@ func Test_flightService_Fly_Progress(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, _ domain.CameraPlan, _ domain.GeoSlice, _ domain.FrameSetRequest, progress func(domain.RenderProgress)) (domain.RenderSummary, error) {
@@ -545,7 +568,7 @@ func Test_flightService_Fly_Progress(t *testing.T) {
 		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
 		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
 		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.workspace.EXPECT().NewTemporary().Return("/tmp/sobrevoo-fly-1", func() error { return nil }, nil)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, slice, gomock.Any(), gomock.Any()).Return(domain.RenderSummary{Drawn: 20}, nil)
 		m.videoService.EXPECT().Assemble(gomock.Any(), plan, gomock.Any(), gomock.Any()).
@@ -611,7 +634,7 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		m.cameraPlanService.EXPECT().Export(plan, "/tmp/kept/plan.json", false).Return(nil)
 		gomock.InOrder(
 			m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(domain.GeoSlice{}, errors.New("no such file")),
-			m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil),
+			m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil),
 			m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", false).Return(nil),
 			m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(reloaded, nil),
 		)
@@ -632,6 +655,36 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		assert.Equal(t, "/tmp/kept/frames", summary.FramesDirectory)
 		assert.False(t, summary.PlanReused)
 		assert.False(t, summary.SliceReused)
+	})
+
+	t.Run("should pass the request's source selection to GeoSliceService.Generate when regenerating a kept slice", func(t *testing.T) {
+		// given
+		m := newFlightMocks(t)
+		name := "mapa-b"
+		selection := domain.SourceSelection{BaseMapName: &name}
+		request := builddomain.NewFlightRequestBuilder().WithKeep("/tmp/kept").WithSelection(selection).Build()
+		reloaded := slice
+		reloaded.ContentID = "the-content-id-only-a-read-back-slice-has"
+		m.videoService.EXPECT().CheckDestination(gomock.Any(), gomock.Any()).Return(nil)
+		m.videoService.EXPECT().CheckEncoder(gomock.Any()).Return(anEncoder, nil)
+		m.cameraPlanService.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		m.workspace.EXPECT().EnsureDirectory("/tmp/kept").Return(nil)
+		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(domain.CameraPlan{}, errors.New("no such file"))
+		m.cameraPlanService.EXPECT().Export(plan, "/tmp/kept/plan.json", false).Return(nil)
+		gomock.InOrder(
+			m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(domain.GeoSlice{}, errors.New("no such file")),
+			m.geoSliceService.EXPECT().Generate(plan, selection).Return(slice, nil),
+			m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", false).Return(nil),
+			m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(reloaded, nil),
+		)
+		m.frameService.EXPECT().DrawFrames(gomock.Any(), plan, reloaded, gomock.Any(), gomock.Any()).Return(domain.RenderSummary{}, nil)
+		m.videoService.EXPECT().Assemble(gomock.Any(), plan, gomock.Any(), gomock.Any()).Return(domain.VideoSummary{}, nil)
+
+		// when
+		_, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
 	})
 
 	t.Run("should return the error of ensuring the kept directory exists as it is, without loading or generating anything", func(t *testing.T) {
@@ -659,7 +712,7 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(plan, nil)
 		m.cameraPlanService.EXPECT().Export(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(domain.GeoSlice{}, errors.New("no such file"))
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", false).Return(nil)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
 
@@ -680,7 +733,7 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(another, nil)
 		m.cameraPlanService.EXPECT().Export(plan, "/tmp/kept/plan.json", true).Return(nil)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(domain.GeoSlice{}, errors.New("no such file"))
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", true).Return(nil)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
 
@@ -717,7 +770,7 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		readyToFlyKept(m)
 		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(plan, nil)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
-		m.geoSliceService.EXPECT().Generate(gomock.Any()).Times(0)
+		m.geoSliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Times(0)
 		m.geoSliceService.EXPECT().Export(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 		// when
@@ -736,8 +789,71 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		another := forPlan(framesSlice(), framesPlan(5))
 		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(plan, nil)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(another, nil)
-		m.geoSliceService.EXPECT().Generate(plan).Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
 		m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", true).Return(nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
+
+		// when
+		summary, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.False(t, summary.SliceReused)
+	})
+
+	t.Run("should not reuse a kept slice whose recorded provenance uses a different base map than the one now requested (010-geo-data-source-control FR-011)", func(t *testing.T) {
+		// given: slice's recorded base map is "europa-central-mapa" (framesSlice's default);
+		// this run explicitly requests a different one
+		m := newFlightMocks(t)
+		name := "mapa-b"
+		request := builddomain.NewFlightRequestBuilder().WithKeep("/tmp/kept").WithSelection(domain.SourceSelection{BaseMapName: &name}).Build()
+		readyToFlyKept(m)
+		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(plan, nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{BaseMapName: &name}).Return(slice, nil)
+		m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", false).Return(nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
+
+		// when
+		summary, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.False(t, summary.SliceReused)
+	})
+
+	t.Run("should reuse a kept slice whose recorded provenance uses exactly the base map now requested (010-geo-data-source-control FR-011)", func(t *testing.T) {
+		// given
+		m := newFlightMocks(t)
+		name := "europa-central-mapa"
+		request := builddomain.NewFlightRequestBuilder().WithKeep("/tmp/kept").WithSelection(domain.SourceSelection{BaseMapName: &name}).Build()
+		readyToFlyKept(m)
+		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(plan, nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(gomock.Any(), gomock.Any()).Times(0)
+		m.geoSliceService.EXPECT().Export(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+		// when
+		summary, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.True(t, summary.SliceReused)
+	})
+
+	t.Run("should not reuse a kept slice made with automatic selection when this run requests an explicit source (010-geo-data-source-control FR-011)", func(t *testing.T) {
+		// given: the kept slice's recorded base map ("europa-central-mapa")
+		// happens to differ from the one requested now — automatic-to-explicit
+		// is just another case of "the source requested now differs from the
+		// one recorded"
+		m := newFlightMocks(t)
+		name := "mapa-b"
+		request := builddomain.NewFlightRequestBuilder().WithKeep("/tmp/kept").WithSelection(domain.SourceSelection{BaseMapName: &name}).Build()
+		readyToFlyKept(m)
+		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(plan, nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{BaseMapName: &name}).Return(slice, nil)
+		m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", false).Return(nil)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
 
 		// when

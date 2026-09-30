@@ -142,6 +142,52 @@ func Test_Store_Delete(t *testing.T) {
 	})
 }
 
+func Test_Store_Clear(t *testing.T) {
+	t.Run("should remove every registered source at once", func(t *testing.T) {
+		// given
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
+		require.NoError(t, store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
+		require.NoError(t, store.Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-relevo").WithType(domain.DataTypeElevation).Build()))
+
+		// when
+		err := store.Clear()
+
+		// then
+		require.NoError(t, err)
+		sources, err := store.List()
+		require.NoError(t, err)
+		assert.Empty(t, sources)
+	})
+
+	t.Run("should not fail when the registry is already empty", func(t *testing.T) {
+		// given
+		store := jsonfile.NewGeoDataRepository(registryPath(t))
+
+		// when
+		err := store.Clear()
+
+		// then
+		require.NoError(t, err)
+		sources, err := store.List()
+		require.NoError(t, err)
+		assert.Empty(t, sources)
+	})
+
+	t.Run("should persist the empty registry atomically, the same way Save and Delete do", func(t *testing.T) {
+		// given
+		path := registryPath(t)
+		require.NoError(t, jsonfile.NewGeoDataRepository(path).Save(builddomain.NewGeoDataSourceBuilder().WithName("europa-central-mapa").Build()))
+
+		// when
+		require.NoError(t, jsonfile.NewGeoDataRepository(path).Clear())
+
+		// then: a separate instance pointed at the same path sees the change
+		sources, err := jsonfile.NewGeoDataRepository(path).List()
+		require.NoError(t, err)
+		assert.Empty(t, sources)
+	})
+}
+
 func Test_Store_RoundTrip(t *testing.T) {
 	t.Run("should preserve every field of a saved source, including RegisteredAt", func(t *testing.T) {
 		// given

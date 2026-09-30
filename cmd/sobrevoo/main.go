@@ -90,6 +90,7 @@ func run() int {
 	geoDataCommand.AddCommand(cli.NewGeoDataCheckCommand(geoDataService))
 	geoDataCommand.AddCommand(cli.NewGeoDataListCommand(geoDataService))
 	geoDataCommand.AddCommand(cli.NewGeoDataRemoveCommand(geoDataService))
+	geoDataCommand.AddCommand(cli.NewGeoDataClearCommand(geoDataService))
 	geoDataCommand.AddCommand(cli.NewGeoDataSliceCommand(cameraPlanService, geoSliceService))
 	geoDataCommand.AddCommand(cli.NewGeoDataElevationCommand(geoDataService))
 
