@@ -16,6 +16,7 @@ import (
 func NewGeoDataSliceCommand(cameraPlanService application.CameraPlanService, geoSliceService application.GeoSliceService) *cobra.Command {
 	var exportFlag string
 	var overwriteFlag bool
+	var baseMapFlag, elevationFlag string
 
 	cmd := &cobra.Command{
 		Use:   "slice <plan-file>",
@@ -35,24 +36,27 @@ func NewGeoDataSliceCommand(cameraPlanService application.CameraPlanService, geo
 				return newUsageError(fmt.Errorf("--overwrite requires --export"))
 			}
 
-			return runGeoDataSlice(cmd, cameraPlanService, geoSliceService, args[0], exportFlag, overwriteFlag)
+			selection := parseSourceSelection(cmd, baseMapFlag, elevationFlag)
+			return runGeoDataSlice(cmd, cameraPlanService, geoSliceService, args[0], exportFlag, overwriteFlag, selection)
 		},
 	}
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return newUsageError(err) })
 
 	cmd.Flags().StringVar(&exportFlag, "export", "", "Write the complete slice to this file, as a ZIP")
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "With --export, replace the file if it already exists")
+	cmd.Flags().StringVar(&baseMapFlag, "base-map", "", baseMapNameUsage)
+	cmd.Flags().StringVar(&elevationFlag, "elevation", "", elevationNameUsage)
 
 	return cmd
 }
 
-func runGeoDataSlice(cmd *cobra.Command, cameraPlanService application.CameraPlanService, geoSliceService application.GeoSliceService, planPath, exportPath string, overwrite bool) error {
+func runGeoDataSlice(cmd *cobra.Command, cameraPlanService application.CameraPlanService, geoSliceService application.GeoSliceService, planPath, exportPath string, overwrite bool, selection domain.SourceSelection) error {
 	plan, err := cameraPlanService.Load(planPath)
 	if err != nil {
 		return err
 	}
 
-	slice, err := geoSliceService.Generate(plan)
+	slice, err := geoSliceService.Generate(plan, selection)
 	if err != nil {
 		return err
 	}

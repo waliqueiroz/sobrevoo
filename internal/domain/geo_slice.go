@@ -241,6 +241,35 @@ func describeArea(area BoundingBox) string {
 	return text
 }
 
+// EnsureUsesSelection refuses, with ErrSliceUsesDifferentSource, a slice
+// whose recorded provenance (Summary.Sources) does not use, for a type
+// selection names, exactly the source named — the same comparison
+// FlightService makes before reusing a slice kept by "fly --keep"
+// (010-geo-data-source-control FR-011): the requested source is compared
+// against what the slice already registers it used, not recomputed. A type
+// selection leaves nil (automatic) is not checked at all.
+func (g GeoSlice) EnsureUsesSelection(selection SourceSelection) error {
+	if err := ensureUsesOne(g.Summary.Sources, selection.BaseMapName, DataTypeBaseMap); err != nil {
+		return err
+	}
+	return ensureUsesOne(g.Summary.Sources, selection.ElevationName, DataTypeElevation)
+}
+
+// ensureUsesOne checks one type of name against the slice's recorded uses.
+func ensureUsesOne(uses []SliceSourceUse, name *string, wantType DataType) error {
+	if name == nil {
+		return nil
+	}
+
+	for _, use := range uses {
+		if use.Source.Type == wantType && use.Source.Name == *name {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("%w: the slice does not use %q for %s", ErrSliceUsesDifferentSource, *name, wantType)
+}
+
 // EnsureDrawable refuses a slice that cannot be drawn: one whose base map has
 // tiles that are not images — vector tiles, which are drawn by a later stage —
 // (ErrTileFormatUnsupported), or whose elevation has no sample with a value at

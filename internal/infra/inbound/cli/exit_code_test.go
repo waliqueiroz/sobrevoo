@@ -261,6 +261,18 @@ func Test_ExitCode(t *testing.T) {
 		assert.Equal(t, 55, cli.ExitCode(domain.ErrInvalidOverlayBlock))
 	})
 
+	t.Run("should map ErrDataSourceTypeMismatch to 56", func(t *testing.T) {
+		assert.Equal(t, 56, cli.ExitCode(domain.ErrDataSourceTypeMismatch))
+	})
+
+	t.Run("should map ErrRegistryClearNotConfirmed to 57", func(t *testing.T) {
+		assert.Equal(t, 57, cli.ExitCode(domain.ErrRegistryClearNotConfirmed))
+	})
+
+	t.Run("should map ErrSliceUsesDifferentSource to 58", func(t *testing.T) {
+		assert.Equal(t, 58, cli.ExitCode(domain.ErrSliceUsesDifferentSource))
+	})
+
 	t.Run("should map a wrapped sixth-stage error to its code", func(t *testing.T) {
 		// given
 		err := fmt.Errorf("%w: 4 missing (12-15)", domain.ErrFrameSequenceInvalid)

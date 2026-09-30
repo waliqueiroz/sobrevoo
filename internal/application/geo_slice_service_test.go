@@ -141,7 +141,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 		m.elevationReader.EXPECT().ReadWindow(relief.Path, wantWindow).Return(samplesFor(wantWindow), nil)
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -184,7 +184,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 			})
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -211,7 +211,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil })
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -226,7 +226,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 		m.repository.EXPECT().List().Return([]domain.GeoDataSource{baseMapSource("map", wholeWorldish)}, nil)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.ErrorIs(t, err, domain.ErrAreaNotCovered)
@@ -243,7 +243,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 		m.repository.EXPECT().List().Return([]domain.GeoDataSource{reliefSource("dem", wholeWorldish)}, nil)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		var notCovered *domain.AreaNotCoveredError
@@ -259,7 +259,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 		m.repository.EXPECT().List().Return([]domain.GeoDataSource{baseMapSource("map", wholeWorldish), westOnly}, nil)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		var notCovered *domain.AreaNotCoveredError
@@ -286,7 +286,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil }).Times(2)
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -318,7 +318,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil }).Times(2)
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -353,7 +353,7 @@ func Test_geoSliceService_Generate(t *testing.T) {
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil }).Times(2)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -375,12 +375,12 @@ func Test_geoSliceService_Generate(t *testing.T) {
 		m.elevationReader.EXPECT().Describe(gomock.Any()).Return(reliefInfo, nil).AnyTimes()
 		m.elevationReader.EXPECT().ReadWindow(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil }).AnyTimes()
-		expected, err := m.service.Generate(plan)
+		expected, err := m.service.Generate(plan, domain.SourceSelection{})
 		require.NoError(t, err)
 
 		for i := 0; i < 100; i++ {
 			// when
-			slice, err := m.service.Generate(plan)
+			slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 			// then
 			require.NoError(t, err)
@@ -406,7 +406,7 @@ func Test_geoSliceService_Generate_Errors(t *testing.T) {
 		m.repository.EXPECT().List().Return(nil, boom)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		assert.ErrorIs(t, err, boom)
@@ -419,7 +419,7 @@ func Test_geoSliceService_Generate_Errors(t *testing.T) {
 		m.baseMapReader.EXPECT().Levels(baseMap.Path).Return(domain.LevelRange{}, boom)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		assert.ErrorIs(t, err, boom)
@@ -434,7 +434,7 @@ func Test_geoSliceService_Generate_Errors(t *testing.T) {
 		m.baseMapReader.EXPECT().ReadTiles(baseMap.Path, gomock.Any(), gomock.Any()).Return(domain.TileRead{}, boom)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		assert.ErrorIs(t, err, boom)
@@ -448,7 +448,7 @@ func Test_geoSliceService_Generate_Errors(t *testing.T) {
 		m.elevationReader.EXPECT().Describe(relief.Path).Return(domain.ElevationGridInfo{}, boom)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		assert.ErrorIs(t, err, boom)
@@ -465,10 +465,97 @@ func Test_geoSliceService_Generate_Errors(t *testing.T) {
 		m.elevationReader.EXPECT().ReadWindow(relief.Path, gomock.Any()).Return(domain.ElevationWindow{}, boom)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		assert.ErrorIs(t, err, boom)
+	})
+}
+
+func Test_geoSliceService_Generate_SourceSelection(t *testing.T) {
+	plan := slicePlan()
+
+	t.Run("should use exclusively the base map requested, even when a smaller (automatically winning) one is also registered", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		small := baseMapSource("small", sliceBox(-24, -23, -47, -46))
+		big := baseMapSource("big", wholeWorldish)
+		relief := reliefSource("dem", wholeWorldish)
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{small, big, relief}, nil)
+		// "small" is never asked for anything: it lost to the explicit
+		// selection before any base map reader call.
+		m.baseMapReader.EXPECT().Levels(big.Path).Return(domain.LevelRange{Min: 0, Max: 16}, nil)
+		m.baseMapReader.EXPECT().ReadTiles(big.Path, gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ string, _ int, ids []domain.TileID) (domain.TileRead, error) { return tilesFor(ids), nil })
+		m.elevationReader.EXPECT().Describe(relief.Path).Return(reliefInfo, nil)
+		m.elevationReader.EXPECT().ReadWindow(relief.Path, gomock.Any()).
+			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil })
+		name := "big"
+
+		// when
+		slice, err := m.service.Generate(plan, domain.SourceSelection{BaseMapName: &name})
+
+		// then
+		require.NoError(t, err)
+		require.Len(t, slice.TileSets, 1)
+		assert.Equal(t, "big", slice.TileSets[0].Source.Name)
+		require.Len(t, slice.Summary.Sources, 2)
+	})
+
+	t.Run("should refuse a requested name that is not registered, before reading any content", func(t *testing.T) {
+		// given: the readers have no expectations at all — any call fails the test
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		baseMap := baseMapSource("map", wholeWorldish)
+		relief := reliefSource("dem", wholeWorldish)
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{baseMap, relief}, nil)
+		name := "nao-existe"
+
+		// when
+		_, err := m.service.Generate(plan, domain.SourceSelection{BaseMapName: &name})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrDataSourceNotRegistered)
+	})
+
+	t.Run("should refuse a requested name that is registered as the other type, before reading any content", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		baseMap := baseMapSource("map", wholeWorldish)
+		relief := reliefSource("dem", wholeWorldish)
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{baseMap, relief}, nil)
+		name := "dem"
+
+		// when
+		_, err := m.service.Generate(plan, domain.SourceSelection{BaseMapName: &name})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrDataSourceTypeMismatch)
+	})
+
+	t.Run("should refuse, without mixing in another registered source, an explicitly requested elevation that covers only part of the area", func(t *testing.T) {
+		// given: "west-only" is requested explicitly, and does not cover the
+		// whole area; "rest-of-the-world" would cover the rest, but is never
+		// registered as a candidate for coverage because it was not requested
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		baseMap := baseMapSource("map", wholeWorldish)
+		westOnly := reliefSource("west-only", sliceBox(-30, -20, -50, -46.63))
+		restOfTheWorld := reliefSource("rest-of-the-world", wholeWorldish)
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{baseMap, westOnly, restOfTheWorld}, nil)
+		name := "west-only"
+
+		// when
+		_, err := m.service.Generate(plan, domain.SourceSelection{ElevationName: &name})
+
+		// then
+		var notCovered *domain.AreaNotCoveredError
+		require.ErrorAs(t, err, &notCovered)
+		assert.Equal(t, domain.CoverageStatusPartial, notCovered.Report.Status)
+		require.Len(t, notCovered.Report.ElevationSourcesUsed, 1)
+		assert.Equal(t, "west-only", notCovered.Report.ElevationSourcesUsed[0].Name)
 	})
 }
 
@@ -539,7 +626,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil })
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -561,7 +648,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil })
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -584,7 +671,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 			})
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -598,7 +685,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 		m.elevationReader.EXPECT().Describe(relief.Path).Return(reliefInfo, nil)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.ErrorIs(t, err, domain.ErrSliceTooLarge)
@@ -613,7 +700,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 		m.elevationReader.EXPECT().Describe(relief.Path).Return(reliefInfo, nil)
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrSliceTooLarge)
@@ -631,7 +718,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 			})
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrSliceTooLarge)
@@ -664,7 +751,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil })
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.NoError(t, err)
@@ -680,7 +767,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 			Return(domain.TileRead{}, fmt.Errorf("%w: cut off", domain.ErrGeoDataContentUnreadable))
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.ErrorIs(t, err, domain.ErrGeoDataContentUnreadable)
@@ -695,7 +782,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 		m.baseMapReader.EXPECT().Levels(baseMap.Path).Return(domain.LevelRange{}, fmt.Errorf("%w: no tiles", domain.ErrGeoDataContentUnreadable))
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.ErrorIs(t, err, domain.ErrGeoDataContentUnreadable)
@@ -709,7 +796,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 		m.elevationReader.EXPECT().Describe(relief.Path).Return(domain.ElevationGridInfo{}, fmt.Errorf("%w: unit 9999", domain.ErrElevationUnitUnsupported))
 
 		// when
-		_, err := m.service.Generate(plan)
+		_, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.ErrorIs(t, err, domain.ErrElevationUnitUnsupported)
@@ -727,7 +814,7 @@ func Test_geoSliceService_Generate_Robustness(t *testing.T) {
 			Return(domain.ElevationWindow{}, fmt.Errorf("%w: cut off", domain.ErrGeoDataContentUnreadable))
 
 		// when
-		slice, err := m.service.Generate(plan)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
 
 		// then
 		require.ErrorIs(t, err, domain.ErrGeoDataContentUnreadable)
@@ -782,7 +869,7 @@ func sliceOver(t *testing.T, plan domain.CameraPlan, covered domain.BoundingBox,
 	m.elevationReader.EXPECT().ReadWindow(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil }).AnyTimes()
 
-	slice, err := m.service.Generate(plan)
+	slice, err := m.service.Generate(plan, domain.SourceSelection{})
 	require.NoError(t, err)
 	return slice
 }

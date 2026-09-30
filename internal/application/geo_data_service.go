@@ -38,9 +38,16 @@ type GeoDataService interface {
 	// touching the underlying data file on disk (FR-011, FR-012).
 	Remove(name string) error
 
+	// Clear removes every registered source at once (010-geo-data-source-control
+	// FR-001, FR-002). Without confirmed, nothing is removed: it reports, via
+	// ErrRegistryClearNotConfirmed, how many entries would be removed (FR-003).
+	Clear(confirmed bool) (removedCount int, err error)
+
 	// CheckCoverage verifies whether the track read from reader is covered
-	// by the registered sources (FR-013 through FR-018).
-	CheckCoverage(reader io.Reader) (domain.CoverageReport, error)
+	// by the registered sources (FR-013 through FR-018), or, when selection
+	// names one, exclusively by the requested source of that type
+	// (010-geo-data-source-control FR-004 through FR-010).
+	CheckCoverage(reader io.Reader, selection domain.SourceSelection) (domain.CoverageReport, error)
 
 	// ElevationAt reads the elevation of a coordinate from the registered
 	// elevation data (FR-017, FR-018): the cell that contains it, in the
@@ -131,7 +138,36 @@ func (s *geoDataService) Remove(name string) error {
 	return s.repository.Delete(name)
 }
 
-func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport, error) {
+func (s *geoDataService) Clear(confirmed bool) (int, error) {
+	sources, err := s.repository.List()
+	if err != nil {
+		return 0, err
+	}
+
+	if !confirmed {
+		return len(sources), fmt.Errorf("%w: %d entries would be removed; re-run with --confirm", domain.ErrRegistryClearNotConfirmed, len(sources))
+	}
+
+	if err := s.repository.Clear(); err != nil {
+		return 0, err
+	}
+	return len(sources), nil
+}
+
+func (s *geoDataService) CheckCoverage(reader io.Reader, selection domain.SourceSelection) (domain.CoverageReport, error) {
+	// The selection is resolved first, before treating the track, so an
+	// invalid requested name is refused before any other work
+	// (010-geo-data-source-control FR-006).
+	sources, err := s.repository.List()
+	if err != nil {
+		return domain.CoverageReport{}, err
+	}
+	baseMaps, elevations := partitionAvailableSources(s.fileChecker, sources)
+	baseMaps, elevations, err = selection.Resolve(baseMaps, elevations)
+	if err != nil {
+		return domain.CoverageReport{}, err
+	}
+
 	// The route used for coverage is cleaned but not simplified/smoothed:
 	// those two steps are rendering preparation and could shift points,
 	// masking a real coverage gap (research.md item 9).
@@ -139,13 +175,6 @@ func (s *geoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport,
 	if err != nil {
 		return domain.CoverageReport{}, err
 	}
-
-	sources, err := s.repository.List()
-	if err != nil {
-		return domain.CoverageReport{}, err
-	}
-
-	baseMaps, elevations := partitionAvailableSources(s.fileChecker, sources)
 
 	return cleaned.Route.Coverage(baseMaps, elevations), nil
 }

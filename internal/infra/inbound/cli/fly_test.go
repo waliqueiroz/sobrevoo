@@ -352,6 +352,52 @@ func Test_FlightCommand_Overlay(t *testing.T) {
 	})
 }
 
+func Test_FlightCommand_Selection(t *testing.T) {
+	t.Run("should pass an empty SourceSelection when neither flag is given", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
+			return x.(domain.FlightRequest).Selection == domain.SourceSelection{}
+		}), gomock.Any()).Return(aFlight(), nil)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should pass the requested base map and elevation names as a SourceSelection", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		baseMap, elevation := "mapa-b", "relevo-a"
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
+			got := x.(domain.FlightRequest).Selection
+			return got.BaseMapName != nil && *got.BaseMapName == baseMap &&
+				got.ElevationName != nil && *got.ElevationName == elevation
+		}), gomock.Any()).Return(aFlight(), nil)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--base-map", baseMap, "--elevation", elevation)
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should map a requested source of the wrong type to the same exit code geodata slice already gives", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.FlightSummary{}, domain.ErrDataSourceTypeMismatch)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--base-map", "relevo-a")
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrDataSourceTypeMismatch)
+		assert.Equal(t, 56, cli.ExitCode(err))
+	})
+}
+
 func Test_FlightCommand_Execute(t *testing.T) {
 	t.Run("should open the track file and fly it, with the default parameters, resolution and quality, without overwriting", func(t *testing.T) {
 		// given

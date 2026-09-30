@@ -55,6 +55,7 @@ sobrevoo fly <trajeto.gpx> --output <voo.mp4>
              [--trail-color <#RRGGBB>] [--trail-width <proporção>] [--marker-color <#RRGGBB>]
              [--marker-radius <proporção>] [--background-color <#RRGGBB>]
              [--overlays=false] [--overlay-blocks <lista>]
+             [--base-map <nome>] [--elevation <nome>]
              [--quality low|medium|high] [--keep <diretório>] [--overwrite]
 ```
 
@@ -98,6 +99,8 @@ Total time: 00:33:00
 | `--background-color` | `#RRGGBB` | `#20262E` | Cor do fundo (fora do recorte, acima do horizonte) |
 | `--overlays` | `true`/`false` | `true` | Se as sobreposições de tela (distância, elevação, tempo, perfil) são desenhadas |
 | `--overlay-blocks` | lista separada por vírgula de `distance`, `elevation`, `time`, `profile` | os quatro | Quais blocos aparecem, quando `--overlays` não é `false` |
+| `--base-map` | nome já registrado | seleção automática | Usa exclusivamente essa fonte de mapa base, em vez da escolha automática por área |
+| `--elevation` | nome já registrado | seleção automática | Idem, para elevação |
 | `--quality` | `low`, `medium`, `high` | `medium` | Qualidade da codificação: `low` (rápido e pequeno, para conferir), `medium` (para publicar), `high` (para guardar) |
 | `--keep` | diretório | — | Guarda `plan.json`, `slice.zip` e `frames/` nesse diretório em vez de num temporário, e reaproveita o que ainda vale numa execução seguinte |
 | `--overwrite` | — | — | Substitui o vídeo de destino, e qualquer intermediário desatualizado sob `--keep`, se já existirem |
@@ -120,10 +123,14 @@ na mão com os mesmos valores.
   --export`/`render all --output` já produzem — abríveis com as ferramentas
   de sempre. Uma execução seguinte, com o mesmo trajeto e os mesmos valores,
   reaproveita o que ainda vale em vez de refazer — a aparência escolhida
-  também faz parte dessa identidade — e a configuração de sobreposição
+  também faz parte dessa identidade, e a configuração de sobreposição
   também: mudar só uma delas reaproveita o plano e o recorte (que não
   dependem de aparência nem de sobreposição) e refaz só os quadros e o
-  vídeo. Atenção: repetir o mesmo
+  vídeo. A fonte pedida por `--base-map`/`--elevation` também faz parte da
+  identidade do **recorte**: trocar a fonte pedida (ou passar de automática
+  para explícita, ou vice-versa) entre duas execuções nunca reaproveita, em
+  silêncio, o recorte guardado de uma fonte diferente — um recorte novo é
+  gerado, mesmo que o plano continue batendo. Atenção: repetir o mesmo
   `--output` numa segunda execução exige `--overwrite` para o vídeo — e
   `--overwrite` também refaz os quadros do zero, mesmo que o conjunto já
   bata (é a mesma regra de `render all --overwrite`, sem exceção para
@@ -191,7 +198,8 @@ registro) e **GeoTIFF em CRS geográfico, WGS84** (relevo). O registro fica em
 sobrevoo geodata register <arquivo> --name <nome>   # registra um mapa base ou relevo
 sobrevoo geodata list                               # lista os registros
 sobrevoo geodata remove <nome>                      # remove o registro (nunca o arquivo)
-sobrevoo geodata check <trajeto.gpx>                # o trajeto está coberto?
+sobrevoo geodata clear --confirm                    # remove TODOS os registros de uma vez (nunca os arquivos)
+sobrevoo geodata check <trajeto.gpx> [--base-map <nome>] [--elevation <nome>]   # o trajeto está coberto?
 ```
 
 ```console
@@ -213,10 +221,16 @@ Elevation sources used: europa-relevo
 | Flag | Valores | Padrão | Descrição |
 |---|---|---|---|
 | `register --name` | texto | — | Nome do registro (obrigatória, precisa ser única) |
+| `clear --confirm` | — | — | Obrigatória para `clear` de fato remover algo; sem ela, recusa dizendo quantas entradas seriam removidas |
+| `check --base-map` | nome já registrado | seleção automática | Usa exclusivamente essa fonte de mapa base, em vez da escolha automática por área |
+| `check --elevation` | nome já registrado | seleção automática | Idem, para elevação |
 
 `register` não tem outras flags: o tipo (mapa base ou relevo) e a área
 coberta são descobertos a partir do conteúdo do arquivo, nunca informados
-pelo usuário. `list` e `remove` também não têm flags.
+pelo usuário. `list` e `remove` também não têm flags. `clear` remove **todas**
+as entradas do registro de uma vez, mesmo as que ainda têm arquivo no disco
+— e nunca toca nenhum arquivo, só os ponteiros do registro; sem `--confirm`
+não remove nada (nunca por prompt interativo).
 
 Um trajeto só conta como coberto quando há mapa base **e** relevo em toda a
 sua extensão; `check` reporta o veredito (`full`, `partial` ou `none`) e os
@@ -225,11 +239,17 @@ quando consegue processar o trajeto — mesmo quando ele não está coberto (os
 erros de leitura do próprio arquivo de trajeto, se ele for inválido, usam os
 mesmos códigos de `inspect`: `1` a `3`). Se o arquivo de um registro for
 movido ou apagado, `list` o marca com `(file not found)` em vez de
-escondê-lo, e `check` deixa de contá-lo.
+escondê-lo, e `check` deixa de contá-lo. Com `--base-map`/`--elevation`, o
+relatório de `check` passa a refletir exclusivamente a fonte pedida para
+aquele tipo — uma cobertura incompleta da fonte pedida aparece como lacuna,
+sem nunca ser completada em silêncio por outra fonte registrada.
 
 Códigos de saída de `register`/`remove`: `5` arquivo não encontrado, `6`
 ilegível, `7` formato não suportado, `8` nome já em uso, `9` nome não
-registrado; documentados em `specs/002-geo-data-registry/contracts/cli.md`.
+registrado (também usado por `--base-map`/`--elevation` para um nome
+inexistente); `56` nome registrado como o outro tipo; `57` `clear` sem
+`--confirm`; documentados em `specs/002-geo-data-registry/contracts/cli.md`
+e `specs/010-geo-data-source-control/contracts/`.
 
 ### `plan`: planejar o movimento de câmera
 
@@ -284,7 +304,8 @@ exportação inválido, `39` proporção (`--aspect`) inválida; documentados em
 ### `geodata slice` e `geodata elevation`: ler o conteúdo dos dados registrados
 
 ```sh
-sobrevoo geodata slice <plano.json> [--export <recorte.zip>] [--overwrite]
+sobrevoo geodata slice <plano.json> [--export <recorte.zip>] [--overwrite] \
+                        [--base-map <nome>] [--elevation <nome>]
 sobrevoo geodata elevation --lat <graus> --lon <graus>
 ```
 
@@ -326,20 +347,31 @@ Source: relevo (cell row 1203, column 884)
 |---|---|---|---|
 | `slice --export` | caminho | — | Grava o recorte completo num ZIP (formato em `specs/004-geo-data-slice/contracts/slice-file.md`) |
 | `slice --overwrite` | — | — | Com `--export`, substitui um arquivo que já exista |
+| `slice --base-map` | nome já registrado | seleção automática | Usa exclusivamente essa fonte de mapa base |
+| `slice --elevation` | nome já registrado | seleção automática | Idem, para elevação |
 | `elevation --lat` | graus decimais, -90 a 90 | — | Latitude da coordenada (obrigatória) |
 | `elevation --lon` | graus decimais, -180 a 180 | — | Longitude da coordenada (obrigatória) |
 
 `elevation` informa a elevação, em metros, da célula do relevo registrado
 que contém a coordenada, ou diz que o arquivo não tem valor para aquele
 ponto, para você conferir contra outra fonte; sempre mostra qual registro e
-qual célula (linha e coluna) foram usados.
+qual célula (linha e coluna) foram usados. `elevation` não tem
+`--base-map`/`--elevation`: ela já opera sobre um só tipo de dado.
+
+Com `--base-map`/`--elevation`, `slice` usa exclusivamente a fonte pedida
+para aquele tipo — a linha `Sources:` do resumo lista só ela — e recusa,
+exatamente como recusaria uma cobertura incompleta hoje, se essa fonte não
+cobrir toda a área, sem nunca completar em silêncio com outra fonte
+registrada.
 
 Códigos de saída: `17` plano inválido, `18` plano de versão desconhecida,
 `19` área não coberta, `20` recorte grande demais, `21` dado geográfico
 ilegível, `22` unidade de elevação não suportada, `23` destino da exportação
 já existe, `24` destino da exportação inválido, `25` coordenada sem
-cobertura de relevo, `26` coordenada inválida; documentados em
-`specs/004-geo-data-slice/contracts/cli.md`.
+cobertura de relevo, `26` coordenada inválida, `9`/`56` nome de fonte
+inexistente/do tipo errado (`--base-map`/`--elevation`); documentados em
+`specs/004-geo-data-slice/contracts/cli.md` e
+`specs/010-geo-data-source-control/contracts/source-selection-flags.md`.
 
 ### `render frame` e `render all`: desenhar os quadros do voo
 

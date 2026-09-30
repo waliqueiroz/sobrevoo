@@ -124,6 +124,12 @@ func ExitCode(err error) int {
 		return 54
 	case errors.Is(err, domain.ErrInvalidOverlayBlock):
 		return 55
+	case errors.Is(err, domain.ErrDataSourceTypeMismatch):
+		return 56
+	case errors.Is(err, domain.ErrRegistryClearNotConfirmed):
+		return 57
+	case errors.Is(err, domain.ErrSliceUsesDifferentSource):
+		return 58
 	default:
 		// Anything else (file-open I/O errors, malformed-but-recognized
 		// content, CLI usage errors not already handled by Cobra itself) is

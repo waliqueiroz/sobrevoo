@@ -42,18 +42,33 @@ func (m *MockGeoDataService) EXPECT() *MockGeoDataServiceMockRecorder {
 }
 
 // CheckCoverage mocks base method.
-func (m *MockGeoDataService) CheckCoverage(reader io.Reader) (domain.CoverageReport, error) {
+func (m *MockGeoDataService) CheckCoverage(reader io.Reader, selection domain.SourceSelection) (domain.CoverageReport, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CheckCoverage", reader)
+	ret := m.ctrl.Call(m, "CheckCoverage", reader, selection)
 	ret0, _ := ret[0].(domain.CoverageReport)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CheckCoverage indicates an expected call of CheckCoverage.
-func (mr *MockGeoDataServiceMockRecorder) CheckCoverage(reader any) *gomock.Call {
+func (mr *MockGeoDataServiceMockRecorder) CheckCoverage(reader, selection any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckCoverage", reflect.TypeOf((*MockGeoDataService)(nil).CheckCoverage), reader)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckCoverage", reflect.TypeOf((*MockGeoDataService)(nil).CheckCoverage), reader, selection)
+}
+
+// Clear mocks base method.
+func (m *MockGeoDataService) Clear(confirmed bool) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Clear", confirmed)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Clear indicates an expected call of Clear.
+func (mr *MockGeoDataServiceMockRecorder) Clear(confirmed any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clear", reflect.TypeOf((*MockGeoDataService)(nil).Clear), confirmed)
 }
 
 // ElevationAt mocks base method.

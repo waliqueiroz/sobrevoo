@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Nove features estão implementadas até agora:
+Relive/Strava). Dez features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -46,7 +46,16 @@ embutida na ferramenta e sem nenhuma leitura nova do trajeto GPS ou dos
 dados geográficos registrados: o plano de câmera passou a guardar, por
 quadro, o instante real da atividade e a elevação do trajeto no ponto do
 marcador (`format_version` 2; um plano da versão 1 é recusado, pedindo para
-ser gerado de novo). Ainda não há áudio.
+ser gerado de novo); e `specs/010-geo-data-source-control/` acrescenta,
+sobre o registro de dados geográficos, um comando que limpa o registro
+inteiro de uma vez, só com confirmação explícita (`geodata clear
+--confirm`), e a possibilidade de escolher explicitamente, pelo nome já
+usado ao registrar, qual fonte de mapa base e/ou de elevação usar
+(`--base-map`/`--elevation`, em `geodata check`, `geodata slice` e `fly`),
+em vez de depender sempre da seleção automática por área; a escolha
+explícita nunca mistura fontes nem completa em silêncio uma cobertura
+incompleta, e passa a fazer parte da decisão de reaproveitar um recorte
+guardado por `fly --keep`. Ainda não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -67,8 +76,9 @@ go test ./internal/infra/inbound/cli/... -run 'Test_InspectCommand_Execute/shoul
 # Rodar a CLI direto, sem compilar um binário:
 go run ./cmd/sobrevoo inspect path/to/track.gpx --simplification=low --smoothing=high
 go run ./cmd/sobrevoo plan path/to/track.gpx --duration 45 --distance high --aspect 9:16 --export plan.json
-go run ./cmd/sobrevoo geodata slice plan.json --export slice.zip
+go run ./cmd/sobrevoo geodata slice plan.json --export slice.zip --base-map ruas --elevation srtm-sp
 go run ./cmd/sobrevoo geodata elevation --lat -23.5505 --lon -46.6333
+go run ./cmd/sobrevoo geodata clear --confirm   # remove todas as entradas do registro, nunca os arquivos
 go run ./cmd/sobrevoo render frame plan.json slice.zip --number 300 --output frame.png --trail-color "#00FF00" --marker-radius 0.03 --overlay-blocks distance,time
 go run ./cmd/sobrevoo render all plan.json slice.zip --output frames/ --resolution 1280x720
 go run ./cmd/sobrevoo video plan.json frames/ --output flight.mp4 --quality medium   # precisa do ffmpeg instalado
@@ -107,7 +117,12 @@ adapter.
   de um trajeto, consultado por distância (`ElevationProfile.At`), a mesma
   técnica de busca por bracket que `PlanarRoute.PointAt` já usa; `CameraFrame`
   ganhou `ActivityElapsed`, `TrackElevation` e `TrackElevationGain`, e
-  `CameraPlan`/`PlanSummary` ganharam `ElevationAvailable`), construtores
+  `CameraPlan`/`PlanSummary` ganharam `ElevationAvailable`; e, na etapa 10,
+  `SourceSelection` — a escolha explícita, por nome, de fonte de mapa base
+  e/ou de elevação, com o método `Resolve(baseMaps, elevations)` que
+  restringe as listas de candidatos a um só elemento por tipo antes de
+  entregá-las ao mesmo `Route.Coverage`/`SelectSource` de sempre; e
+  `FlightRequest` ganhou `Selection`), construtores
   que carregam regra de negócio (`NewGeoDataSource`, `NewTrackSummary`,
   `NewCameraPlan`, que calcula o resumo a partir dos quadros, `NewGeoSlice`,
   que calcula o resumo do recorte e o põe em ordem, `NewCoordinate`,
@@ -127,7 +142,12 @@ adapter.
   `SlicePlan` (`TileCount`, `SampleCount`, `Level`) e `SizeGuard` (o que conta
   para o limite de tamanho e qual nível é reportado), `SliceRegions` (`BaseMaps`,
   `TilesFor`), `ElevationGridInfo` (`CellAt`, `Window`) e `ElevationGrid` (`At`,
-  `NoValueCount`, `Range`) — ver `specs/004-geo-data-slice/research.md`;
+  `NoValueCount`, `Range`) — ver `specs/004-geo-data-slice/research.md`; e, na
+  etapa 10, `GeoSlice.EnsureUsesSelection`, que recusa um recorte cuja
+  procedência (`Summary.Sources`, já existente desde a etapa 4) não usa,
+  para um tipo pedido, exatamente a fonte pedida — comparação usada só por
+  `FlightService.reuseSlice` para decidir reaproveitar ou não um recorte
+  guardado por `--keep`;
   o que sobra como função livre é matemática sem dono (`clamp`, `quantize`,
   `frameTime`, `normalizeDegrees`). Distância
   de Haversine, ganho de elevação, duração, cálculo de bounding box —
@@ -156,10 +176,14 @@ adapter.
   `ErrVideoEncodingFailed`; o do comando único: `ErrFlightInterrupted`; e os
   da aparência: `ErrInvalidColor`, `ErrInvalidTrailWidth`,
   `ErrInvalidMarkerRadius`; e o da sobreposição de tela:
-  `ErrInvalidOverlayBlock`), e
+  `ErrInvalidOverlayBlock`; e os do controle do registro (etapa 10):
+  `ErrDataSourceTypeMismatch` (um nome pedido explicitamente existe, mas é
+  do outro tipo), `ErrRegistryClearNotConfirmed` (`geodata clear` sem
+  `--confirm`) e `ErrSliceUsesDifferentSource` (a comparação de
+  `GeoSlice.EnsureUsesSelection`, nunca devolvido a um usuário)), e
   as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
-  `GeoDataRepository`, `FileChecker`, `CameraPlanExporter`,
+  `GeoDataRepository` (ganhou `Clear`, etapa 10), `FileChecker`, `CameraPlanExporter`,
   `CameraPlanReader`, `BaseMapReader`, `ElevationReader`, `GeoSliceExporter`,
   `GeoSliceReader`, `TileDecoder`, `FrameRepository`, `FrameExporter`,
   `VideoEncoder`, `VideoExporter`, `Workspace` (o diretório de quadros de
@@ -177,9 +201,13 @@ adapter.
   — só decide qual porta/função de domínio chamar, e em qual ordem. Há um
   serviço por recurso: `TrackService` (`Clean`, `Treat`, `Inspect` — o único
   lugar que sabe transformar um trajeto bruto em limpo ou tratado),
-  `GeoDataService` (`Register`, `List`, `Remove`, `CheckCoverage`,
-  `ElevationAt`), `CameraPlanService` (`Generate`, `Export`, `Load`) e
-  `GeoSliceService` (`Generate`, `Export`, `Load`), `FrameService`
+  `GeoDataService` (`Register`, `List`, `Remove`, `Clear` — etapa 10,
+  limpa o registro inteiro, sem confirmação recusa citando a contagem —,
+  `CheckCoverage`, `ElevationAt`; `CheckCoverage` ganhou um parâmetro
+  `SourceSelection`, resolvido antes de tratar o trajeto), `CameraPlanService`
+  (`Generate`, `Export`, `Load`) e
+  `GeoSliceService` (`Generate` — ganhou o mesmo parâmetro `SourceSelection`
+  —, `Export`, `Load`), `FrameService`
   (`DrawFrame`, `DrawFrames`), `VideoService` (`Assemble`, e as operações que
   `Assemble` já fazia por dentro e passam a existir também sozinhas,
   `CheckEncoder` e `CheckDestination`) e `FlightService` (`Fly`, o comando
@@ -233,8 +261,10 @@ adapter.
   `specs/006-video-assembly/contracts/cli.md` e
   `specs/007-full-flight-pipeline/contracts/cli.md` e
   `specs/008-frame-appearance/contracts/appearance-flags.md` e
-  `specs/009-frame-overlays/contracts/overlay-flags.md` para o
-  mapeamento exato.
+  `specs/009-frame-overlays/contracts/overlay-flags.md` e
+  `specs/010-geo-data-source-control/contracts/registry-clear.md` e
+  `specs/010-geo-data-source-control/contracts/source-selection-flags.md`
+  para o mapeamento exato.
   Na etapa 1, era também o único lugar que tocava o filesystem (`os.Open`,
   para obter o `io.Reader` que `TrackParser` espera). A partir da etapa 2
   isso não é mais universal: adapters de saída que precisam de acesso
@@ -418,6 +448,40 @@ inclui `OverlayConfig.Fingerprint()` no hash, ao lado do de `Appearance` —
 sem precisar de um `RenderVersion` novo, e sem nenhuma lógica nova de
 reaproveitamento em `render all`/`fly --keep`, que já decide
 reaproveitar-ou-redesenhar por `FrameSetID`.
+
+### O controle do registro de dados geográficos (etapa 10)
+
+`geodata clear --confirm` (`specs/010-geo-data-source-control/`) remove
+todas as entradas do registro de uma vez — nunca os arquivos de dado
+geográfico no disco (`GeoDataRepository.Clear`, escrita atômica igual a
+`Save`/`Delete`) — e sem `--confirm` recusa (`ErrRegistryClearNotConfirmed`)
+citando quantas entradas seriam removidas, sem precisar de `geodata list`
+antes. `--base-map <nome>`/`--elevation <nome>` (mesmo `parseSourceSelection`
+compartilhado, `internal/infra/inbound/cli/source_selection.go`) existem em
+`geodata check`, `geodata slice` e `fly` — não em `plan` nem em `geodata
+elevation` (o primeiro não lê dados geográficos; o segundo já opera sobre
+um só tipo). A escolha se encaixa no algoritmo de seleção automática sem
+alterá-lo: `domain.SourceSelection.Resolve` restringe, antes de chamar
+`Route.Coverage`/`SelectSource`, a lista de candidatos de um tipo a um só
+elemento — o mesmo algoritmo de sempre, sobre uma lista de um, garante de
+graça tanto o uso exclusivo (nunca mistura, FR-010) quanto a recusa por
+cobertura incompleta (FR-007, `ErrAreaNotCovered` em `slice`/`fly`; em
+`check`, que só relata, a lacuna aparece no relatório). Um nome que não
+existe é `ErrDataSourceNotRegistered` (reaproveitado); um nome que existe
+mas é do outro tipo é `ErrDataSourceTypeMismatch`.
+
+O reaproveitamento de um recorte guardado por `fly --keep` passou a exigir
+também que a procedência que o recorte já registra (`Summary.Sources`,
+existente desde a etapa 4) bata com a fonte pedida agora
+(`GeoSlice.EnsureUsesSelection`, `ErrSliceUsesDifferentSource`) — ao lado
+da checagem de plano que `EnsureMatches` já fazia, na mesma linha de
+`FlightService.reuseSlice`. A comparação é contra o que o recorte guardado
+já registra ter usado, não contra uma reconstrução da seleção automática
+atual — se o nome pedido agora não é o que está gravado para aquele tipo
+(inclusive a troca entre seleção automática e explícita, em qualquer
+direção), o recorte é tratado como desatualizado e um novo é gerado; nenhum
+registro novo, nem mudança no formato do arquivo do recorte, foi
+necessário.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

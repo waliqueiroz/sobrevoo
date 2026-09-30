@@ -21,7 +21,7 @@ import (
 // returns stdout and the resulting error. The service is a test double —
 // this is a unit test of the CLI adapter alone (Constitution Principle
 // III), never a real GeoDataService.
-func executeGeoDataCheckCommand(t *testing.T, geoDataService application.GeoDataService) (stdout string, err error) {
+func executeGeoDataCheckCommand(t *testing.T, geoDataService application.GeoDataService, extraArgs ...string) (stdout string, err error) {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "track.gpx")
@@ -30,7 +30,7 @@ func executeGeoDataCheckCommand(t *testing.T, geoDataService application.GeoData
 	cmd := cli.NewGeoDataCheckCommand(geoDataService)
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	cmd.SetArgs([]string{path})
+	cmd.SetArgs(append([]string{path}, extraArgs...))
 
 	err = cmd.Execute()
 
@@ -64,7 +64,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -89,7 +89,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -112,7 +112,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -134,7 +134,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -156,7 +156,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -178,7 +178,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -202,7 +202,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -222,7 +222,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(output, nil)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(output, nil)
 
 		// when
 		stdout, err := executeGeoDataCheckCommand(t, mockedService)
@@ -236,7 +236,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
-		mockedService.EXPECT().CheckCoverage(gomock.Any()).Return(domain.CoverageReport{}, domain.ErrEmptyFile)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(domain.CoverageReport{}, domain.ErrEmptyFile)
 
 		// when
 		_, err := executeGeoDataCheckCommand(t, mockedService)
@@ -244,5 +244,64 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.Equal(t, 1, cli.ExitCode(err))
+	})
+
+	t.Run("should pass the requested base map and elevation names as a SourceSelection", func(t *testing.T) {
+		// given
+		mockCtrl := gomock.NewController(t)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
+		baseMap, elevation := "mapa-b", "relevo-a"
+		mockedService.EXPECT().
+			CheckCoverage(gomock.Any(), domain.SourceSelection{BaseMapName: &baseMap, ElevationName: &elevation}).
+			Return(domain.CoverageReport{Status: domain.CoverageStatusFull}, nil)
+
+		// when
+		_, err := executeGeoDataCheckCommand(t, mockedService, "--base-map", "mapa-b", "--elevation", "relevo-a")
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should pass an empty SourceSelection when neither flag is given", func(t *testing.T) {
+		// given
+		mockCtrl := gomock.NewController(t)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().
+			CheckCoverage(gomock.Any(), domain.SourceSelection{}).
+			Return(domain.CoverageReport{Status: domain.CoverageStatusFull}, nil)
+
+		// when
+		_, err := executeGeoDataCheckCommand(t, mockedService)
+
+		// then
+		require.NoError(t, err)
+	})
+
+	t.Run("should map a requested source of the wrong type to exit code 56", func(t *testing.T) {
+		// given
+		mockCtrl := gomock.NewController(t)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(domain.CoverageReport{}, domain.ErrDataSourceTypeMismatch)
+
+		// when
+		_, err := executeGeoDataCheckCommand(t, mockedService, "--base-map", "relevo-a")
+
+		// then
+		require.Error(t, err)
+		assert.Equal(t, 56, cli.ExitCode(err))
+	})
+
+	t.Run("should map a requested source that does not exist to exit code 9", func(t *testing.T) {
+		// given
+		mockCtrl := gomock.NewController(t)
+		mockedService := mockapplication.NewMockGeoDataService(mockCtrl)
+		mockedService.EXPECT().CheckCoverage(gomock.Any(), gomock.Any()).Return(domain.CoverageReport{}, domain.ErrDataSourceNotRegistered)
+
+		// when
+		_, err := executeGeoDataCheckCommand(t, mockedService, "--base-map", "nao-existe")
+
+		// then
+		require.Error(t, err)
+		assert.Equal(t, 9, cli.ExitCode(err))
 	})
 }

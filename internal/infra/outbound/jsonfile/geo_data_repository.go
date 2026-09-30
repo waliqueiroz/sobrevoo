@@ -89,6 +89,13 @@ func (r *GeoDataRepository) Delete(name string) error {
 	return r.write(filtered)
 }
 
+// Clear removes every registered source at once — even ones whose file
+// still exists on disk. It never touches any data file (FR-001, FR-002 of
+// 010-geo-data-source-control).
+func (r *GeoDataRepository) Clear() error {
+	return r.write(nil)
+}
+
 // read loads the registry file's content. A missing file (e.g. the very
 // first run) is treated as an empty registry, not an error.
 func (r *GeoDataRepository) read() ([]domain.GeoDataSource, error) {

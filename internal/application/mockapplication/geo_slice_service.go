@@ -55,18 +55,18 @@ func (mr *MockGeoSliceServiceMockRecorder) Export(slice, path, overwrite any) *g
 }
 
 // Generate mocks base method.
-func (m *MockGeoSliceService) Generate(plan domain.CameraPlan) (domain.GeoSlice, error) {
+func (m *MockGeoSliceService) Generate(plan domain.CameraPlan, selection domain.SourceSelection) (domain.GeoSlice, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Generate", plan)
+	ret := m.ctrl.Call(m, "Generate", plan, selection)
 	ret0, _ := ret[0].(domain.GeoSlice)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Generate indicates an expected call of Generate.
-func (mr *MockGeoSliceServiceMockRecorder) Generate(plan any) *gomock.Call {
+func (mr *MockGeoSliceServiceMockRecorder) Generate(plan, selection any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockGeoSliceService)(nil).Generate), plan)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockGeoSliceService)(nil).Generate), plan, selection)
 }
 
 // Load mocks base method.

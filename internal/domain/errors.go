@@ -239,6 +239,20 @@ var (
 	// ErrInvalidOverlayBlock reports an overlay block name that is not one of
 	// the four documented ones.
 	ErrInvalidOverlayBlock = errors.New("invalid overlay block")
+
+	// ErrDataSourceTypeMismatch reports a name explicitly requested for one
+	// data type (base map or elevation) that is registered as the other type.
+	ErrDataSourceTypeMismatch = errors.New("data source is registered as a different type")
+
+	// ErrRegistryClearNotConfirmed reports "geodata clear" run without
+	// confirmation: nothing was removed.
+	ErrRegistryClearNotConfirmed = errors.New("registry clear was not confirmed")
+
+	// ErrSliceUsesDifferentSource reports a kept geo data slice whose recorded
+	// provenance does not use, for a type an explicit selection names, the
+	// source requested — only compared internally, when deciding whether to
+	// reuse a slice kept by "fly --keep" (never returned to a user directly).
+	ErrSliceUsesDifferentSource = errors.New("geo data slice uses a different source than requested")
 )
 
 // AreaNotCoveredError is the error for an area that the registered geo data
