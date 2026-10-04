@@ -93,6 +93,11 @@ func (b *CameraFrameBuilder) WithTrackElevationGain(gain float64) *CameraFrameBu
 	return b
 }
 
+func (b *CameraFrameBuilder) WithMarkerSpeed(speed float64) *CameraFrameBuilder {
+	b.frame.MarkerSpeed = speed
+	return b
+}
+
 func (b *CameraFrameBuilder) Build() domain.CameraFrame {
 	return b.frame
 }

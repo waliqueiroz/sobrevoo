@@ -37,6 +37,13 @@ func (b *OverlayConfigBuilder) WithoutProfile() *OverlayConfigBuilder {
 	return b
 }
 
+// WithSpeed turns on the speed block, which — unlike the other four — is
+// off by default (014-speed-overlay-block).
+func (b *OverlayConfigBuilder) WithSpeed() *OverlayConfigBuilder {
+	b.config.Speed = true
+	return b
+}
+
 func (b *OverlayConfigBuilder) Build() domain.OverlayConfig {
 	return b.config
 }

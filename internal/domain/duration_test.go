@@ -155,3 +155,107 @@ func Test_Route_TimeAt(t *testing.T) {
 		assert.Equal(t, 5*time.Minute, elapsed)
 	})
 }
+
+// Test_Route_DistanceAt mirrors Test_Route_TimeAt with the roles of time and
+// distance swapped (014-speed-overlay-block): DistanceAt is TimeAt's exact
+// inverse, used to find the two ends of the speed window by elapsed time.
+func Test_Route_DistanceAt(t *testing.T) {
+	start := time.Date(2026, 1, 1, 8, 0, 0, 0, time.UTC)
+
+	t.Run("should return not ok when some points are missing time", func(t *testing.T) {
+		// given
+		points := []domain.TrackPoint{
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithoutTime().Build(),
+		}
+		distances := []float64{0, 100}
+
+		// when
+		distance, ok := (domain.Route{Points: points}).DistanceAt(distances, 30*time.Second)
+
+		// then
+		assert.False(t, ok)
+		assert.Equal(t, 0.0, distance)
+	})
+
+	t.Run("should return the first point's distance at elapsed time zero", func(t *testing.T) {
+		// given
+		points := []domain.TrackPoint{
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(10 * time.Minute)).Build(),
+		}
+		distances := []float64{0, 1000}
+
+		// when
+		distance, ok := (domain.Route{Points: points}).DistanceAt(distances, 0)
+
+		// then
+		assert.True(t, ok)
+		assert.Equal(t, 0.0, distance)
+	})
+
+	t.Run("should return the last point's distance at the total duration", func(t *testing.T) {
+		// given
+		points := []domain.TrackPoint{
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(7 * time.Minute)).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(22 * time.Minute)).Build(),
+		}
+		distances := []float64{0, 400, 1000}
+
+		// when
+		distance, ok := (domain.Route{Points: points}).DistanceAt(distances, 22*time.Minute)
+
+		// then
+		assert.True(t, ok)
+		assert.Equal(t, 1000.0, distance)
+	})
+
+	t.Run("should interpolate linearly between two points", func(t *testing.T) {
+		// given
+		points := []domain.TrackPoint{
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(10 * time.Minute)).Build(),
+		}
+		distances := []float64{0, 1000}
+
+		// when
+		distance, ok := (domain.Route{Points: points}).DistanceAt(distances, 150*time.Second)
+
+		// then: a quarter of the way, in time, is a quarter of the way in distance
+		assert.True(t, ok)
+		assert.Equal(t, 250.0, distance)
+	})
+
+	t.Run("should clamp an elapsed time before the first point to the first point's distance", func(t *testing.T) {
+		// given
+		points := []domain.TrackPoint{
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(10 * time.Minute)).Build(),
+		}
+		distances := []float64{100, 1000}
+
+		// when
+		distance, ok := (domain.Route{Points: points}).DistanceAt(distances, -time.Minute)
+
+		// then
+		assert.True(t, ok)
+		assert.Equal(t, 100.0, distance)
+	})
+
+	t.Run("should clamp an elapsed time beyond the end to the last point's distance", func(t *testing.T) {
+		// given
+		points := []domain.TrackPoint{
+			builddomain.NewTrackPointBuilder().WithTime(start).Build(),
+			builddomain.NewTrackPointBuilder().WithTime(start.Add(5 * time.Minute)).Build(),
+		}
+		distances := []float64{0, 1000}
+
+		// when
+		distance, ok := (domain.Route{Points: points}).DistanceAt(distances, time.Hour)
+
+		// then
+		assert.True(t, ok)
+		assert.Equal(t, 1000.0, distance)
+	})
+}

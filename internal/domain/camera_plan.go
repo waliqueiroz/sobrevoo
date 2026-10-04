@@ -122,6 +122,15 @@ type CameraFrame struct {
 	// zero and meaningless when the plan's ElevationAvailable is false.
 	TrackElevation     float64
 	TrackElevationGain float64
+
+	// MarkerSpeed is the activity's average speed (meters per second) over
+	// a fixed time window (CameraTuning.SpeedWindow) centered on
+	// ActivityElapsed, shortened at the two ends of the track where the
+	// full window does not fit on one side — never the instantaneous speed
+	// between two consecutive GPS points, which is too noisy to read
+	// (014-speed-overlay-block). Zero and meaningless when TimeReference is
+	// TimeReferenceDistance, the same criterion ActivityElapsed uses.
+	MarkerSpeed float64
 }
 
 // PlanSummary describes a plan at a glance. It is computed from the frames.
@@ -246,6 +255,8 @@ func (c CameraPlan) Validate() error {
 			return invalid("frames[%d].marker.lon is %g, must be between -180 and 180", i, f.MarkerLongitude)
 		case math.IsNaN(f.CameraToMarkerDistance) || math.IsInf(f.CameraToMarkerDistance, 0) || f.CameraToMarkerDistance < 0:
 			return invalid("frames[%d].camera_to_marker_m is %g, must be a finite number of at least 0", i, f.CameraToMarkerDistance)
+		case math.IsNaN(f.MarkerSpeed) || math.IsInf(f.MarkerSpeed, 0) || f.MarkerSpeed < 0:
+			return invalid("frames[%d].marker_speed_mps is %g, must be a finite number of at least 0", i, f.MarkerSpeed)
 		}
 	}
 
@@ -371,6 +382,7 @@ func (c CameraPlan) ID() string {
 		write(quantized(f.MarkerLongitude, coordinateStep))
 		write(quantized(f.MarkerDistance, lengthStep))
 		write(quantized(f.CameraToMarkerDistance, lengthStep))
+		write(quantized(f.MarkerSpeed, speedStep))
 	}
 
 	return hex.EncodeToString(hash.Sum(nil))

@@ -61,6 +61,7 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		assert.InDelta(t, 22.2, second.ActivityElapsed.Seconds(), 1e-9)
 		assert.InDelta(t, 771.1, second.TrackElevation, 1e-9)
 		assert.InDelta(t, 11.1, second.TrackElevationGain, 1e-9)
+		assert.InDelta(t, 5.0, second.MarkerSpeed, 1e-9)
 		assert.Equal(t, 400.0, plan.Summary.MaxCameraAltitude)
 		assert.NoError(t, plan.Validate())
 	})
@@ -104,6 +105,7 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 			assert.InDelta(t, frame.ActivityElapsed.Seconds(), got.ActivityElapsed.Seconds(), 1e-9)
 			assert.InDelta(t, frame.TrackElevation, got.TrackElevation, 1e-3)
 			assert.InDelta(t, frame.TrackElevationGain, got.TrackElevationGain, 1e-3)
+			assert.InDelta(t, frame.MarkerSpeed, got.MarkerSpeed, 1e-3)
 		}
 	})
 
@@ -121,19 +123,34 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 
 	t.Run("should refuse a format version it does not know, saying which it found and which it accepts", func(t *testing.T) {
 		// given
-		path := writePlanFile(t, helper.PlanFileWithVersion(3))
+		path := writePlanFile(t, helper.PlanFileWithVersion(4))
 
 		// when
 		_, err := jsonfile.NewCameraPlanReader().Read(path)
 
 		// then
 		require.ErrorIs(t, err, domain.ErrPlanFormatVersionUnsupported)
-		assert.ErrorContains(t, err, "found 3, accepted: 2")
+		assert.ErrorContains(t, err, "found 4, accepted: 3")
 	})
 
 	t.Run("should refuse a plan of the previous format version, telling the user to generate it again", func(t *testing.T) {
 		// given: a plan made before this stage, without the per-frame
-		// activity time and track elevation (009-frame-overlays FR-007)
+		// marker speed (014-speed-overlay-block FR-013)
+		path := writePlanFile(t, helper.PlanFileWithVersion(2))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFormatVersionUnsupported)
+		assert.ErrorContains(t, err, "found 2, accepted: 3")
+		assert.ErrorContains(t, err, "generate the plan again")
+	})
+
+	t.Run("should refuse a plan from two format versions back the same way", func(t *testing.T) {
+		// given: a plan made before even the previous stage
+		// (009-frame-overlays), without the per-frame activity time and
+		// track elevation either
 		path := writePlanFile(t, helper.PlanFileWithVersion(1))
 
 		// when
@@ -141,7 +158,7 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 
 		// then
 		require.ErrorIs(t, err, domain.ErrPlanFormatVersionUnsupported)
-		assert.ErrorContains(t, err, "found 1, accepted: 2")
+		assert.ErrorContains(t, err, "found 1, accepted: 3")
 		assert.ErrorContains(t, err, "generate the plan again")
 	})
 
@@ -260,6 +277,18 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		// then
 		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
 		assert.ErrorContains(t, err, "frames[1].marker.gain_m")
+	})
+
+	t.Run("should name a marker missing speed_mps", func(t *testing.T) {
+		// given
+		path := writePlanFile(t, helper.PlanFileWithoutMarkerField("speed_mps"))
+
+		// when
+		_, err := jsonfile.NewCameraPlanReader().Read(path)
+
+		// then
+		require.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].marker.speed_mps")
 	})
 
 	t.Run("should name a summary missing elevation_available", func(t *testing.T) {

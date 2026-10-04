@@ -207,6 +207,13 @@ func Test_FormatOverlayElapsed(t *testing.T) {
 	})
 }
 
+func Test_FormatOverlaySpeed(t *testing.T) {
+	t.Run("should show km/h to one decimal, converted from meters per second", func(t *testing.T) {
+		assert.Equal(t, "10.0 km/h", formatOverlaySpeed(10.0/3.6))
+		assert.Equal(t, "0.0 km/h", formatOverlaySpeed(0))
+	})
+}
+
 func Test_ProfileMarkerRadius(t *testing.T) {
 	t.Run("should be the ratio of the frame's height when that is above the floor", func(t *testing.T) {
 		// given / when / then
@@ -259,6 +266,7 @@ func Test_BlockText(t *testing.T) {
 		TrackElevation:     80,
 		TrackElevationGain: 6,
 		ActivityElapsed:    28*time.Minute + 44*time.Second,
+		MarkerSpeed:        5.5,
 	}
 
 	t.Run("should write the distance label in Portuguese", func(t *testing.T) {
@@ -277,6 +285,11 @@ func Test_BlockText(t *testing.T) {
 	t.Run("should write the time label in Portuguese", func(t *testing.T) {
 		// given / when / then
 		assert.Equal(t, "TEMPO "+formatOverlayElapsed(frame.ActivityElapsed), timeBlockText(frame))
+	})
+
+	t.Run("should write the speed label in Portuguese", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, "VEL "+formatOverlaySpeed(frame.MarkerSpeed), speedBlockText(frame))
 	})
 
 	t.Run("should never write the old English labels", func(t *testing.T) {
@@ -336,6 +349,31 @@ func Test_StablePanelWidth(t *testing.T) {
 
 		// then
 		assert.Equal(t, face.textWidth(distanceBlockText(long), ppem), width)
+	})
+
+	t.Run("should include the speed block among the widest candidates when requested", func(t *testing.T) {
+		// given
+		speedOnly, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockSpeed})
+		longSpeed := CameraFrame{Index: 2, Phase: PhaseFollowing, MarkerSpeed: 123.4}
+		plan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceClock, "", []CameraFrame{short, long, longSpeed}, nil, true)
+
+		// when
+		width := stablePanelWidth(face, plan, speedOnly, ppem)
+
+		// then
+		assert.Equal(t, face.textWidth(speedBlockText(longSpeed), ppem), width)
+	})
+
+	t.Run("should ignore the speed block when the plan has no clock reference, even if requested", func(t *testing.T) {
+		// given
+		speedOnly, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockSpeed})
+		plan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceDistance, "", []CameraFrame{short, long}, nil, true)
+
+		// when
+		width := stablePanelWidth(face, plan, speedOnly, ppem)
+
+		// then
+		assert.Equal(t, 0, width)
 	})
 }
 
@@ -464,6 +502,38 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 
 		// then
 		assert.NotEqual(t, baseline.Pix, withClock.Pix)
+	})
+
+	t.Run("should draw nothing for the speed block when the plan has no clock reference", func(t *testing.T) {
+		// given
+		speedOnly, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockSpeed})
+		distancePlan := planWith(true, TimeReferenceDistance)
+
+		withoutClock, baseline := blank(), blank()
+		noBlocks, _ := NewOverlayConfig(true, nil)
+
+		// when
+		screenOverlay{image: withoutClock, config: speedOnly, face: face}.draw(distancePlan, 1)
+		screenOverlay{image: baseline, config: noBlocks, face: face}.draw(distancePlan, 1)
+
+		// then
+		assert.Equal(t, baseline.Pix, withoutClock.Pix)
+	})
+
+	t.Run("should draw the speed block when requested and the plan has a clock reference", func(t *testing.T) {
+		// given
+		speedOnly, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockSpeed})
+		clockPlan := planWith(true, TimeReferenceClock)
+
+		withSpeed, baseline := blank(), blank()
+		noBlocks, _ := NewOverlayConfig(true, nil)
+
+		// when
+		screenOverlay{image: withSpeed, config: speedOnly, face: face, panelWidth: panelWidthFor(clockPlan, speedOnly, 640)}.draw(clockPlan, 1)
+		screenOverlay{image: baseline, config: noBlocks, face: face}.draw(clockPlan, 1)
+
+		// then
+		assert.NotEqual(t, baseline.Pix, withSpeed.Pix)
 	})
 
 	t.Run("should draw nothing for the elevation and profile blocks when the plan has no elevation", func(t *testing.T) {

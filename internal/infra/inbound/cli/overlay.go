@@ -12,8 +12,8 @@ import (
 // all" and "fly" (009-frame-overlays): same names, same values accepted,
 // same defaults, wherever they appear.
 const (
-	overlaysUsage      = "Whether the screen overlays (distance, elevation, time, elevation profile) are drawn at all"
-	overlayBlocksUsage = "Comma-separated overlay blocks to show, when --overlays is not false: distance, elevation, time, profile"
+	overlaysUsage      = "Whether the screen overlays (distance, elevation, time, elevation profile, speed) are drawn at all"
+	overlayBlocksUsage = "Comma-separated overlay blocks to show, when --overlays is not false: distance, elevation, time, profile, speed (speed is not on by default)"
 )
 
 // parseOverlay reads the two overlay flags, falling back to defaults for the
@@ -54,6 +54,9 @@ func overlayBlocksOf(config domain.OverlayConfig) []domain.OverlayBlock {
 	}
 	if config.Profile {
 		blocks = append(blocks, domain.OverlayBlockProfile)
+	}
+	if config.Speed {
+		blocks = append(blocks, domain.OverlayBlockSpeed)
 	}
 	return blocks
 }

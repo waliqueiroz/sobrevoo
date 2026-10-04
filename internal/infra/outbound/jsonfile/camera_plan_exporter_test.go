@@ -19,8 +19,8 @@ import (
 
 func examplePlan() domain.CameraPlan {
 	frames := []domain.CameraFrame{
-		{Index: 0, Time: 0, Phase: domain.PhaseOpening, CameraLatitude: -23.5505199, CameraLongitude: -46.6333094, CameraAltitude: 912.804, Heading: 0, Tilt: 60, MarkerLatitude: -23.5505199, MarkerLongitude: -46.6333094, MarkerDistance: 0, CameraToMarkerDistance: 1054.02, ActivityElapsed: 0, TrackElevation: 760.5, TrackElevationGain: 0},
-		{Index: 1, Time: 33333333 * time.Nanosecond, Phase: domain.PhaseFollowing, CameraLatitude: -23.55, CameraLongitude: 179.9999999, CameraAltitude: 100.5, Heading: 359.999, Tilt: 45, MarkerLatitude: -23.55, MarkerLongitude: -179.9999999, MarkerDistance: 12.5, CameraToMarkerDistance: 141.421, ActivityElapsed: 3 * time.Second, TrackElevation: 764.25, TrackElevationGain: 3.75},
+		{Index: 0, Time: 0, Phase: domain.PhaseOpening, CameraLatitude: -23.5505199, CameraLongitude: -46.6333094, CameraAltitude: 912.804, Heading: 0, Tilt: 60, MarkerLatitude: -23.5505199, MarkerLongitude: -46.6333094, MarkerDistance: 0, CameraToMarkerDistance: 1054.02, ActivityElapsed: 0, TrackElevation: 760.5, TrackElevationGain: 0, MarkerSpeed: 0},
+		{Index: 1, Time: 33333333 * time.Nanosecond, Phase: domain.PhaseFollowing, CameraLatitude: -23.55, CameraLongitude: 179.9999999, CameraAltitude: 100.5, Heading: 359.999, Tilt: 45, MarkerLatitude: -23.55, MarkerLongitude: -179.9999999, MarkerDistance: 12.5, CameraToMarkerDistance: 141.421, ActivityElapsed: 3 * time.Second, TrackElevation: 764.25, TrackElevationGain: 3.75, MarkerSpeed: 4.166},
 	}
 	parameters := builddomain.NewPlanParametersBuilder().WithDuration(42 * time.Second).WithFrameRate(29.97).WithDistance(domain.LevelHigh).WithTilt(domain.LevelLow).WithSimplification(domain.LevelLow).WithSmoothing(domain.LevelHigh).Build()
 	return builddomain.NewCameraPlanBuilder().
@@ -49,7 +49,7 @@ func Test_CameraPlanExporter_Export(t *testing.T) {
 
 		// then
 		text := string(content)
-		assert.True(t, strings.HasPrefix(text, "{\n  \"format_version\": 2,\n  \"parameters\": {"))
+		assert.True(t, strings.HasPrefix(text, "{\n  \"format_version\": 3,\n  \"parameters\": {"))
 		assert.Less(t, strings.Index(text, `"parameters"`), strings.Index(text, `"summary"`))
 		assert.Less(t, strings.Index(text, `"summary"`), strings.Index(text, `"frames"`))
 		assert.True(t, strings.HasSuffix(text, "]\n}\n"))
@@ -68,7 +68,7 @@ func Test_CameraPlanExporter_Export(t *testing.T) {
 			}
 		}
 		require.Len(t, frameLines, 2)
-		assert.Equal(t, `    {"index":0,"time_s":0,"activity_time_s":0,"phase":"opening","camera":{"lat":-23.5505199,"lon":-46.6333094,"altitude_m":912.804},"heading_deg":0,"tilt_deg":60,"marker":{"lat":-23.5505199,"lon":-46.6333094,"distance_m":0,"elevation_m":760.5,"gain_m":0},"camera_to_marker_m":1054.02},`, frameLines[0])
+		assert.Equal(t, `    {"index":0,"time_s":0,"activity_time_s":0,"phase":"opening","camera":{"lat":-23.5505199,"lon":-46.6333094,"altitude_m":912.804},"heading_deg":0,"tilt_deg":60,"marker":{"lat":-23.5505199,"lon":-46.6333094,"distance_m":0,"elevation_m":760.5,"gain_m":0,"speed_mps":0},"camera_to_marker_m":1054.02},`, frameLines[0])
 		assert.True(t, strings.HasSuffix(frameLines[1], "}"), "the last frame has no trailing comma")
 	})
 
@@ -129,13 +129,14 @@ func Test_CameraPlanExporter_Export(t *testing.T) {
 					DistanceM float64 `json:"distance_m"`
 					Elevation float64 `json:"elevation_m"`
 					Gain      float64 `json:"gain_m"`
+					SpeedMPS  float64 `json:"speed_mps"`
 				} `json:"marker"`
 				CameraToMkr float64 `json:"camera_to_marker_m"`
 			} `json:"frames"`
 		}
 		require.NoError(t, json.Unmarshal(content, &decoded))
 
-		assert.Equal(t, 2, decoded.FormatVersion)
+		assert.Equal(t, 3, decoded.FormatVersion)
 		assert.Equal(t, 42.0, decoded.Parameters.DurationS)
 		assert.Equal(t, 29.97, decoded.Parameters.FrameRate)
 		assert.Equal(t, "high", decoded.Parameters.Distance)
@@ -170,6 +171,7 @@ func Test_CameraPlanExporter_Export(t *testing.T) {
 			assert.Equal(t, want.MarkerDistance, got.Marker.DistanceM)
 			assert.Equal(t, want.TrackElevation, got.Marker.Elevation)
 			assert.Equal(t, want.TrackElevationGain, got.Marker.Gain)
+			assert.Equal(t, want.MarkerSpeed, got.Marker.SpeedMPS)
 			assert.Equal(t, want.CameraToMarkerDistance, got.CameraToMkr)
 		}
 	})

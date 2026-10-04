@@ -12,6 +12,7 @@ const (
 	coordinateStep = 1e-7
 	lengthStep     = 1e-3
 	angleStep      = 1e-3
+	speedStep      = 1e-3
 )
 
 // PlanCamera plans the camera flight over a treated track: for every frame
@@ -239,8 +240,10 @@ func (c cameraPlanner) frame(index int, phase Phase, view CameraView, marker Pla
 	toMarker := math.Sqrt(math.Pow(pose.Position.X-marker.X, 2) + math.Pow(pose.Position.Y-marker.Y, 2) + pose.Altitude*pose.Altitude)
 
 	var activityElapsed time.Duration
+	var markerSpeed float64
 	if elapsed, ok := c.trackRoute.TimeAt(c.route.Distances, markerDistance); ok {
 		activityElapsed = elapsed
+		markerSpeed = c.markerSpeedAt(elapsed)
 	}
 	var trackElevation, trackElevationGain float64
 	if c.elevation != nil {
@@ -263,7 +266,35 @@ func (c cameraPlanner) frame(index int, phase Phase, view CameraView, marker Pla
 		ActivityElapsed:        activityElapsed,
 		TrackElevation:         quantize(trackElevation, lengthStep),
 		TrackElevationGain:     quantize(trackElevationGain, lengthStep),
+		MarkerSpeed:            quantize(markerSpeed, speedStep),
 	}
+}
+
+// markerSpeedAt is the activity's average speed (meters per second) over
+// c.tuning.SpeedWindow, centered on elapsed (the marker's own real elapsed
+// time, from c.trackRoute.TimeAt), shortened at the two ends of the track by
+// clamping the window to [0, total] — never left absent nor made to jump,
+// since Route.DistanceAt already clamps the same way TimeAt does
+// (014-speed-overlay-block research.md item 1). Zero when the track has no
+// usable time data (the caller never calls it in that case) or when the
+// clamped window has no span (a track shorter than the window, or a single
+// point).
+func (c cameraPlanner) markerSpeedAt(elapsed time.Duration) float64 {
+	total, ok := c.trackRoute.Duration()
+	if !ok {
+		return 0
+	}
+
+	half := c.tuning.SpeedWindow / 2
+	startT, endT := max(elapsed-half, 0), min(elapsed+half, total)
+	span := endT - startT
+	if span <= 0 {
+		return 0
+	}
+
+	startDistance, _ := c.trackRoute.DistanceAt(c.route.Distances, startT)
+	endDistance, _ := c.trackRoute.DistanceAt(c.route.Distances, endT)
+	return (endDistance - startDistance) / span.Seconds()
 }
 
 // quantizeLongitude quantizes lon and wraps it back into [-180, 180), since

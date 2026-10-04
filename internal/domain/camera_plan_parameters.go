@@ -95,6 +95,15 @@ type CameraTuning struct {
 	MaxTargetSpeedInDistances   float64
 	GaussianSigmaSeconds        float64
 
+	// SpeedWindow is the fixed duration of the time window, centered on the
+	// marker's activity instant, averaged to compute CameraFrame.MarkerSpeed
+	// (014-speed-overlay-block) — the same for every track and every video,
+	// never read from a flag: a window large enough that GPS noise does not
+	// make it shake frame to frame, small enough to still track a climb or a
+	// descent. Shortened, not left absent, at the two ends of the track,
+	// where it does not fit entirely on one side.
+	SpeedWindow time.Duration
+
 	// The overview pose used by the opening and the closing.
 	OverviewTiltDegrees        float64
 	OverviewVerticalFOVDegrees float64

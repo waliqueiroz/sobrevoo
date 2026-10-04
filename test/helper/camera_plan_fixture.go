@@ -15,9 +15,11 @@ type PlanFrameSpec struct {
 	MarkerDistance, CameraToMarker  float64
 
 	// ActivityTime is activity_time_s; MarkerElevation and MarkerGain are
-	// marker.elevation_m and marker.gain_m (009-frame-overlays).
+	// marker.elevation_m and marker.gain_m (009-frame-overlays);
+	// MarkerSpeed is marker.speed_mps (014-speed-overlay-block).
 	ActivityTime                float64
 	MarkerElevation, MarkerGain float64
+	MarkerSpeed                 float64
 }
 
 // PlanFileSpec describes a camera plan file fixture, in the format of
@@ -44,6 +46,7 @@ func DefaultPlanFileSpec() PlanFileSpec {
 			MarkerLat: lat, MarkerLon: -46.6,
 			MarkerDistance: distance, CameraToMarker: 600,
 			ActivityTime: distance / 5, MarkerElevation: 760 + distance/10, MarkerGain: distance / 10,
+			MarkerSpeed: 5,
 		}
 	}
 	return PlanFileSpec{
@@ -68,7 +71,7 @@ func planDocument(spec PlanFileSpec) map[string]any {
 			"tilt_deg":        f.Tilt,
 			"marker": map[string]any{
 				"lat": f.MarkerLat, "lon": f.MarkerLon, "distance_m": f.MarkerDistance,
-				"elevation_m": f.MarkerElevation, "gain_m": f.MarkerGain,
+				"elevation_m": f.MarkerElevation, "gain_m": f.MarkerGain, "speed_mps": f.MarkerSpeed,
 			},
 			"camera_to_marker_m": f.CameraToMarker,
 		}
@@ -88,7 +91,7 @@ func planDocument(spec PlanFileSpec) map[string]any {
 	}
 
 	return map[string]any{
-		"format_version": 2,
+		"format_version": 3,
 		"parameters":     parameters,
 		"summary": map[string]any{
 			"duration_s":           spec.DurationSeconds,
@@ -163,7 +166,7 @@ func PlanFileWithoutFrameField(field string) []byte {
 }
 
 // PlanFileWithoutMarkerField returns a plan file whose second frame's marker
-// lacks the given key ("elevation_m" or "gain_m").
+// lacks the given key ("elevation_m", "gain_m" or "speed_mps").
 func PlanFileWithoutMarkerField(field string) []byte {
 	document := planDocument(DefaultPlanFileSpec())
 	marker := document["frames"].([]any)[1].(map[string]any)["marker"].(map[string]any)
