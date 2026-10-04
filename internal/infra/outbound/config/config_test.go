@@ -65,7 +65,7 @@ func Test_Load(t *testing.T) {
 		assert.Equal(t, 1920.0, cfg.SliceTuning.ReferenceHeightPixels)
 		assert.Equal(t, 2.0, cfg.SliceTuning.TexelScreenRatio)
 		assert.Equal(t, int64(65_536), cfg.SliceTuning.EstimatedTileBytes)
-		assert.Equal(t, int64(268_435_456), cfg.SliceTuning.MaxSizeBytes)
+		assert.Equal(t, int64(1_610_612_736), cfg.SliceTuning.MaxSizeBytes)
 	})
 
 	t.Run("should default the plan to 30 fps, medium distance, medium tilt and a vertical 9:16 video", func(t *testing.T) {

@@ -285,7 +285,12 @@ func sliceTuning() SliceTuning {
 		ReferenceHeightPixels: 1920,
 		TexelScreenRatio:      2.0,
 		EstimatedTileBytes:    64 * 1024,
-		MaxSizeBytes:          256 * 1024 * 1024,
+		// MaxSizeBytes was raised from 256 MiB to 1.5 GiB after real-world
+		// use with a high-detail satellite base map at a close --distance:
+		// the slice is an intermediate working file (tiles + elevation
+		// samples at their native resolution), not the final video, which
+		// stays a small fraction of it once encoded.
+		MaxSizeBytes: 1536 * 1024 * 1024,
 	}
 }
 

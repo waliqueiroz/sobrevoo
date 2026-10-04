@@ -16,7 +16,7 @@ func NewSliceTuningBuilder() *SliceTuningBuilder {
 			ReferenceHeightPixels: 1920,
 			TexelScreenRatio:      2.0,
 			EstimatedTileBytes:    64 * 1024,
-			MaxSizeBytes:          256 * 1024 * 1024,
+			MaxSizeBytes:          1536 * 1024 * 1024,
 		},
 	}
 }
