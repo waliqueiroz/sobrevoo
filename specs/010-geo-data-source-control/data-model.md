@@ -80,21 +80,24 @@ leitura de conteúdo — antes de qualquer outro trabalho (FR-006, FR-007).
 
 ## `GeoSlice` (estendido) — `internal/domain/geo_slice.go`
 
-Um método novo, ao lado de `EnsureMatches`/`EnsureCovers`:
+Um método novo, ao lado de `EnsureMatches`/`EnsureCovers` (revisado em
+2026-10-04 — `research.md` item 3, "Revisão"; a primeira versão,
+`EnsureUsesSelection`, não verificava a seleção automática):
 
 ```go
-// EnsureUsesSelection refuses, with ErrSliceUsesDifferentSource, a slice
-// whose recorded provenance (Summary.Sources) does not use, for a type
-// selection names, exactly the source named — the same check FlightService
-// makes before reusing a kept slice (FR-011).
-func (g GeoSlice) EnsureUsesSelection(selection SourceSelection) error
+// EnsureUsesSources refuses, with ErrSliceUsesDifferentSource, a slice whose
+// recorded provenance (Summary.Sources) is not exactly sources — the same
+// registered files, of the same types, no more and no fewer (FR-011).
+func (g GeoSlice) EnsureUsesSources(sources []GeoDataSource) error
 ```
 
-Para cada campo não nulo de `selection`, procura em `g.Summary.Sources` um
-`SliceSourceUse` desse tipo cujo `Source.Name` seja exatamente o pedido; não
-achando, `ErrSliceUsesDifferentSource`. Um campo nulo não é verificado —
-nenhuma mudança na verificação quando a seleção continua automática nas duas
-execuções.
+Compara a procedência gravada com o conjunto dado por tipo, nome e caminho do
+arquivo, sem depender da ordem; qualquer diferença — uma fonte a mais, a
+menos ou trocada — é `ErrSliceUsesDifferentSource`. O conjunto dado vem de
+`GeoSliceService.Sources(plan, selection)`: as fontes de que um recorte
+gerado agora seria tirado, calculadas só pelos metadados do registro, pelo
+mesmo caminho de `Generate` (inclusive `SliceRegions.Sources`, que lista as
+fontes das regiões, sem as de valor zero de uma região descoberta).
 
 Nenhum campo novo em `GeoSlice`/`SliceSummary`/`SliceSourceUse`: a
 procedência que a verificação usa (`Summary.Sources`) já existe desde a
@@ -105,7 +108,7 @@ formato de arquivo nesta etapa.
 ## `FlightRequest` (estendido) — `internal/domain/flight.go`
 
 Ganha um campo `Selection domain.SourceSelection`, usado em
-`GeoSliceService.Generate` e em `GeoSlice.EnsureUsesSelection` dentro de
+`GeoSliceService.Generate` e em `GeoSliceService.Sources` dentro de
 `FlightService.reuseSlice`; não afeta o plano (`CameraPlanService.Generate`
 não lê dados geográficos, Clarifications da spec).
 
@@ -114,12 +117,16 @@ não lê dados geográficos, Clarifications da spec).
 A condição de reaproveitamento passa a ser:
 
 ```go
-existing.EnsureMatches(plan) == nil && existing.EnsureUsesSelection(request.Selection) == nil
+if existing, err := s.geoSliceService.Load(slicePath); err == nil && existing.EnsureMatches(plan) == nil {
+    if sources, err := s.geoSliceService.Sources(plan, selection); err == nil && existing.EnsureUsesSources(sources) == nil {
+        // reused
+    }
+}
 ```
 
-no lugar de só `existing.EnsureMatches(plan) == nil` — a mesma linha, uma
-condição a mais, nenhuma reestruturação do método (FR-011, História de
-Usuário 4).
+no lugar de só `existing.EnsureMatches(plan) == nil` (FR-011, História de
+Usuário 4). Um nome pedido que não resolve faz `Sources` falhar; o recorte
+então não é reaproveitado, e `Generate` recusa o nome como sempre.
 
 ## Sentinelas de erro novas — `internal/domain/errors.go`
 

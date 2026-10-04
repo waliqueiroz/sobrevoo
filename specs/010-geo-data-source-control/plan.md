@@ -69,15 +69,15 @@ esta etapa não introduz nenhum novo limite.
 
 | Princípio | Verificação |
 |---|---|
-| I. Arquitetura Hexagonal | `SourceSelection.Resolve` e `GeoSlice.EnsureUsesSelection` são código de domínio puro (`internal/domain`), sem nenhuma biblioteca de infraestrutura — mesma fronteira de sempre. `geodata clear` só acrescenta um método (`Clear`) ao adapter `jsonfile` já existente. |
+| I. Arquitetura Hexagonal | `SourceSelection.Resolve` e `GeoSlice.EnsureUsesSources` (antes `EnsureUsesSelection` — `research.md` item 3, "Revisão") são código de domínio puro (`internal/domain`), sem nenhuma biblioteca de infraestrutura — mesma fronteira de sempre. `geodata clear` só acrescenta um método (`Clear`) ao adapter `jsonfile` já existente. |
 | II. Portas para Toda Dependência Externa | Um método novo numa porta já existente (`GeoDataRepository.Clear`) — nenhuma porta nova. `SourceSelection.Resolve` não faz I/O (opera sobre listas já buscadas pelo chamador), então não precisa de porta nenhuma. |
 | III. Entrypoints Descartáveis | A CLI só traduz três flags novas (`--confirm`, `--base-map`, `--elevation`) em chamadas de `GeoDataService`/`GeoSliceService`, e erros sentinela em códigos de saída — nenhuma regra de negócio na CLI; `parseSourceSelection` não valida nada (só monta o DTO), a validação real fica inteiramente em `SourceSelection.Resolve`. |
 | IV. Neutralidade Geográfica | Sem mudança: nenhum dado geográfico fixo é introduzido; a escolha de fonte é sempre pelo nome que o próprio usuário deu ao registrar. |
 | V. Funcionamento Offline | Sem mudança: nenhuma dependência de rede ou serviço externo novo. |
-| VI. Testes Automatizados no Núcleo | `SourceSelection`, `GeoSlice.EnsureUsesSelection` e o método `Clear` de `GeoDataService` são testados com as portas mockadas (`mockdomain`), sem tocar disco; a CLI continua mockando `application.GeoDataService`/`GeoSliceService`/`FlightService` (`mockapplication`). |
+| VI. Testes Automatizados no Núcleo | `SourceSelection`, `GeoSlice.EnsureUsesSources` e o método `Clear` de `GeoDataService` são testados com as portas mockadas (`mockdomain`), sem tocar disco; a CLI continua mockando `application.GeoDataService`/`GeoSliceService`/`FlightService` (`mockapplication`). |
 | VII. Erros Sentinela no Domínio | Três sentinelas novos em `errors.go` — `ErrDataSourceTypeMismatch`, `ErrRegistryClearNotConfirmed`, `ErrSliceUsesDifferentSource` —, ao lado dos já existentes; `ErrDataSourceNotRegistered` (já existente) é reaproveitado para um nome pedido que não existe. |
 | VIII. Configuração Injetada | Nenhuma configuração nova: nem `--confirm` nem `--base-map`/`--elevation` têm um padrão configurável (a ausência já é o padrão — seleção automática, sem confirmação); `config.go`/`config_mapping.go` não mudam. |
-| IX. Portas/Service Layer/Regra de Negócio | Nenhum serviço novo: `GeoDataService` ganha um método (`Clear`) e um parâmetro (`CheckCoverage`); `GeoSliceService.Generate` ganha um parâmetro; `FlightService.reuseSlice` ganha uma condição. A regra de negócio (resolver a seleção contra os candidatos, verificar a procedência do recorte guardado) vive inteiramente em `internal/domain`, como método de `SourceSelection`/`GeoSlice` — os serviços só orquestram (buscam os candidatos via porta, delegam a regra, devolvem o resultado), exatamente como `GeoDataService.CheckCoverage` já faz hoje com `Route.Coverage`. |
+| IX. Portas/Service Layer/Regra de Negócio | Nenhum serviço novo: `GeoDataService` ganha um método (`Clear`) e um parâmetro (`CheckCoverage`); `GeoSliceService.Generate` ganha um parâmetro (e, na revisão do `research.md` item 3, `GeoSliceService` ganha `Sources`); `FlightService.reuseSlice` ganha uma condição. A regra de negócio (resolver a seleção contra os candidatos, verificar a procedência do recorte guardado) vive inteiramente em `internal/domain`, como método de `SourceSelection`/`GeoSlice` — os serviços só orquestram (buscam os candidatos via porta, delegam a regra, devolvem o resultado), exatamente como `GeoDataService.CheckCoverage` já faz hoje com `Route.Coverage`. |
 | X. Testes: Given/When/Then, Builders, Isolamento | Sem mudança de convenção; `builddomain` ganha um builder para `SourceSelection` se os testes pedirem (provavelmente não — é um struct de dois campos opcionais, sem literal repetido o bastante para justificar um). |
 
 Nenhuma violação; nada a registrar em Rastreamento de Complexidade.
@@ -107,15 +107,15 @@ novos e extensões pontuais dentro da árvore já estabelecida:
 internal/domain/
 ├── source_selection.go          # NOVO: SourceSelection, Resolve
 ├── geo_data_source.go            # GeoDataRepository: +Clear() error
-├── geo_slice.go                  # +GeoSlice.EnsureUsesSelection
+├── geo_slice.go                  # +GeoSlice.EnsureUsesSources, +SliceRegions.Sources
 ├── flight.go                     # FlightRequest: +Selection
 └── errors.go                     # +ErrDataSourceTypeMismatch, +ErrRegistryClearNotConfirmed,
                                    #  +ErrSliceUsesDifferentSource
 
 internal/application/
 ├── geo_data_service.go           # +Clear(confirmed bool); CheckCoverage: +selection
-├── geo_slice_service.go          # Generate: +selection
-└── flight_service.go             # reuseSlice: +selection, checa EnsureUsesSelection também
+├── geo_slice_service.go          # Generate: +selection; +Sources (revisão)
+└── flight_service.go             # reuseSlice: +selection, checa GeoSliceService.Sources + EnsureUsesSources também
 
 internal/infra/outbound/jsonfile/
 └── geo_data_repository.go        # +Clear() error (mesma escrita atômica de Save/Delete)
