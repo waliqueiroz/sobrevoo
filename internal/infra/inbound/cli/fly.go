@@ -163,7 +163,10 @@ func runFly(
 		fmt.Fprint(out, formatFlightInterrupted(summary))
 		return err
 	case err != nil:
-		return err
+		// The frames of a run live under --keep (without it, in a new
+		// temporary directory, which never holds another set): another
+		// directory is another --keep, not another --output.
+		return withAnotherDirectoryHint(err, "--keep")
 	}
 
 	fmt.Fprint(out, formatFlightSummary(request, summary))

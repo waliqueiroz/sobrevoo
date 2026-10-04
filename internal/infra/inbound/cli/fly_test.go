@@ -3,6 +3,7 @@ package cli_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -500,6 +501,21 @@ func Test_FlightCommand_Execute(t *testing.T) {
 		assert.Contains(t, stdout, "Holes (in the frames drawn now): none\n"+
 			"Destination: /tmp/kept/frames (frame_000000.png to frame_000379.png)\n"+
 			"Video written to flight.mp4\n")
+	})
+
+	t.Run("should point to another --keep, not another --output, for frames of another set under --keep", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		conflict := fmt.Errorf("%w: 380 frames are of another set; use --overwrite to replace them", domain.ErrFrameSetConflict)
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.FlightSummary{}, conflict)
+
+		// when
+		stdout, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--keep", "/tmp/kept")
+
+		// then
+		assert.Equal(t, 37, cli.ExitCode(err))
+		assert.EqualError(t, err, "frame destination holds frames of another set: 380 frames are of another set; use --overwrite to replace them, or another --keep")
+		assert.Empty(t, stdout)
 	})
 
 	t.Run("should return the error of the run as it is, and print no summary", func(t *testing.T) {

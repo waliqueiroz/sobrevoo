@@ -281,7 +281,9 @@ func (d FrameDirectory) overwrite(id FrameSetID, frameCount int) FrameWork {
 }
 
 // conflict is the error for a directory that cannot be written to without
-// overwrite, saying what is in the way and how to go on.
+// overwrite, saying what is in the way and how to go on. The other way on — a
+// different directory — is named by the command, which knows the flag that
+// chooses it.
 func conflict(otherSet, foreign int) error {
 	var causes []string
 	if otherSet > 0 {
@@ -290,7 +292,7 @@ func conflict(otherSet, foreign int) error {
 	if foreign > 0 {
 		causes = append(causes, fmt.Sprintf("%s not this tool's", countOf(foreign, "file named like a frame is", "files named like frames are")))
 	}
-	return fmt.Errorf("%w: %s; use --overwrite to replace them, or another --output", ErrFrameSetConflict, strings.Join(causes, ", "))
+	return fmt.Errorf("%w: %s; use --overwrite to replace them", ErrFrameSetConflict, strings.Join(causes, ", "))
 }
 
 func countOf(n int, singular, plural string) string {
