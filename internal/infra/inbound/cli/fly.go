@@ -14,14 +14,15 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// NewFlightCommand creates the "fly" command, which chains the six existing
-// stages behind a single call (FlightService.Fly): from a GPS track straight
-// to a video, using the geo data already registered, without requiring any
-// other command or intermediate file (the seventh stage). defaults are the
-// plan parameters, defaultResolution the frame resolution, defaultAppearance
-// the trail/marker/background the frames are drawn with (008-frame-
-// appearance), defaultOverlay the screen overlay configuration (009-frame-
-// overlays) and defaultQuality the video quality used when the
+// NewFlightCommand creates the "fly" command, which runs the five stages of a
+// flight — the work of the "plan", "geodata slice", "render all" and "video"
+// commands — behind a single call (FlightService.Fly): from a GPS track
+// straight to a video, using the geo data already registered, without
+// requiring any other command or intermediate file (the seventh stage).
+// defaults are the plan parameters, defaultResolution the frame resolution,
+// defaultAppearance the trail/marker/background the frames are drawn with
+// (008-frame-appearance), defaultOverlay the screen overlay configuration
+// (009-frame-overlays) and defaultQuality the video quality used when the
 // corresponding flag is not given — the same defaults "plan", "render all"
 // and "video" already use.
 func NewFlightCommand(
