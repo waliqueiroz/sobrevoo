@@ -33,12 +33,13 @@ type cameraPlanService struct {
 	exporter     domain.CameraPlanExporter
 	reader       domain.CameraPlanReader
 
-	// defaultLevel is the simplification and smoothing level applied to the
-	// track before planning, and tuning holds the planning constants. Both
-	// are resolved by an outbound configuration adapter and injected by
-	// whoever assembles the service (Constitution Principle VIII).
-	defaultLevel domain.Level
-	tuning       domain.CameraTuning
+	// tuning holds the planning constants, resolved by an outbound
+	// configuration adapter and injected by whoever assembles the service
+	// (Constitution Principle VIII). The simplification and smoothing level
+	// applied to the track before planning is not resolved here: it always
+	// comes already resolved in parameters.Simplification/.Smoothing
+	// (013-treatment-level-flags), the same way Distance/Tilt already do.
+	tuning domain.CameraTuning
 }
 
 // NewCameraPlanService creates a CameraPlanService backed by the given
@@ -47,14 +48,12 @@ func NewCameraPlanService(
 	trackService TrackService,
 	exporter domain.CameraPlanExporter,
 	reader domain.CameraPlanReader,
-	defaultLevel domain.Level,
 	tuning domain.CameraTuning,
 ) CameraPlanService {
 	return &cameraPlanService{
 		trackService: trackService,
 		exporter:     exporter,
 		reader:       reader,
-		defaultLevel: defaultLevel,
 		tuning:       tuning,
 	}
 }
@@ -64,7 +63,7 @@ func (s *cameraPlanService) Generate(reader io.Reader, parameters domain.PlanPar
 		return domain.CameraPlan{}, err
 	}
 
-	treated, err := s.trackService.Treat(reader, s.defaultLevel, s.defaultLevel)
+	treated, err := s.trackService.Treat(reader, parameters.Simplification, parameters.Smoothing)
 	if err != nil {
 		return domain.CameraPlan{}, err
 	}

@@ -22,7 +22,7 @@ func examplePlan() domain.CameraPlan {
 		{Index: 0, Time: 0, Phase: domain.PhaseOpening, CameraLatitude: -23.5505199, CameraLongitude: -46.6333094, CameraAltitude: 912.804, Heading: 0, Tilt: 60, MarkerLatitude: -23.5505199, MarkerLongitude: -46.6333094, MarkerDistance: 0, CameraToMarkerDistance: 1054.02, ActivityElapsed: 0, TrackElevation: 760.5, TrackElevationGain: 0},
 		{Index: 1, Time: 33333333 * time.Nanosecond, Phase: domain.PhaseFollowing, CameraLatitude: -23.55, CameraLongitude: 179.9999999, CameraAltitude: 100.5, Heading: 359.999, Tilt: 45, MarkerLatitude: -23.55, MarkerLongitude: -179.9999999, MarkerDistance: 12.5, CameraToMarkerDistance: 141.421, ActivityElapsed: 3 * time.Second, TrackElevation: 764.25, TrackElevationGain: 3.75},
 	}
-	parameters := builddomain.NewPlanParametersBuilder().WithDuration(42 * time.Second).WithFrameRate(29.97).WithDistance(domain.LevelHigh).WithTilt(domain.LevelLow).Build()
+	parameters := builddomain.NewPlanParametersBuilder().WithDuration(42 * time.Second).WithFrameRate(29.97).WithDistance(domain.LevelHigh).WithTilt(domain.LevelLow).WithSimplification(domain.LevelLow).WithSmoothing(domain.LevelHigh).Build()
 	return builddomain.NewCameraPlanBuilder().
 		WithParameters(parameters).
 		WithDurationMode(domain.DurationModeAutomatic).
@@ -83,10 +83,12 @@ func Test_CameraPlanExporter_Export(t *testing.T) {
 		var decoded struct {
 			FormatVersion int `json:"format_version"`
 			Parameters    struct {
-				DurationS float64 `json:"duration_s"`
-				FrameRate float64 `json:"frame_rate"`
-				Distance  string  `json:"distance"`
-				Tilt      string  `json:"tilt"`
+				DurationS      float64 `json:"duration_s"`
+				FrameRate      float64 `json:"frame_rate"`
+				Distance       string  `json:"distance"`
+				Tilt           string  `json:"tilt"`
+				Simplification string  `json:"simplification"`
+				Smoothing      string  `json:"smoothing"`
 			} `json:"parameters"`
 			Summary struct {
 				DurationS      float64 `json:"duration_s"`
@@ -138,6 +140,8 @@ func Test_CameraPlanExporter_Export(t *testing.T) {
 		assert.Equal(t, 29.97, decoded.Parameters.FrameRate)
 		assert.Equal(t, "high", decoded.Parameters.Distance)
 		assert.Equal(t, "low", decoded.Parameters.Tilt)
+		assert.Equal(t, "low", decoded.Parameters.Simplification)
+		assert.Equal(t, "high", decoded.Parameters.Smoothing)
 		assert.Equal(t, "automatic", decoded.Summary.DurationMode)
 		assert.Equal(t, plan.Summary.FrameCount, decoded.Summary.FrameCount)
 		assert.Equal(t, plan.Summary.MinCameraAltitude, decoded.Summary.CameraAltitude.Min)

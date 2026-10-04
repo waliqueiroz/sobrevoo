@@ -35,7 +35,7 @@ func NewFlightCommand(
 ) *cobra.Command {
 	settings := newRenderSettings(options)
 	var outputFlag, qualityFlag, resolutionFlag, keepFlag string
-	var durationFlag, fpsFlag, distanceFlag, tiltFlag, aspectFlag string
+	var durationFlag, fpsFlag, distanceFlag, tiltFlag, simplificationFlag, smoothingFlag, aspectFlag string
 	var trailColorFlag, trailWidthFlag, markerColorFlag, markerRadiusFlag, backgroundColorFlag string
 	var overlaysFlag bool
 	var overlayBlocksFlag string
@@ -69,7 +69,7 @@ func NewFlightCommand(
 			// already owns it parses it (research.md item 9), so the same value
 			// always means the same thing and the same invalid value fails the
 			// same way (FR-003).
-			parameters, err := parsePlanParameters(cmd, defaults, durationFlag, fpsFlag, distanceFlag, tiltFlag, aspectFlag)
+			parameters, err := parsePlanParameters(cmd, defaults, durationFlag, fpsFlag, distanceFlag, tiltFlag, simplificationFlag, smoothingFlag, aspectFlag)
 			if err != nil {
 				return err
 			}
@@ -114,6 +114,8 @@ func NewFlightCommand(
 	cmd.Flags().StringVar(&fpsFlag, "fps", strconv.FormatFloat(defaults.FrameRate, 'g', -1, 64), "Frames per second, from 1 to 120")
 	cmd.Flags().StringVar(&distanceFlag, "distance", levelName(defaults.Distance), "How far the camera flies from the track: low, medium, or high")
 	cmd.Flags().StringVar(&tiltFlag, "tilt", levelName(defaults.Tilt), "How steeply the camera looks down: low (near the horizon), medium, or high (near vertical)")
+	cmd.Flags().StringVar(&simplificationFlag, "simplification", levelName(defaults.Simplification), "Simplification level applied to the treated route: low, medium, or high")
+	cmd.Flags().StringVar(&smoothingFlag, "smoothing", levelName(defaults.Smoothing), "Smoothing level applied to the treated route: low, medium, or high")
 	cmd.Flags().StringVar(&aspectFlag, "aspect", defaults.Aspect.String(), "Shape of the video, WIDTH:HEIGHT: the opening and the closing frame the whole track for it (for example 9:16 vertical, 16:9 horizontal)")
 	cmd.Flags().StringVar(&resolutionFlag, "resolution", formatResolution(defaultResolution), resolutionUsage)
 	cmd.Flags().StringVar(&trailColorFlag, "trail-color", formatColor(defaultAppearance.TrailColor), trailColorUsage)

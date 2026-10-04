@@ -33,7 +33,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		// given: a TrackService mock with no expectations fails the test if it is called
 		mockCtrl := gomock.NewController(t)
 		trackService := mockapplication.NewMockTrackService(mockCtrl)
-		service := application.NewCameraPlanService(trackService, nil, nil, domain.LevelMedium, tuning)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 		parameters := builddomain.NewPlanParametersBuilder().WithFrameRate(0).Build()
 
 		// when
@@ -49,7 +49,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		trackService := mockapplication.NewMockTrackService(mockCtrl)
 		trackService.EXPECT().Treat(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TreatedTrack{}, wantErr)
-		service := application.NewCameraPlanService(trackService, nil, nil, domain.LevelMedium, tuning)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
 		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build())
@@ -58,15 +58,16 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		assert.ErrorIs(t, err, wantErr)
 	})
 
-	t.Run("should treat the track with the default level for both simplification and smoothing", func(t *testing.T) {
+	t.Run("should treat the track with the parameters' simplification and smoothing levels", func(t *testing.T) {
 		// given
+		parameters := builddomain.NewPlanParametersBuilder().WithSimplification(domain.LevelHigh).WithSmoothing(domain.LevelLow).Build()
 		mockCtrl := gomock.NewController(t)
 		trackService := mockapplication.NewMockTrackService(mockCtrl)
-		trackService.EXPECT().Treat(gomock.Any(), domain.LevelHigh, domain.LevelHigh).Return(treatedRoute(5000), nil)
-		service := application.NewCameraPlanService(trackService, nil, nil, domain.LevelHigh, tuning)
+		trackService.EXPECT().Treat(gomock.Any(), domain.LevelHigh, domain.LevelLow).Return(treatedRoute(5000), nil)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
-		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build())
+		_, err := service.Generate(strings.NewReader(""), parameters)
 
 		// then
 		assert.NoError(t, err)
@@ -82,7 +83,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		trackService := mockapplication.NewMockTrackService(mockCtrl)
 		trackService.EXPECT().Treat(gomock.Any(), gomock.Any(), gomock.Any()).Return(treated, nil)
-		service := application.NewCameraPlanService(trackService, nil, nil, domain.LevelMedium, tuning)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
 		plan, err := service.Generate(strings.NewReader(""), parameters)
@@ -97,7 +98,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		trackService := mockapplication.NewMockTrackService(mockCtrl)
 		trackService.EXPECT().Treat(gomock.Any(), gomock.Any(), gomock.Any()).Return(treatedRoute(20000), nil)
-		service := application.NewCameraPlanService(trackService, nil, nil, domain.LevelMedium, tuning)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(5 * time.Second).Build()
 
 		// when
@@ -112,7 +113,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		trackService := mockapplication.NewMockTrackService(mockCtrl)
 		trackService.EXPECT().Treat(gomock.Any(), gomock.Any(), gomock.Any()).Return(treatedRoute(10), nil)
-		service := application.NewCameraPlanService(trackService, nil, nil, domain.LevelMedium, tuning)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
 		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build())
@@ -126,7 +127,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		trackService := mockapplication.NewMockTrackService(mockCtrl)
 		trackService.EXPECT().Treat(gomock.Any(), gomock.Any(), gomock.Any()).Return(treatedRoute(2_500_000), nil)
-		service := application.NewCameraPlanService(trackService, nil, nil, domain.LevelMedium, tuning)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
 		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build())
@@ -143,7 +144,7 @@ func Test_cameraPlanService_Export(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		exporter := mockdomain.NewMockCameraPlanExporter(mockCtrl)
 		exporter.EXPECT().Export(plan, "/tmp/plan.json", true).Return(nil)
-		service := application.NewCameraPlanService(nil, exporter, nil, domain.LevelMedium, domain.CameraTuning{})
+		service := application.NewCameraPlanService(nil, exporter, nil, domain.CameraTuning{})
 
 		// when
 		err := service.Export(plan, "/tmp/plan.json", true)
@@ -159,7 +160,7 @@ func Test_cameraPlanService_Export(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			exporter := mockdomain.NewMockCameraPlanExporter(mockCtrl)
 			exporter.EXPECT().Export(gomock.Any(), gomock.Any(), false).Return(wantErr)
-			service := application.NewCameraPlanService(nil, exporter, nil, domain.LevelMedium, domain.CameraTuning{})
+			service := application.NewCameraPlanService(nil, exporter, nil, domain.CameraTuning{})
 
 			// when
 			err := service.Export(plan, "/tmp/plan.json", false)
@@ -177,7 +178,7 @@ func Test_cameraPlanService_Load(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		reader := mockdomain.NewMockCameraPlanReader(mockCtrl)
 		reader.EXPECT().Read("plan.json").Return(plan, nil)
-		service := application.NewCameraPlanService(nil, nil, reader, domain.LevelMedium, domain.CameraTuning{})
+		service := application.NewCameraPlanService(nil, nil, reader, domain.CameraTuning{})
 
 		// when
 		loaded, err := service.Load("plan.json")
@@ -193,7 +194,7 @@ func Test_cameraPlanService_Load(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		reader := mockdomain.NewMockCameraPlanReader(mockCtrl)
 		reader.EXPECT().Read(gomock.Any()).Return(domain.CameraPlan{}, wantErr)
-		service := application.NewCameraPlanService(nil, nil, reader, domain.LevelMedium, domain.CameraTuning{})
+		service := application.NewCameraPlanService(nil, nil, reader, domain.CameraTuning{})
 
 		// when
 		_, err := service.Load("plan.json")
@@ -209,7 +210,7 @@ func Test_cameraPlanService_Load(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		reader := mockdomain.NewMockCameraPlanReader(mockCtrl)
 		reader.EXPECT().Read(gomock.Any()).Return(incoherent, nil)
-		service := application.NewCameraPlanService(nil, nil, reader, domain.LevelMedium, domain.CameraTuning{})
+		service := application.NewCameraPlanService(nil, nil, reader, domain.CameraTuning{})
 
 		// when
 		_, err := service.Load("plan.json")

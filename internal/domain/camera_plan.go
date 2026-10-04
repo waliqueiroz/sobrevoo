@@ -355,6 +355,8 @@ func (c CameraPlan) ID() string {
 	write(int64(math.Float64bits(c.Parameters.FrameRate)))
 	write(int64(c.Parameters.Distance))
 	write(int64(c.Parameters.Tilt))
+	write(int64(c.Parameters.Simplification))
+	write(int64(c.Parameters.Smoothing))
 
 	write(int64(len(c.Frames)))
 	for _, f := range c.Frames {

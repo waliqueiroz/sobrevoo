@@ -36,6 +36,13 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		require.NotNil(t, plan.Parameters.Duration)
 		assert.Equal(t, 100*time.Millisecond, *plan.Parameters.Duration)
 		assert.Equal(t, domain.LevelMedium, plan.Parameters.Distance)
+		// The fixture's parameters have no "simplification"/"smoothing" keys
+		// at all — the same shape a plan file from before this feature has.
+		// Reading that absence as medium is the Clarification session's
+		// decision (spec.md), already satisfied by parseLevel's existing
+		// "unknown or empty text reads as medium" rule.
+		assert.Equal(t, domain.LevelMedium, plan.Parameters.Simplification)
+		assert.Equal(t, domain.LevelMedium, plan.Parameters.Smoothing)
 		assert.Equal(t, domain.TimeReferenceClock, plan.TimeReference)
 		assert.Equal(t, domain.DurationModeAutomatic, plan.Summary.DurationMode)
 		assert.Equal(t, 3, plan.Summary.FrameCount)
@@ -71,6 +78,8 @@ func Test_CameraPlanReader_Read(t *testing.T) {
 		require.Len(t, plan.Frames, len(original.Frames))
 		assert.Equal(t, original.Parameters.Distance, plan.Parameters.Distance)
 		assert.Equal(t, original.Parameters.Tilt, plan.Parameters.Tilt)
+		assert.Equal(t, original.Parameters.Simplification, plan.Parameters.Simplification)
+		assert.Equal(t, original.Parameters.Smoothing, plan.Parameters.Smoothing)
 		assert.Equal(t, *original.Parameters.Duration, *plan.Parameters.Duration)
 		assert.Equal(t, original.TimeReference, plan.TimeReference)
 		assert.Equal(t, original.TimeFallbackReason, plan.TimeFallbackReason)

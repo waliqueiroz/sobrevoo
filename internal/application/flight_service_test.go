@@ -705,7 +705,15 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 	})
 
 	t.Run("should reuse the plan under the kept directory when it already matches, without exporting it again", func(t *testing.T) {
-		// given
+		// given: plan's Simplification/Smoothing are both LevelMedium (the
+		// builder's default), the same effective level a request without
+		// --simplification/--smoothing resolves to — this is also,
+		// bit for bit, what a plan.json written before this feature exists
+		// reads as (parseLevel's existing "absent or unknown text reads as
+		// medium" fallback, proven in camera_plan_reader_test.go), so this
+		// scenario already doubles as the Clarification's "no recorded
+		// level == medium" case reusing correctly, with no code of its own
+		// (013-treatment-level-flags).
 		m := newFlightMocks(t)
 		request := builddomain.NewFlightRequestBuilder().WithKeep("/tmp/kept").Build()
 		readyToFlyKept(m)
@@ -731,6 +739,31 @@ func Test_flightService_Fly_Keep(t *testing.T) {
 		readyToFlyKept(m)
 		another := framesPlan(5)
 		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(another, nil)
+		m.cameraPlanService.EXPECT().Export(plan, "/tmp/kept/plan.json", true).Return(nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(domain.GeoSlice{}, errors.New("no such file"))
+		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)
+		m.geoSliceService.EXPECT().Export(slice, "/tmp/kept/slice.zip", true).Return(nil)
+		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(slice, nil)
+
+		// when
+		summary, err := m.service.Fly(context.Background(), strings.NewReader("track"), request, nil)
+
+		// then
+		require.NoError(t, err)
+		assert.False(t, summary.PlanReused)
+	})
+
+	t.Run("should not reuse a plan under the kept directory whose simplification or smoothing level differs from the one just generated (013-treatment-level-flags)", func(t *testing.T) {
+		// given: a plan kept from a previous run, identical except for its
+		// treatment levels — CameraPlan.ID() already includes them (the same
+		// mechanism Distance/Tilt already use), so reusePlan's existing
+		// comparison tells the two apart without any dedicated logic.
+		m := newFlightMocks(t)
+		request := builddomain.NewFlightRequestBuilder().WithKeep("/tmp/kept").WithOverwrite().Build()
+		readyToFlyKept(m)
+		stale := plan
+		stale.Parameters.Simplification = domain.LevelHigh
+		m.cameraPlanService.EXPECT().Load("/tmp/kept/plan.json").Return(stale, nil)
 		m.cameraPlanService.EXPECT().Export(plan, "/tmp/kept/plan.json", true).Return(nil)
 		m.geoSliceService.EXPECT().Load("/tmp/kept/slice.zip").Return(domain.GeoSlice{}, errors.New("no such file"))
 		m.geoSliceService.EXPECT().Generate(plan, domain.SourceSelection{}).Return(slice, nil)

@@ -19,7 +19,7 @@ import (
 // the plan parameters used when a flag is not given; a nil Duration means the
 // duration is computed from the track.
 func NewPlanCommand(cameraPlanService application.CameraPlanService, defaults domain.PlanParameters) *cobra.Command {
-	var durationFlag, fpsFlag, distanceFlag, tiltFlag, aspectFlag, exportFlag string
+	var durationFlag, fpsFlag, distanceFlag, tiltFlag, simplificationFlag, smoothingFlag, aspectFlag, exportFlag string
 	var overwriteFlag bool
 
 	cmd := &cobra.Command{
@@ -36,7 +36,7 @@ func NewPlanCommand(cameraPlanService application.CameraPlanService, defaults do
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			parameters, err := parsePlanParameters(cmd, defaults, durationFlag, fpsFlag, distanceFlag, tiltFlag, aspectFlag)
+			parameters, err := parsePlanParameters(cmd, defaults, durationFlag, fpsFlag, distanceFlag, tiltFlag, simplificationFlag, smoothingFlag, aspectFlag)
 			if err != nil {
 				return err
 			}
@@ -54,6 +54,8 @@ func NewPlanCommand(cameraPlanService application.CameraPlanService, defaults do
 	cmd.Flags().StringVar(&fpsFlag, "fps", strconv.FormatFloat(defaults.FrameRate, 'g', -1, 64), "Frames per second, from 1 to 120")
 	cmd.Flags().StringVar(&distanceFlag, "distance", levelName(defaults.Distance), "How far the camera flies from the track: low, medium, or high")
 	cmd.Flags().StringVar(&tiltFlag, "tilt", levelName(defaults.Tilt), "How steeply the camera looks down: low (near the horizon), medium, or high (near vertical)")
+	cmd.Flags().StringVar(&simplificationFlag, "simplification", levelName(defaults.Simplification), "Simplification level applied to the treated route: low, medium, or high")
+	cmd.Flags().StringVar(&smoothingFlag, "smoothing", levelName(defaults.Smoothing), "Smoothing level applied to the treated route: low, medium, or high")
 	cmd.Flags().StringVar(&aspectFlag, "aspect", defaults.Aspect.String(), "Shape of the video, WIDTH:HEIGHT: the opening and the closing frame the whole track for it (for example 9:16 vertical, 16:9 horizontal)")
 	cmd.Flags().StringVar(&exportFlag, "export", "", "Write the complete plan to this file, as JSON")
 	cmd.Flags().BoolVar(&overwriteFlag, "overwrite", false, "With --export, replace the file if it already exists")
@@ -61,7 +63,7 @@ func NewPlanCommand(cameraPlanService application.CameraPlanService, defaults do
 	return cmd
 }
 
-func parsePlanParameters(cmd *cobra.Command, defaults domain.PlanParameters, durationFlag, fpsFlag, distanceFlag, tiltFlag, aspectFlag string) (domain.PlanParameters, error) {
+func parsePlanParameters(cmd *cobra.Command, defaults domain.PlanParameters, durationFlag, fpsFlag, distanceFlag, tiltFlag, simplificationFlag, smoothingFlag, aspectFlag string) (domain.PlanParameters, error) {
 	parameters := defaults
 
 	if cmd.Flags().Changed("duration") {
@@ -83,6 +85,12 @@ func parsePlanParameters(cmd *cobra.Command, defaults domain.PlanParameters, dur
 	}
 	if parameters.Tilt, err = parseLevel(tiltFlag); err != nil {
 		return domain.PlanParameters{}, newUsageError(fmt.Errorf("--tilt: %w", err))
+	}
+	if parameters.Simplification, err = parseLevel(simplificationFlag); err != nil {
+		return domain.PlanParameters{}, newUsageError(fmt.Errorf("--simplification: %w", err))
+	}
+	if parameters.Smoothing, err = parseLevel(smoothingFlag); err != nil {
+		return domain.PlanParameters{}, newUsageError(fmt.Errorf("--smoothing: %w", err))
 	}
 
 	// The value is validated with the other parameters, by the domain, so an
