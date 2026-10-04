@@ -28,21 +28,6 @@ type Scene struct {
 	// pixel size is used for every frame of one drawing, so every glyph it
 	// ever rasterizes stays in its cache for the rest of the execution.
 	face *vectorFace
-
-	// panelWidth is the numeric panels' shared width (012-overlay-ptbr-
-	// readability FR-007/FR-008), computed once — from every frame of the
-	// first plan rendered through this Scene — and reused for the rest of
-	// its lifetime: a Scene renders one plan, at one resolution, from
-	// construction to disposal (internal/application/frame_service.go
-	// never reuses one across requests), the same invariant face's glyph
-	// cache already relies on. panelWidthHeight guards against the one
-	// cheap case worth guarding — Render asked for a different resolution
-	// than before — recomputing then; it does not detect a different plan
-	// at the same resolution, which no real caller ever does (research.md
-	// item 4).
-	panelWidth       int
-	panelWidthHeight int
-	panelWidthSet    bool
 }
 
 // NewScene prepares a slice for drawing. It fails with ErrNoElevationData when
@@ -69,20 +54,6 @@ func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning, appearan
 		scene.surfaces = append(scene.surfaces, newSurface(grid, lowest))
 	}
 	return scene, nil
-}
-
-// numericPanelWidth is the numeric overlay panels' shared width for plan,
-// at ppem, for a frame height pixels tall — computed once (stablePanelWidth,
-// frame_screen_overlay.go) and cached for the rest of this Scene's
-// lifetime; recomputed only if height differs from the cached call's
-// (research.md item 4).
-func (s *Scene) numericPanelWidth(plan CameraPlan, height, ppem int) int {
-	if !s.panelWidthSet || s.panelWidthHeight != height {
-		s.panelWidth = stablePanelWidth(s.face, plan, s.overlayConfig, ppem)
-		s.panelWidthHeight = height
-		s.panelWidthSet = true
-	}
-	return s.panelWidth
 }
 
 // place puts the terrain on the plane of a frame.
@@ -132,9 +103,7 @@ func (s *Scene) Render(ctx context.Context, plan CameraPlan, index int, resoluti
 	over.drawTrail(trail)
 	over.drawMarker(trail[index])
 
-	ppem := overlayPpem(resolution.Height)
-	panelWidth := s.numericPanelWidth(plan, resolution.Height, ppem)
-	screenOverlay{image: image, config: s.overlayConfig, appearance: s.appearance, face: s.face, panelWidth: panelWidth}.draw(plan, index)
+	screenOverlay{image: image, config: s.overlayConfig, appearance: s.appearance, face: s.face}.draw(plan, index)
 
 	return image, stats, nil
 }

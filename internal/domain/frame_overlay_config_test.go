@@ -64,13 +64,28 @@ func Test_NewOverlayConfig(t *testing.T) {
 		assert.False(t, config.Profile)
 	})
 
-	t.Run("should refuse an unknown block name, naming it", func(t *testing.T) {
+	t.Run("should turn on the gain block when named, independent of elevation", func(t *testing.T) {
+		// given / when
+		config, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{domain.OverlayBlockGain})
+
+		// then
+		require.NoError(t, err)
+		assert.True(t, config.Gain)
+		assert.False(t, config.Elevation)
+		assert.False(t, config.Distance)
+		assert.False(t, config.Time)
+		assert.False(t, config.Profile)
+		assert.False(t, config.Speed)
+	})
+
+	t.Run("should refuse an unknown block name, naming it and listing the six accepted names", func(t *testing.T) {
 		// given / when
 		_, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{"altitude"})
 
 		// then
 		require.ErrorIs(t, err, domain.ErrInvalidOverlayBlock)
 		assert.ErrorContains(t, err, "altitude")
+		assert.ErrorContains(t, err, "distance, elevation, gain, time, profile, speed")
 	})
 }
 
@@ -146,6 +161,16 @@ func Test_OverlayConfig_Fingerprint(t *testing.T) {
 		config := base()
 		other := config
 		other.Speed = true
+
+		// when / then
+		assert.NotEqual(t, config.Fingerprint(), other.Fingerprint())
+	})
+
+	t.Run("should change when Gain changes", func(t *testing.T) {
+		// given
+		config := base()
+		other := config
+		other.Gain = true
 
 		// when / then
 		assert.NotEqual(t, config.Fingerprint(), other.Fingerprint())

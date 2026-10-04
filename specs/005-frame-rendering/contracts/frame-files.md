@@ -107,7 +107,7 @@ conta. Um quadro com os dois tipos de pixel conta nas duas colunas.
 ## Compatibilidade
 
 O arquivo não referencia data, hora, caminhos, nome de máquina nem versão do
-binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `3`)
+binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `5`)
 sobe sempre que o algoritmo ou as constantes visuais mudam de forma
 visível; quadros de outra `RenderVersion` pertencem a outro conjunto e não são
 reaproveitados. Consumidores devem ignorar blocos auxiliares que não
@@ -137,3 +137,23 @@ três — topo e laterais, e uma maior na base, adequada ao vídeo vertical.
 Nenhum valor exibido, bloco, enquadramento, terreno ou traçado muda.
 Quadros da versão `2` são, portanto, de outro conjunto, pela mesma regra de
 sempre.
+
+**Nota da décima segunda etapa**: a versão do desenho passou de `3` para
+`4` (`specs/012-overlay-ptbr-readability/contracts/frame-files-change.md`):
+os rótulos das sobreposições passam para português do Brasil, a fonte
+embutida ganha um peso mais forte, o contorno do texto passa a ser fino e
+proporcional ao tamanho da letra, e a largura dos três painéis numéricos
+deixa de pulsar quadro a quadro, sendo computada uma única vez por voo.
+Nenhum valor exibido muda. Quadros da versão `3` são de outro conjunto.
+
+**Nota da décima quinta etapa**: a versão do desenho passou de `4` para `5`
+(`specs/015-overlay-redesign/contracts/frame-files-change.md`): os blocos
+numéricos perdem o painel de fundo e passam a ser desenhados lado a lado,
+em colunas de mesma largura, numa faixa horizontal única, em três alturas
+de texto (rótulo por extenso, valor, unidade) em vez de uma linha
+empilhada; o ganho de elevação acumulado deixa de ser um segundo número
+colado ao bloco de elevação e vira um bloco próprio (`gain`); e o gráfico
+de elevação no rodapé também perde o painel, destacando-se do terreno por
+contorno. Nenhum valor exibido, cálculo, arredondamento, unidade,
+enquadramento, terreno ou traçado muda. Quadros da versão `4` são,
+portanto, de outro conjunto.

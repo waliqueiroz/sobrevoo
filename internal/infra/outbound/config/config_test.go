@@ -133,14 +133,14 @@ func Test_Load(t *testing.T) {
 		assert.Equal(t, "#20262E", cfg.RenderDefaults.BackgroundColor)
 	})
 
-	t.Run("should default the screen overlays to enabled, with the four blocks", func(t *testing.T) {
+	t.Run("should default the screen overlays to enabled, with distance, elevation, speed and the elevation profile", func(t *testing.T) {
 		// when
 		cfg, err := config.Load()
 
 		// then
 		require.NoError(t, err)
 		assert.True(t, cfg.RenderDefaults.OverlaysEnabled)
-		assert.ElementsMatch(t, []string{"distance", "elevation", "time", "profile"}, cfg.RenderDefaults.OverlayBlocks)
+		assert.ElementsMatch(t, []string{"distance", "elevation", "speed", "profile"}, cfg.RenderDefaults.OverlayBlocks)
 	})
 }
 

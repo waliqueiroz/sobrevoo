@@ -185,7 +185,7 @@ func Test_domainAppearance(t *testing.T) {
 }
 
 func Test_domainOverlayConfig(t *testing.T) {
-	t.Run("should map the default overlay configuration to enabled, with the four blocks", func(t *testing.T) {
+	t.Run("should map the default overlay configuration to enabled, with distance, elevation, speed and the elevation profile", func(t *testing.T) {
 		// given
 		cfg, err := config.Load()
 		require.NoError(t, err)
@@ -195,7 +195,7 @@ func Test_domainOverlayConfig(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Equal(t, builddomain.NewOverlayConfigBuilder().Build(), overlay)
+		assert.Equal(t, builddomain.NewOverlayConfigBuilder().WithoutTime().WithSpeed().Build(), overlay)
 	})
 
 	t.Run("should turn on only the blocks named", func(t *testing.T) {

@@ -17,7 +17,16 @@ import "strconv"
 // an outline sized from the glyph itself instead of the frame's height, and
 // with the numeric panels' shared width computed once per flight instead of
 // once per frame.
-const RenderVersion = 4
+// Version 5 (015-overlay-redesign) redraws the screen overlay from scratch:
+// the numeric blocks lose their backing panel and are laid out side by side,
+// in equal-width columns across a single horizontal row, in a fixed order,
+// each one in up to three lines (a spelled-out label, a larger value, and a
+// unit) instead of one abbreviated, upper-case line over a panel; the
+// elevation gain, previously a second number glued to the elevation block,
+// becomes its own block; and the elevation profile at the bottom loses its
+// panel too, standing out from the terrain through the same text-outline
+// technique instead.
+const RenderVersion = 5
 
 // RGB is a color, 8 bits per channel.
 type RGB struct {
@@ -44,20 +53,17 @@ var (
 	TrailCasingColor = RGB{0x10, 0x10, 0x10}
 	MarkerRingColor  = RGB{0xFF, 0xFF, 0xFF}
 
-	// OverlayPanelColor is the color of the semi-transparent backing plate
-	// every screen overlay block is drawn on, at OverlayPanelOpacity;
-	// OverlayTextColor is the color of the text and of the elevation
+	// OverlayTextColor is the color of the text, and of the elevation
 	// profile's line and marker. Fixed, not part of OverlayConfig, so a
 	// block stays legible over any background without sampling it
 	// (009-frame-overlays FR-010, research.md item 5).
-	OverlayPanelColor = RGB{0x00, 0x00, 0x00}
-	OverlayTextColor  = RGB{0xFF, 0xFF, 0xFF}
+	OverlayTextColor = RGB{0xFF, 0xFF, 0xFF}
 
 	// OverlayTextOutlineColor is the color of the outline drawn around every
 	// glyph of the screen overlay's text, before the glyph itself — the same
-	// technique as TrailCasingColor/MarkerRingColor, applied to text, so it
-	// stays legible over any background without depending on
-	// OverlayPanelOpacity (011-overlay-polish FR-004, research.md item 6).
+	// technique as TrailCasingColor/MarkerRingColor, applied to text — and,
+	// since 015-overlay-redesign, to the elevation profile's line and
+	// marker too, now that neither draws over a panel anymore.
 	OverlayTextOutlineColor = RGB{0x10, 0x10, 0x10}
 )
 
@@ -108,9 +114,15 @@ const (
 	ProfileMarkerRadiusRatio = 0.012
 	ProfileMarkerMinRadius   = 4.0
 
-	// OverlayPanelOpacity is how opaque OverlayPanelColor is over what is
-	// behind it.
-	OverlayPanelOpacity = 0.55
+	// OverlayLabelHeightRatio and OverlayValueHeightRatio size the two
+	// bodies of text a numeric overlay block draws, as a fraction of the
+	// frame's height: the label and the unit, small, at
+	// OverlayLabelHeightRatio; the value, the one glanced at, bigger, at
+	// OverlayValueHeightRatio — twice the label's (015-overlay-redesign
+	// FR-005, research.md item 3). Neither is adjustable by the user
+	// (FR-018).
+	OverlayLabelHeightRatio = 0.020
+	OverlayValueHeightRatio = 0.040
 )
 
 // RenderTuning holds the heuristic constants of drawing a frame. They are

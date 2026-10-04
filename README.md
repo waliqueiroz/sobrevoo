@@ -272,30 +272,38 @@ o quadro mostra uma **hachura cinza**; onde o relevo não tem valor, um
 
 ### Sobreposições de tela
 
-Fixos na tela, por cima do terreno, o vídeo mostra quatro blocos, todos
-ligados por padrão: a distância percorrida até o marcador (`DIST`), a
-elevação no ponto do marcador e o ganho acumulado até ali (`ELEV` e
-`GANHO`), o tempo decorrido da atividade (`TEMPO`) e, na parte de baixo, um
-perfil de elevação do trajeto inteiro com um marcador que avança com o voo.
-Um quinto bloco, a velocidade da atividade (`VEL`), existe mas não vem
-ligado por padrão — só aparece para quem pedir por nome em
-`--overlay-blocks`. É a velocidade média numa janela de tempo fixa de 30
-segundos em torno do marcador, nunca a velocidade instantânea entre dois
-pontos consecutivos do GPS, que oscilaria demais para ser lida. Os valores
-vêm só do trajeto, nunca do relevo registrado; o ganho acumulado do último
-quadro é exatamente o ganho de elevação que o `inspect` relata para o
-mesmo trajeto, com os mesmos níveis de tratamento.
+Fixos na tela, por cima do terreno, o vídeo mostra, lado a lado numa faixa
+horizontal no alto, os blocos ligados — sem nenhum painel atrás, o texto
+direto sobre a imagem, cada um numa coluna de mesma largura, sempre na
+mesma ordem (velocidade, elevação, distância, ganho, tempo decorrido),
+qualquer que seja a ordem pedida em `--overlay-blocks`. Dentro de cada
+bloco, de cima para baixo: o rótulo por extenso ("Distância", "Elevação",
+"Ganho", "Tempo decorrido", "Velocidade"), o valor num corpo bem maior, e a
+unidade — o tempo decorrido, sem unidade, mostra só as duas primeiras
+linhas. Por padrão vêm ligados a velocidade, a elevação no ponto do
+marcador e a distância percorrida até ele; o ganho acumulado até o
+marcador e o tempo decorrido da atividade existem, mas não vêm ligados por
+padrão — só aparecem para quem pedir por nome em `--overlay-blocks`. Na
+parte de baixo, sempre que a elevação está disponível, um perfil de
+elevação do trajeto inteiro, com um marcador que avança com o voo, se
+destaca do terreno por um contorno, como o texto. A velocidade é a média
+numa janela de tempo fixa de 30 segundos em torno do marcador, nunca a
+velocidade instantânea entre dois pontos consecutivos do GPS, que
+oscilaria demais para ser lida. Os valores vêm só do trajeto, nunca do
+relevo registrado; o ganho acumulado do último quadro é exatamente o
+ganho de elevação que o `inspect` relata para o mesmo trajeto, com os
+mesmos níveis de tratamento.
 
 | Flag | Valores | Padrão | O que faz |
 |---|---|---|---|
 | `--overlays` | `true`, `false` | `true` | Liga ou desliga todos os blocos de uma vez |
-| `--overlay-blocks` | lista separada por vírgula de `distance`, `elevation`, `time`, `profile`, `speed` | `distance,elevation,time,profile` (sem `speed`) | Quais blocos aparecem, quando `--overlays` não é `false` |
+| `--overlay-blocks` | lista separada por vírgula de `distance`, `elevation`, `gain`, `time`, `profile`, `speed` | `distance,elevation,speed,profile` (sem `gain` nem `time`) | Quais blocos aparecem, quando `--overlays` não é `false` — sempre desenhados na mesma ordem fixa, qualquer que seja a ordem da lista |
 
 Por ser uma flag booleana, `--overlays` precisa do sinal de igual para ser
 desligada: `--overlays=false`. Um trajeto sem altitude em todos os pontos
-fica sem a elevação e sem o perfil; um sem horários (ou com horários
-inconsistentes) fica sem o tempo e sem a velocidade — e o marcador avança
-pela distância, não pelo relógio.
+fica sem a elevação, sem o ganho e sem o perfil; um sem horários (ou com
+horários inconsistentes) fica sem o tempo e sem a velocidade — e o
+marcador avança pela distância, não pelo relógio.
 
 ### Escolha da fonte de dados
 

@@ -116,7 +116,9 @@ type RenderTuning struct {
 // otherwise: the resolution of the images (1080 × 1920, vertical), the
 // appearance of the trail, the marker and the background (008-frame-
 // appearance), and the screen overlay configuration (009-frame-overlays):
-// on by default, with the four blocks named in OverlayBlocks. Colors are
+// on by default, with the blocks named in OverlayBlocks — distance,
+// elevation, speed and the elevation profile (015-overlay-redesign); time
+// and gain are available but not on by default. Colors are
 // hexadecimal RGB text ("#RRGGBB"); the composition root parses and
 // validates them into domain.Appearance, and OverlayBlocks into
 // domain.OverlayConfig.
@@ -230,7 +232,7 @@ func Load() (Config, error) {
 			MarkerColor: "#E5252A", MarkerRadiusRatio: 0.012,
 			BackgroundColor: "#20262E",
 			OverlaysEnabled: true,
-			OverlayBlocks:   []string{"distance", "elevation", "time", "profile"},
+			OverlayBlocks:   []string{"distance", "elevation", "speed", "profile"},
 		},
 		VideoDefaults: VideoDefaults{Quality: LevelMedium},
 		FFmpegBinary:  "ffmpeg",
