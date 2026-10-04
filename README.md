@@ -358,9 +358,17 @@ nesse diretório (criado se ainda não existir), em vez de descartá-los:
 ```
 
 Numa execução seguinte com o mesmo `--keep`, o `fly` reaproveita o que ainda
-vale para o trajeto e os valores informados agora, e avisa na própria linha
-da etapa (`unchanged since the last run under --keep, reusing plan.json`,
-`unchanged, reusing slice.zip`). O plano é sempre recalculado — é rápido —
+vale para o trajeto e os valores informados agora, e avisa numa linha logo
+abaixo da etapa:
+
+```console
+Stage 2/5: planning the camera
+  unchanged since the last run under --keep, reusing plan.json
+Stage 3/5: slicing the geo data
+  unchanged, reusing slice.zip
+```
+
+O plano é sempre recalculado — é rápido —
 e só comparado com o guardado; o ganho de tempo está no recorte e,
 sobretudo, nos quadros, que não são redesenhados. O que vale depende do que
 mudou:

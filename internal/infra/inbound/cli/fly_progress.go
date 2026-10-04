@@ -38,9 +38,12 @@ func (p *flyProgressPrinter) report(progress domain.FlightProgress) {
 	if !p.announced || progress.Stage != p.stage {
 		p.render.finish()
 		p.video.finish()
-		fmt.Fprintf(p.out, "Stage %d/%d: %s%s\n", int(progress.Stage)+1, flyProgressCount, progress.Stage, reuseAnnouncement(progress))
+		fmt.Fprintf(p.out, "Stage %d/%d: %s\n", int(progress.Stage)+1, flyProgressCount, progress.Stage)
 		p.stage = progress.Stage
 		p.announced = true
+	}
+	if note := reuseNote(progress); note != "" {
+		fmt.Fprintf(p.out, "  %s\n", note)
 	}
 
 	switch {
@@ -51,18 +54,20 @@ func (p *flyProgressPrinter) report(progress domain.FlightProgress) {
 	}
 }
 
-// reuseAnnouncement says, for the camera-planning and geo-data-slicing stage
-// announcements, that the plan/slice under --keep was reused instead of
-// (re)computed (contracts/intermediates-directory.md); empty otherwise.
-func reuseAnnouncement(progress domain.FlightProgress) string {
+// reuseNote says, for the camera-planning and geo-data-slicing stages, that
+// the plan/slice under --keep was reused instead of (re)written
+// (contracts/intermediates-directory.md) — on a line of its own under the
+// stage's announcement, since it is known only once the stage has started;
+// empty otherwise.
+func reuseNote(progress domain.FlightProgress) string {
 	if !progress.Reused {
 		return ""
 	}
 	switch progress.Stage {
 	case domain.StageCameraPlanning:
-		return " (unchanged since the last run under --keep, reusing plan.json)"
+		return "unchanged since the last run under --keep, reusing plan.json"
 	case domain.StageGeoDataSlicing:
-		return " (unchanged, reusing slice.zip)"
+		return "unchanged, reusing slice.zip"
 	default:
 		return ""
 	}

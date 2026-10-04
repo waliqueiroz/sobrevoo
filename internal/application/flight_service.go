@@ -65,17 +65,19 @@ func (s *flightService) Fly(ctx context.Context, reader io.Reader, request domai
 		summary.Interrupted = errors.Is(err, domain.ErrFlightInterrupted)
 		return summary, err
 	}
+	// Each stage is announced as it starts, before its own work — never after
+	// it, so what the progress shows is what is being done right now, and an
+	// error comes after the announcement of the stage that failed.
 	report := func(stage domain.FlightStage) {
 		if progress != nil {
 			progress(domain.FlightProgress{Stage: stage})
 		}
 	}
-	// reported, unlike report, is used for the two stages whose announcement
-	// says whether they were reused — known only once the stage's own work
-	// (or its reuse decision) is done, not before.
-	reported := func(stage domain.FlightStage, reused bool) {
+	// reused says, after the fact, that the plan/slice under Keep was reused:
+	// whether it was is known only once the stage has started.
+	reused := func(stage domain.FlightStage) {
 		if progress != nil {
-			progress(domain.FlightProgress{Stage: stage, Reused: reused})
+			progress(domain.FlightProgress{Stage: stage, Reused: true})
 		}
 	}
 
@@ -89,11 +91,13 @@ func (s *flightService) Fly(ctx context.Context, reader io.Reader, request domai
 	}
 
 	report(domain.StageTrackProcessing)
-	plan, err := s.cameraPlanService.Generate(reader, request.Parameters)
+	plan, err := s.cameraPlanService.Generate(reader, request.Parameters, func() {
+		summary.Completed = append(summary.Completed, domain.StageTrackProcessing)
+		report(domain.StageCameraPlanning)
+	})
 	if err != nil {
 		return finish(err)
 	}
-	summary.Completed = append(summary.Completed, domain.StageTrackProcessing)
 
 	if request.Keep != "" {
 		// The kept directory may not exist yet (a first run with --keep, or a
@@ -106,9 +110,12 @@ func (s *flightService) Fly(ctx context.Context, reader io.Reader, request domai
 			return finish(err)
 		}
 	}
-	reported(domain.StageCameraPlanning, summary.PlanReused)
+	if summary.PlanReused {
+		reused(domain.StageCameraPlanning)
+	}
 	summary.Completed = append(summary.Completed, domain.StageCameraPlanning)
 
+	report(domain.StageGeoDataSlicing)
 	var slice domain.GeoSlice
 	if request.Keep != "" {
 		slice, err = s.reuseSlice(plan, request.Selection, filepath.Join(request.Keep, "slice.zip"), request.Overwrite, &summary)
@@ -118,7 +125,9 @@ func (s *flightService) Fly(ctx context.Context, reader io.Reader, request domai
 	if err != nil {
 		return finish(err)
 	}
-	reported(domain.StageGeoDataSlicing, summary.SliceReused)
+	if summary.SliceReused {
+		reused(domain.StageGeoDataSlicing)
+	}
 	summary.Completed = append(summary.Completed, domain.StageGeoDataSlicing)
 
 	// A kept directory needs no workspace of its own: the frames simply live

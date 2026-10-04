@@ -98,29 +98,17 @@ func Test_FlightCommand_Progress(t *testing.T) {
 		assert.Contains(t, stderr, "Encoding frame 15/20 (75.0%), elapsed 00:00:06\n")
 	})
 
-	t.Run("should say the plan was reused when the camera-planning stage announcement says so", func(t *testing.T) {
-		// given
+	t.Run("should say, on a line under the stage's announcement, that the plan and the slice were reused", func(t *testing.T) {
+		// given: each stage is announced as it starts, and the reuse comes after
 		m := newFlightCommandMocks(t)
 		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, _ io.Reader, _ domain.FlightRequest, progress func(domain.FlightProgress)) (domain.FlightSummary, error) {
+				progress(domain.FlightProgress{Stage: domain.StageTrackProcessing})
+				progress(domain.FlightProgress{Stage: domain.StageCameraPlanning})
 				progress(domain.FlightProgress{Stage: domain.StageCameraPlanning, Reused: true})
-				return aFlight(), nil
-			})
-
-		// when
-		_, stderr, err := executeFlyCommandWith(t, m, []cli.RenderOption{notTerminal}, aTrackFile(t), "--output", "flight.mp4", "--keep", "/tmp/kept")
-
-		// then
-		require.NoError(t, err)
-		assert.Contains(t, stderr, "Stage 2/5: planning the camera (unchanged since the last run under --keep, reusing plan.json)\n")
-	})
-
-	t.Run("should say the slice was reused when the geo-data-slicing stage announcement says so", func(t *testing.T) {
-		// given
-		m := newFlightCommandMocks(t)
-		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-			func(_ context.Context, _ io.Reader, _ domain.FlightRequest, progress func(domain.FlightProgress)) (domain.FlightSummary, error) {
+				progress(domain.FlightProgress{Stage: domain.StageGeoDataSlicing})
 				progress(domain.FlightProgress{Stage: domain.StageGeoDataSlicing, Reused: true})
+				progress(domain.FlightProgress{Stage: domain.StageFrameRendering})
 				return aFlight(), nil
 			})
 
@@ -129,7 +117,12 @@ func Test_FlightCommand_Progress(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Contains(t, stderr, "Stage 3/5: slicing the geo data (unchanged, reusing slice.zip)\n")
+		assert.Equal(t, "Stage 1/5: treating the track\n"+
+			"Stage 2/5: planning the camera\n"+
+			"  unchanged since the last run under --keep, reusing plan.json\n"+
+			"Stage 3/5: slicing the geo data\n"+
+			"  unchanged, reusing slice.zip\n"+
+			"Stage 4/5: drawing the frames\n", stderr)
 	})
 
 	t.Run("should not say anything was reused when it was not", func(t *testing.T) {
