@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Dez features estão implementadas até agora:
+Relive/Strava). Onze features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -55,7 +55,18 @@ usado ao registrar, qual fonte de mapa base e/ou de elevação usar
 em vez de depender sempre da seleção automática por área; a escolha
 explícita nunca mistura fontes nem completa em silêncio uma cobertura
 incompleta, e passa a fazer parte da decisão de reaproveitar um recorte
-guardado por `fly --keep`. Ainda não há áudio.
+guardado por `fly --keep`; e `specs/011-overlay-polish/` corrige o
+acabamento das sobreposições de tela que a nona etapa introduziu, sem
+acrescentar nem mudar nenhum valor exibido, bloco ou configuração: o texto
+passa de uma fonte bitmap ampliada por fator inteiro para uma fonte
+vetorial embutida, rasterizada com suavização por um rasterizador próprio;
+os três painéis numéricos passam a compartilhar a largura do mais largo; o
+marcador do perfil de elevação ganha um raio proporcional à altura do
+quadro, com piso em pixels, como o marcador do mapa já tem; o texto ganha
+um contorno escuro fixo, legível sobre qualquer fundo; e a margem de
+segurança passa a ser maior na borda inferior que nas demais, adequada ao
+vídeo vertical — o que muda os pixels de quadros já desenhados, então a
+versão do desenho sobe (`RenderVersion` 3). Ainda não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -407,17 +418,17 @@ desconhecido). O desenho em si é código de domínio puro
 `screenOverlay` — não confundir com `overlay`, de `frame_overlay.go`, que
 desenha o traçado e o marcador colados no terreno): `Scene.Render` o chama
 por último, depois do traçado e do marcador, sempre por cima, sem nenhum
-teste de profundidade. O texto usa uma fonte bitmap embutida
-(`golang.org/x/image/font/inconsolata`, já uma dependência transitiva do
-módulo — nenhuma nova) para não depender de nenhuma fonte do sistema
-(FR-008); cada glifo é ampliado por replicação inteira de pixel, nunca por
-interpolação, e a mistura alfa reaproveita a mesma fórmula que
-`overlay.blend` já usa — mantendo o determinismo byte a byte entre
-arquiteturas que a etapa 5 exige. Cada bloco desenha sobre uma placa
+teste de profundidade. O texto usa uma fonte embutida para não depender de
+nenhuma fonte do sistema (FR-008) — nesta etapa, uma fonte bitmap
+(`golang.org/x/image/font/inconsolata`), cada glifo ampliado por replicação
+inteira de pixel; a etapa 11 a substitui por uma fonte vetorial suavizada,
+sem mudar o requisito (ver abaixo). A mistura alfa reaproveita a mesma
+fórmula que `overlay.blend` já usa — mantendo o determinismo byte a byte
+entre arquiteturas que a etapa 5 exige. Cada bloco desenha sobre uma placa
 semitransparente de cor fixa (`OverlayPanelColor`/`OverlayPanelOpacity`, em
-`render_tuning.go`, junto de `OverlayMarginRatio` — a margem de segurança
-nas quatro bordas, como fração do menor lado do quadro) para continuar
-legível sobre qualquer fundo, sem nunca amostrar o pixel por baixo.
+`render_tuning.go`) para continuar legível sobre qualquer fundo, sem nunca
+amostrar o pixel por baixo — a margem de segurança que a protege das quatro
+bordas do quadro também muda na etapa 11.
 
 Os valores exibidos vêm exclusivamente do plano de câmera e do recorte —
 nenhuma leitura nova do trajeto GPS nem dos dados geográficos registrados
@@ -482,6 +493,56 @@ atual — se o nome pedido agora não é o que está gravado para aquele tipo
 direção), o recorte é tratado como desatualizado e um novo é gerado; nenhum
 registro novo, nem mudança no formato do arquivo do recorte, foi
 necessário.
+
+### O acabamento das sobreposições de tela (etapa 11)
+
+`specs/011-overlay-polish/` corrige o acabamento visual das sobreposições de
+tela que a etapa 9 introduziu — nenhum valor exibido, bloco, configuração de
+sobreposição, enquadramento, terreno ou traçado muda. O texto passa da fonte
+de bitmap (`golang.org/x/image/font/inconsolata`, réplica de pixel) para uma
+fonte vetorial embutida (`golang.org/x/image/font/gofont/goregular`, "Go
+Regular", licença BSD-3-Clause compatível com o MIT do projeto — já ao
+alcance do módulo, nenhuma dependência nova), rasterizada por um
+rasterizador próprio, escrito à mão em `internal/domain/vector_font.go`:
+`golang.org/x/image/font/sfnt` só extrai os contornos do glifo (dado fixo,
+determinístico), e a rasterização em si (achatamento de curvas em um número
+fixo de segmentos de reta, cobertura por superamostragem 4×4 com a regra do
+número de voltas) usa só os operadores que o resto do desenho de quadros já
+usa — nunca `golang.org/x/image/vector.Rasterizer`, que tem um caminho em
+assembly só para amd64 (`acc_amd64.s`) com um equivalente em Go puro só para
+as demais arquiteturas, exatamente o tipo de divergência entre arquiteturas
+que o hash de referência de `frame_scene_test.go` já proíbe
+(`research.md` item 1). Cada glifo rasterizado fica em cache por `(rune,
+ppem)` em `Scene` (`vectorFace`, construído uma vez em `NewScene`), já que o
+tamanho do texto não muda entre quadros de uma mesma execução.
+
+Três acabamentos novos, cada um sua própria história de usuário, todos
+dentro de `internal/domain/frame_screen_overlay.go`: um contorno escuro
+fixo (`OverlayTextOutlineColor`) desenhado, para cada glifo, antes do
+preenchimento — a mesma técnica de casca-antes-do-núcleo que
+`TrailCasingColor`/`MarkerRingColor` já usam —, que mantém o texto legível
+sobre qualquer fundo sem depender de `OverlayPanelOpacity`; os três painéis
+numéricos (distância; elevação e ganho; tempo decorrido) passam a
+compartilhar a largura do mais largo presente naquele quadro, em vez de
+cada um ter a largura do próprio texto; e o
+marcador do perfil de elevação ganha raio próprio, proporcional à altura do
+quadro com piso em pixels (`ProfileMarkerRadiusRatio`/
+`ProfileMarkerMinRadius`, mesmo padrão de `MarkerRadiusRatio`/
+`MarkerMinRadius`, mas fixo — não ligado à aparência que o usuário escolhe
+para o marcador do terreno). A margem de segurança, antes uma única razão
+igual nas quatro bordas (`OverlayMarginRatio`, fração do lado menor), vira
+três (`OverlayTopMarginRatio`/`OverlaySideMarginRatio`, fração da
+altura/largura; `OverlayBottomMarginRatio`, maior, fração da altura) — a
+base de um vídeo vertical é a faixa que redes sociais tipicamente cobrem
+com legenda e botões.
+
+Como os pixels de um quadro com sobreposição ligada mudam de verdade (ao
+contrário da etapa 6, que só acrescentou um bloco ao arquivo),
+`RenderVersion` sobe de `2` para `3` — já suficiente, sem nenhuma mudança de
+código além do valor da constante, porque `NewFrameSetID` já inclui
+`RenderVersion` no hash: quadros da versão `2` passam a ser, automaticamente,
+de outro conjunto, recusados por `render all` sem `--overwrite` e refeitos
+por `fly --keep` ao notar a mudança.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

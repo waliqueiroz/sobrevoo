@@ -7,7 +7,12 @@ import "strconv"
 // file of a frame changes what it says, so frames drawn by another version are
 // never taken for frames of the same set. Version 2 writes, inside each image,
 // the plan the frame was drawn from; the pixels are those of version 1.
-const RenderVersion = 2
+// Version 3 (011-overlay-polish) rasterizes the screen overlay's text from an
+// embedded vector font, with an outline, and resizes the overlay's margins
+// and elevation-profile marker — the pixels of a frame with the overlay on
+// change; a frame drawn with it off is unaffected, but the set it belongs to
+// still changes, since RenderVersion takes part in FrameSetID regardless.
+const RenderVersion = 3
 
 // RGB is a color, 8 bits per channel.
 type RGB struct {
@@ -42,6 +47,13 @@ var (
 	// (009-frame-overlays FR-010, research.md item 5).
 	OverlayPanelColor = RGB{0x00, 0x00, 0x00}
 	OverlayTextColor  = RGB{0xFF, 0xFF, 0xFF}
+
+	// OverlayTextOutlineColor is the color of the outline drawn around every
+	// glyph of the screen overlay's text, before the glyph itself — the same
+	// technique as TrailCasingColor/MarkerRingColor, applied to text, so it
+	// stays legible over any background without depending on
+	// OverlayPanelOpacity (011-overlay-polish FR-004, research.md item 6).
+	OverlayTextOutlineColor = RGB{0x10, 0x10, 0x10}
 )
 
 const (
@@ -59,11 +71,34 @@ const (
 	MarkerRingRatio = 0.003
 	MarkerRingMin   = 1.5
 
-	// OverlayMarginRatio is the safe margin every screen overlay block
-	// keeps from the four edges of the frame, as a fraction of the
-	// shorter side (min(width, height)) — so a social network's edge crop
-	// of a vertical video never cuts one (009-frame-overlays FR-009).
-	OverlayMarginRatio = 0.06
+	// OverlayTopMarginRatio and OverlaySideMarginRatio are the safe margin
+	// every screen overlay block keeps from the top edge (fraction of the
+	// frame's height) and from either side edge (fraction of its width);
+	// OverlayBottomMarginRatio, the margin from the bottom edge (fraction of
+	// the height), deliberately larger than the other two — the bottom of a
+	// vertical video is the band social networks typically cover with a
+	// caption and buttons (011-overlay-polish FR-007, research.md item 9).
+	OverlayTopMarginRatio    = 0.06
+	OverlaySideMarginRatio   = 0.06
+	OverlayBottomMarginRatio = 0.14
+
+	// OverlayOutlineRatio and OverlayOutlineMinWidth size the outline drawn
+	// around the screen overlay's text: a fraction of the frame's height,
+	// with a floor in pixels, the same pattern as TrailMinWidth/
+	// MarkerMinRadius (011-overlay-polish FR-004, research.md item 6).
+	OverlayOutlineRatio    = 0.0025
+	OverlayOutlineMinWidth = 1.0
+
+	// ProfileMarkerRadiusRatio and ProfileMarkerMinRadius size the dot that
+	// marks the current position on the elevation profile: a fraction of
+	// the frame's height, with a floor in pixels — the same pattern
+	// MarkerRadiusRatio/MarkerMinRadius already use for the marker drawn on
+	// the terrain (011-overlay-polish FR-006, research.md item 8), but its
+	// own fixed constant: the profile's marker is not a style choice
+	// (Appearance.MarkerRadiusRatio), so it never shrinks just because the
+	// user picked a small terrain marker.
+	ProfileMarkerRadiusRatio = 0.012
+	ProfileMarkerMinRadius   = 4.0
 
 	// OverlayPanelOpacity is how opaque OverlayPanelColor is over what is
 	// behind it.
