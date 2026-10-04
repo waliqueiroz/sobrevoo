@@ -15,12 +15,14 @@ const videoLogInterval = 5 * time.Second
 
 // videoProgressPrinter shows how far an encoding got: on a terminal, one line that
 // is rewritten with each report; elsewhere (a log), a new line at most every five
-// seconds and at the last report.
+// seconds and at the last report — never twice for the same number of frames, as
+// the last one is reported both by the encoder and once the video is whole.
 type videoProgressPrinter struct {
 	out         io.Writer
 	terminal    bool
 	written     bool
 	lastPrinted time.Duration
+	lastDone    int
 }
 
 func (p *videoProgressPrinter) report(progress domain.VideoProgress) {
@@ -32,9 +34,14 @@ func (p *videoProgressPrinter) report(progress domain.VideoProgress) {
 		p.written = true
 		return
 	}
+	if p.written && progress.Done == p.lastDone {
+		return
+	}
 	if progress.Done == progress.Total || progress.Elapsed-p.lastPrinted >= videoLogInterval {
 		fmt.Fprintln(p.out, text)
+		p.written = true
 		p.lastPrinted = progress.Elapsed
+		p.lastDone = progress.Done
 	}
 }
 
