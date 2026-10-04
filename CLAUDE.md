@@ -523,8 +523,8 @@ preenchimento — a mesma técnica de casca-antes-do-núcleo que
 `TrailCasingColor`/`MarkerRingColor` já usam —, que mantém o texto legível
 sobre qualquer fundo sem depender de `OverlayPanelOpacity`; os três painéis
 numéricos (distância; elevação e ganho; tempo decorrido) passam a
-compartilhar a largura do mais largo presente naquele quadro, em vez de
-cada um ter a largura do próprio texto; e o
+compartilhar a largura do mais largo presente naquele quadro
+(`numericPanelWidth`), em vez de cada um ter a largura do próprio texto; e o
 marcador do perfil de elevação ganha raio próprio, proporcional à altura do
 quadro com piso em pixels (`ProfileMarkerRadiusRatio`/
 `ProfileMarkerMinRadius`, mesmo padrão de `MarkerRadiusRatio`/

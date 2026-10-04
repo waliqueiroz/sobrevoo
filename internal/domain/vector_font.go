@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/sfnt"
 	"golang.org/x/image/math/fixed"
 )
@@ -65,10 +65,13 @@ type glyphCacheEntry struct {
 	ok   bool
 }
 
-// vectorFace rasterizes the "Go Regular" font embedded in the binary
-// (golang.org/x/image/font/gofont/goregular, BSD-3-Clause, compatible with
-// this project's MIT license — research.md item 2), one glyph at a time,
-// with its own deterministic rasterizer (never
+// vectorFace rasterizes the "Go Bold" font embedded in the binary
+// (golang.org/x/image/font/gofont/gobold, BSD-3-Clause, compatible with
+// this project's MIT license — 011-overlay-polish research.md item 2). It
+// is the bold weight of the same "Go" family the regular weight used
+// before 012-overlay-ptbr-readability, chosen for its stronger contrast
+// over a bright satellite image (that stage's research.md item 3), one
+// glyph at a time, with its own deterministic rasterizer (never
 // golang.org/x/image/vector.Rasterizer, which has an amd64-only assembly
 // path with no equal on other architectures — research.md item 1). A glyph
 // is rasterized the first time it is asked for, at its (rune, ppem), and
@@ -89,7 +92,7 @@ type vectorFace struct {
 // the font is static data compiled into the binary, so a failure would be a
 // build-time bug, never a runtime situation to handle.
 func newVectorFace() *vectorFace {
-	parsed, err := sfnt.Parse(goregular.TTF)
+	parsed, err := sfnt.Parse(gobold.TTF)
 	if err != nil {
 		panic(fmt.Sprintf("sobrevoo: embedded vector font failed to parse: %v", err))
 	}

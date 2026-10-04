@@ -26,6 +26,12 @@ type screenOverlay struct {
 	// 1, 3, 4). Built once per Scene (frame_scene.go) and reused by every
 	// frame of the same render.
 	face *vectorFace
+
+	// panelWidth is the numeric panels' shared width, already computed by
+	// Scene (frame_scene.go) from every frame of the flight — never just
+	// this one — so it stays the same from the first frame to the last
+	// (012-overlay-ptbr-readability FR-007/FR-008, research.md item 4).
+	panelWidth int
 }
 
 // glyphHeightRatio is about how tall, as a share of the frame's height, one
@@ -57,63 +63,98 @@ func (s screenOverlay) draw(plan CameraPlan, index int) {
 	marginTop := roundHalfUp(OverlayTopMarginRatio * float64(height))
 	marginSide := roundHalfUp(OverlaySideMarginRatio * float64(width))
 	marginBottom := roundHalfUp(OverlayBottomMarginRatio * float64(height))
-	ppem := max(1, roundHalfUp(glyphHeightRatio*float64(height)))
+	ppem := overlayPpem(height)
 	pad := roundHalfUp(overlayLinePadding * float64(s.face.lineHeight(ppem)))
 	lineHeight := s.face.lineHeight(ppem) + 2*pad
 
-	var distanceText, elevationText, timeText string
 	showDistance := s.config.Distance
 	showElevation := s.config.Elevation && plan.ElevationAvailable
 	showTime := s.config.Time && plan.TimeReference == TimeReferenceClock
 
-	if showDistance {
-		distanceText = "DIST " + formatOverlayDistance(frame.MarkerDistance)
-	}
-	if showElevation {
-		elevationText = "ELEV " + formatOverlayElevation(frame.TrackElevation) + "   GAIN " + formatOverlayGain(frame.TrackElevationGain)
-	}
-	if showTime {
-		timeText = "TIME " + formatOverlayElapsed(frame.ActivityElapsed)
-	}
-	panelWidth := numericPanelWidth(s.face, ppem, distanceText, elevationText, timeText)
-
 	y := marginTop
 	if showDistance {
-		s.drawLine(marginSide, y, ppem, pad, panelWidth, distanceText)
+		s.drawLine(marginSide, y, ppem, pad, s.panelWidth, distanceBlockText(frame))
 		y += lineHeight + pad
 	}
 	if showElevation {
-		s.drawLine(marginSide, y, ppem, pad, panelWidth, elevationText)
+		s.drawLine(marginSide, y, ppem, pad, s.panelWidth, elevationBlockText(frame))
 		y += lineHeight + pad
 	}
 	if showTime {
-		s.drawLine(marginSide, y, ppem, pad, panelWidth, timeText)
+		s.drawLine(marginSide, y, ppem, pad, s.panelWidth, timeBlockText(frame))
 	}
 	if s.config.Profile && plan.ElevationAvailable {
 		s.drawProfile(plan, index, marginSide, marginBottom, ppem)
 	}
 }
 
-// numericPanelWidth is the width every present numeric block's panel
-// shares, in pixels at ppem: the widest of texts, skipping an empty one —
-// empty is how draw marks a block that is not shown this frame
-// (011-overlay-polish FR-005, research.md item 7).
-func numericPanelWidth(face *vectorFace, ppem int, texts ...string) int {
+// distanceBlockText, elevationBlockText and timeBlockText are the text of
+// each numeric block, labeled in Brazilian Portuguese — this is a personal
+// tool used in Portuguese, so every word the drawing writes is (FR-001,
+// 012-overlay-ptbr-readability, research.md item 1): "DIST" and "ELEV" read
+// the same in Portuguese as they did in English, so they are unchanged;
+// "GAIN" and "TIME" become "GANHO" and "TEMPO". The unit abbreviations
+// ("km", "m") and the formatting of the values are untouched (FR-002).
+// draw and stablePanelWidth are the only two callers, so the text drawn and
+// the text measured can never drift apart (research.md item 5).
+func distanceBlockText(frame CameraFrame) string {
+	return "DIST " + formatOverlayDistance(frame.MarkerDistance)
+}
+
+func elevationBlockText(frame CameraFrame) string {
+	return "ELEV " + formatOverlayElevation(frame.TrackElevation) + "   GANHO " + formatOverlayGain(frame.TrackElevationGain)
+}
+
+func timeBlockText(frame CameraFrame) string {
+	return "TEMPO " + formatOverlayElapsed(frame.ActivityElapsed)
+}
+
+// overlayPpem is the pixel size ("pixels per em") a glyph is rasterized at,
+// for a frame height pixels tall — the same formula draw and
+// Scene.numericPanelWidth (frame_scene.go) both use, so the panel width
+// precomputed from the whole plan matches the size text is actually drawn
+// at (research.md item 6).
+func overlayPpem(height int) int {
+	return max(1, roundHalfUp(glyphHeightRatio*float64(height)))
+}
+
+// stablePanelWidth is the width every present numeric block's panel
+// shares, in pixels at ppem: the widest text any of the three numeric
+// blocks (distance; elevation and gain; time elapsed) has in ANY frame of
+// plan — never just one — so the panels never change width between the
+// first and the last frame of a flight (012-overlay-ptbr-readability
+// FR-007/FR-008, research.md item 4). A block config/plan never shows
+// (config.Distance false, or no clock reference, or no elevation) does not
+// take part; 0 when no numeric block is shown at all.
+func stablePanelWidth(face *vectorFace, plan CameraPlan, config OverlayConfig, ppem int) int {
+	showDistance := config.Distance
+	showElevation := config.Elevation && plan.ElevationAvailable
+	showTime := config.Time && plan.TimeReference == TimeReferenceClock
+	if !showDistance && !showElevation && !showTime {
+		return 0
+	}
+
 	width := 0
-	for _, text := range texts {
-		if text == "" {
-			continue
+	for _, frame := range plan.Frames {
+		if showDistance {
+			width = max(width, face.textWidth(distanceBlockText(frame), ppem))
 		}
-		width = max(width, face.textWidth(text, ppem))
+		if showElevation {
+			width = max(width, face.textWidth(elevationBlockText(frame), ppem))
+		}
+		if showTime {
+			width = max(width, face.textWidth(timeBlockText(frame), ppem))
+		}
 	}
 	return width
 }
 
 // drawLine draws one block: a panel panelWidth pixels wide plus pad on
 // every side, its top-left corner at (x, y), with text over it in
-// OverlayTextColor. panelWidth is shared by every numeric block present in
-// the same draw call (numericPanelWidth), never text's own width alone —
-// the three numeric panels line up at the same width (FR-005).
+// OverlayTextColor. panelWidth is s.panelWidth, computed once per flight by
+// Scene (frame_scene.go), never text's own width alone — the three numeric
+// panels line up at the same, stable width
+// (011-overlay-polish FR-005; 012-overlay-ptbr-readability FR-007/FR-008).
 func (s screenOverlay) drawLine(x, y, ppem, pad, panelWidth int, text string) {
 	h := s.face.lineHeight(ppem)
 	drawPanel(s.image, x, y, x+panelWidth+2*pad, y+h+2*pad)
@@ -255,13 +296,13 @@ func absInt(v int) int {
 // item 6). A rune s.face has no glyph for draws nothing and advances by
 // nothing.
 func (s screenOverlay) drawText(text string, x, y, ppem int, color RGB) {
-	outlineRadius := max(int(OverlayOutlineMinWidth), roundHalfUp(OverlayOutlineRatio*float64(s.image.Resolution.Height)))
+	radius := outlineRadius(ppem)
 
 	penX := x
 	for _, r := range text {
 		mask, ok := s.face.glyph(r, ppem)
 		if ok {
-			s.drawGlyphOutline(mask, penX, y, outlineRadius)
+			s.drawGlyphOutline(mask, penX, y, radius)
 		}
 		penX += glyphAdvance(mask, ok)
 	}
@@ -284,6 +325,15 @@ func glyphAdvance(mask glyphMask, ok bool) int {
 		return 0
 	}
 	return mask.advance
+}
+
+// outlineRadius is the dilation radius of the text's outline, in pixels: a
+// fraction of ppem (the glyph's own size), never smaller than the
+// documented floor — proportional to the letter being outlined, not to the
+// frame it is drawn on, so the same proportion holds at any resolution
+// (012-overlay-ptbr-readability FR-005, research.md item 2).
+func outlineRadius(ppem int) int {
+	return max(int(OverlayOutlineMinWidth), roundHalfUp(OverlayOutlineRatio*float64(ppem)))
 }
 
 // drawGlyphFill blends mask's own coverage, in color, at (x, y) — the same
