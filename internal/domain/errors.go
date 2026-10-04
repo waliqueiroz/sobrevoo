@@ -249,9 +249,9 @@ var (
 	ErrRegistryClearNotConfirmed = errors.New("registry clear was not confirmed")
 
 	// ErrSliceUsesDifferentSource reports a kept geo data slice whose recorded
-	// provenance does not use, for a type an explicit selection names, the
-	// source requested — only compared internally, when deciding whether to
-	// reuse a slice kept by "fly --keep" (never returned to a user directly).
+	// provenance is not exactly the sources a slice made now would use — only
+	// compared internally, when deciding whether to reuse a slice kept by
+	// "fly --keep" (never returned to a user directly).
 	ErrSliceUsesDifferentSource = errors.New("geo data slice uses a different source than requested")
 )
 

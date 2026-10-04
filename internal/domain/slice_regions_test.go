@@ -28,6 +28,42 @@ func Test_SliceRegions_BaseMaps(t *testing.T) {
 	})
 }
 
+func Test_SliceRegions_Sources(t *testing.T) {
+	t.Run("should list each source of both types once, sorted by name", func(t *testing.T) {
+		// given
+		regions := domain.SliceRegions{
+			{Box: box(0, 1, 0, 1), BaseMap: baseMap("mapa-b", box(0, 9, 0, 9)), Elevation: elevation("relevo", box(0, 9, 0, 9))},
+			{Box: box(0, 1, 1, 2), BaseMap: baseMap("mapa-a", box(0, 9, 0, 9)), Elevation: elevation("relevo", box(0, 9, 0, 9))},
+			{Box: box(1, 2, 0, 1), BaseMap: baseMap("mapa-b", box(0, 9, 0, 9)), Elevation: elevation("relevo", box(0, 9, 0, 9))},
+		}
+
+		// when
+		sources := regions.Sources()
+
+		// then
+		require.Len(t, sources, 3)
+		assert.Equal(t, "mapa-a", sources[0].Name)
+		assert.Equal(t, "mapa-b", sources[1].Name)
+		assert.Equal(t, "relevo", sources[2].Name)
+	})
+
+	t.Run("should add nothing for a type no source covers in a region", func(t *testing.T) {
+		// given: the second region has no base map
+		regions := domain.SliceRegions{
+			{Box: box(0, 1, 0, 1), BaseMap: baseMap("mapa", box(0, 1, 0, 1)), Elevation: elevation("relevo", box(0, 9, 0, 9))},
+			{Box: box(1, 2, 0, 1), Elevation: elevation("relevo", box(0, 9, 0, 9))},
+		}
+
+		// when
+		sources := regions.Sources()
+
+		// then
+		require.Len(t, sources, 2)
+		assert.Equal(t, "mapa", sources[0].Name)
+		assert.Equal(t, "relevo", sources[1].Name)
+	})
+}
+
 func Test_SliceRegions_TilesFor(t *testing.T) {
 	// at level 4 a tile is 22.5° wide: longitudes 1° to 40° are columns 8 and 9, latitudes -30° to -1° rows 8 and 9
 	t.Run("should ask the only base map for every tile of the region, sorted by column and row", func(t *testing.T) {

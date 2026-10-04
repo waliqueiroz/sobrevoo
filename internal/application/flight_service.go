@@ -199,18 +199,23 @@ func (s *flightService) reusePlan(plan domain.CameraPlan, planPath string, overw
 
 // reuseSlice reuses the slice already at slicePath when it still matches
 // plan (GeoSlice.EnsureMatches, the same check FrameService already makes
-// before drawing) and was made using selection (GeoSlice.EnsureUsesSelection,
-// 010-geo-data-source-control FR-011): a slice whose recorded provenance
-// uses a different source than requested now — explicit or not — is never
-// reused silently, even when the plan still matches. Otherwise it generates
-// a fresh slice — which is where the coverage of the registered geo data is
-// verified, as the first thing GeoSliceService.Generate does (research.md
-// item 3) — and exports it to slicePath, with the same "another set"
-// protection as reusePlan.
+// before drawing) and was extracted from exactly the sources a slice made now
+// would be (GeoSliceService.Sources, GeoSlice.EnsureUsesSources,
+// 010-geo-data-source-control FR-011): a kept slice whose sources differ from
+// the ones requested now — explicitly or by the automatic selection, in
+// either direction — is never reused silently, even when the plan still
+// matches. Otherwise it generates a fresh slice — which is where the coverage
+// of the registered geo data is verified, as the first thing
+// GeoSliceService.Generate does (research.md item 3) — and exports it to
+// slicePath, with the same "another set" protection as reusePlan.
 func (s *flightService) reuseSlice(plan domain.CameraPlan, selection domain.SourceSelection, slicePath string, overwrite bool, summary *domain.FlightSummary) (domain.GeoSlice, error) {
-	if existing, err := s.geoSliceService.Load(slicePath); err == nil && existing.EnsureMatches(plan) == nil && existing.EnsureUsesSelection(selection) == nil {
-		summary.SliceReused = true
-		return existing, nil
+	if existing, err := s.geoSliceService.Load(slicePath); err == nil && existing.EnsureMatches(plan) == nil {
+		// A requested name that does not resolve is left to Generate, below,
+		// to refuse the way it always does.
+		if sources, err := s.geoSliceService.Sources(plan, selection); err == nil && existing.EnsureUsesSources(sources) == nil {
+			summary.SliceReused = true
+			return existing, nil
+		}
 	}
 
 	slice, err := s.geoSliceService.Generate(plan, selection)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 )
 
 // GeoSliceExporter writes a geo data slice outside the process, as a file the
@@ -241,33 +242,52 @@ func describeArea(area BoundingBox) string {
 	return text
 }
 
-// EnsureUsesSelection refuses, with ErrSliceUsesDifferentSource, a slice
-// whose recorded provenance (Summary.Sources) does not use, for a type
-// selection names, exactly the source named — the same comparison
-// FlightService makes before reusing a slice kept by "fly --keep"
-// (010-geo-data-source-control FR-011): the requested source is compared
-// against what the slice already registers it used, not recomputed. A type
-// selection leaves nil (automatic) is not checked at all.
-func (g GeoSlice) EnsureUsesSelection(selection SourceSelection) error {
-	if err := ensureUsesOne(g.Summary.Sources, selection.BaseMapName, DataTypeBaseMap); err != nil {
-		return err
+// EnsureUsesSources refuses, with ErrSliceUsesDifferentSource, a slice whose
+// recorded provenance (Summary.Sources) is not exactly sources — the same
+// registered files, of the same types, no more and no fewer.
+// FlightService compares a slice kept by "fly --keep" against the sources a
+// slice made now would use (GeoSliceService.Sources), so a kept slice is
+// reused only when it is what would be gathered now
+// (010-geo-data-source-control FR-011): a source requested explicitly that
+// the kept slice did not use alone, a return to the automatic selection that
+// would choose differently, or a registry that changed since, all make it
+// stale. A slice that would come out the same — an explicit request for the
+// one source the automatic selection had used, say — is not.
+func (g GeoSlice) EnsureUsesSources(sources []GeoDataSource) error {
+	used := make([]GeoDataSource, len(g.Summary.Sources))
+	for i, use := range g.Summary.Sources {
+		used[i] = use.Source
 	}
-	return ensureUsesOne(g.Summary.Sources, selection.ElevationName, DataTypeElevation)
+
+	if strings.Join(sourceKeys(used), "\n") != strings.Join(sourceKeys(sources), "\n") {
+		return fmt.Errorf("%w: the slice uses %s, a slice made now would use %s",
+			ErrSliceUsesDifferentSource, describeSources(used), describeSources(sources))
+	}
+	return nil
 }
 
-// ensureUsesOne checks one type of name against the slice's recorded uses.
-func ensureUsesOne(uses []SliceSourceUse, name *string, wantType DataType) error {
-	if name == nil {
-		return nil
+// sourceKeys identifies each source by its type, name and file, sorted, so
+// two lists of sources compare as sets.
+func sourceKeys(sources []GeoDataSource) []string {
+	keys := make([]string, len(sources))
+	for i, source := range sources {
+		keys[i] = string(source.Type) + "\x00" + source.Name + "\x00" + source.Path
 	}
+	sort.Strings(keys)
+	return keys
+}
 
-	for _, use := range uses {
-		if use.Source.Type == wantType && use.Source.Name == *name {
-			return nil
-		}
+// describeSources names sources for a message: "name (type), ...".
+func describeSources(sources []GeoDataSource) string {
+	if len(sources) == 0 {
+		return "no source"
 	}
-
-	return fmt.Errorf("%w: the slice does not use %q for %s", ErrSliceUsesDifferentSource, *name, wantType)
+	names := make([]string, len(sources))
+	for i, source := range sources {
+		names[i] = fmt.Sprintf("%s (%s)", source.Name, source.Type)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 // EnsureDrawable refuses a slice that cannot be drawn: one whose base map has
@@ -422,6 +442,26 @@ func (r SliceRegions) BaseMaps() []GeoDataSource {
 		}
 	}
 	return maps
+}
+
+// Sources lists each registered source the regions are read from, of both
+// types, once and sorted by name — the sources a slice gathered over the
+// regions is extracted from. A region no source of a type covers adds nothing
+// for that type.
+func (r SliceRegions) Sources() []GeoDataSource {
+	var sources []GeoDataSource
+	seen := map[string]bool{}
+	for _, region := range r {
+		for _, source := range []GeoDataSource{region.BaseMap, region.Elevation} {
+			if source.Name == "" || seen[source.Name] {
+				continue
+			}
+			seen[source.Name] = true
+			sources = append(sources, source)
+		}
+	}
+	sort.Slice(sources, func(i, j int) bool { return sources[i].Name < sources[j].Name })
+	return sources
 }
 
 // TilesFor says which tiles to ask each base map for, by the map's name:

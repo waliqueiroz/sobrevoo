@@ -483,79 +483,101 @@ func Test_GeoSlice_EnsureMatches(t *testing.T) {
 	})
 }
 
-func Test_GeoSlice_EnsureUsesSelection(t *testing.T) {
-	baseMap := builddomain.NewGeoDataSourceBuilder().WithName("mapa-a").WithType(domain.DataTypeBaseMap).Build()
-	elevation := builddomain.NewGeoDataSourceBuilder().WithName("relevo-a").WithType(domain.DataTypeElevation).Build()
-	slice := builddomain.NewGeoSliceBuilder().
-		WithTileSets(builddomain.NewTileSetBuilder().WithSource(baseMap).Build()).
-		WithElevation(builddomain.NewElevationGridBuilder().WithSource(elevation).Build()).
-		Build()
+func Test_GeoSlice_EnsureUsesSources(t *testing.T) {
+	mapA := builddomain.NewGeoDataSourceBuilder().WithName("mapa-a").WithPath("/dados/mapa-a.mbtiles").WithType(domain.DataTypeBaseMap).Build()
+	mapB := builddomain.NewGeoDataSourceBuilder().WithName("mapa-b").WithPath("/dados/mapa-b.mbtiles").WithType(domain.DataTypeBaseMap).Build()
+	reliefA := builddomain.NewGeoDataSourceBuilder().WithName("relevo-a").WithPath("/dados/relevo-a.tif").WithType(domain.DataTypeElevation).Build()
+	reliefB := builddomain.NewGeoDataSourceBuilder().WithName("relevo-b").WithPath("/dados/relevo-b.tif").WithType(domain.DataTypeElevation).Build()
+	sliceOf := func(baseMaps []domain.GeoDataSource, elevations ...domain.GeoDataSource) domain.GeoSlice {
+		tileSets := make([]domain.TileSet, len(baseMaps))
+		for i, source := range baseMaps {
+			tileSets[i] = builddomain.NewTileSetBuilder().WithSource(source).Build()
+		}
+		grids := make([]domain.ElevationGrid, len(elevations))
+		for i, source := range elevations {
+			grids[i] = builddomain.NewElevationGridBuilder().WithSource(source).Build()
+		}
+		return builddomain.NewGeoSliceBuilder().WithTileSets(tileSets...).WithElevation(grids...).Build()
+	}
 
-	t.Run("should accept when neither type is selected", func(t *testing.T) {
-		// when / then
-		assert.NoError(t, slice.EnsureUsesSelection(domain.SourceSelection{}))
-	})
-
-	t.Run("should accept when the requested base map is exactly the one the slice's provenance recorded", func(t *testing.T) {
+	t.Run("should accept a slice that uses exactly the sources given, in any order", func(t *testing.T) {
 		// given
-		name := "mapa-a"
-
-		// when / then
-		assert.NoError(t, slice.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &name}))
-	})
-
-	t.Run("should accept when the requested elevation is exactly the one the slice's provenance recorded", func(t *testing.T) {
-		// given
-		name := "relevo-a"
-
-		// when / then
-		assert.NoError(t, slice.EnsureUsesSelection(domain.SourceSelection{ElevationName: &name}))
-	})
-
-	t.Run("should refuse when the requested base map is different from the one the slice's provenance recorded", func(t *testing.T) {
-		// given
-		name := "mapa-b"
+		slice := sliceOf([]domain.GeoDataSource{mapA, mapB}, reliefA)
 
 		// when
-		err := slice.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &name})
+		err := slice.EnsureUsesSources([]domain.GeoDataSource{reliefA, mapB, mapA})
+
+		// then
+		assert.NoError(t, err)
+	})
+
+	t.Run("should refuse a slice that uses a different base map than the one given", func(t *testing.T) {
+		// given
+		slice := sliceOf([]domain.GeoDataSource{mapA}, reliefA)
+
+		// when
+		err := slice.EnsureUsesSources([]domain.GeoDataSource{mapB, reliefA})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
+		assert.ErrorContains(t, err, "the slice uses mapa-a (base map), relevo-a (elevation), a slice made now would use mapa-b (base map), relevo-a (elevation)")
+	})
+
+	t.Run("should refuse a slice that uses a different elevation than the one given", func(t *testing.T) {
+		// given
+		slice := sliceOf([]domain.GeoDataSource{mapA}, reliefA)
+
+		// when
+		err := slice.EnsureUsesSources([]domain.GeoDataSource{mapA, reliefB})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
 	})
 
-	t.Run("should refuse when the requested elevation is different from the one the slice's provenance recorded", func(t *testing.T) {
-		// given
-		name := "relevo-b"
+	t.Run("should refuse a slice that mixed two base maps when only one of them is given, as an explicit request for it would", func(t *testing.T) {
+		// given: the automatic selection had read part of the area from each map
+		slice := sliceOf([]domain.GeoDataSource{mapA, mapB}, reliefA)
 
 		// when
-		err := slice.EnsureUsesSelection(domain.SourceSelection{ElevationName: &name})
+		err := slice.EnsureUsesSources([]domain.GeoDataSource{mapA, reliefA})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
 	})
 
-	t.Run("should check the two types independently, refusing only for the one that does not match", func(t *testing.T) {
+	t.Run("should refuse a slice that used one base map when two are given, as a return to the automatic selection that mixes them would", func(t *testing.T) {
 		// given
-		baseMapName, elevationName := "mapa-a", "relevo-b"
+		slice := sliceOf([]domain.GeoDataSource{mapA}, reliefA)
 
 		// when
-		err := slice.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &baseMapName, ElevationName: &elevationName})
+		err := slice.EnsureUsesSources([]domain.GeoDataSource{mapA, mapB, reliefA})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
-		assert.ErrorContains(t, err, "relevo-b")
 	})
 
-	t.Run("should refuse when the requested type has no recorded use at all", func(t *testing.T) {
+	t.Run("should refuse a slice whose source has the same name as the one given but another file", func(t *testing.T) {
+		// given: the name was removed and registered again for another file
+		slice := sliceOf([]domain.GeoDataSource{mapA}, reliefA)
+		moved := builddomain.NewGeoDataSourceBuilder().WithName("mapa-a").WithPath("/outros/mapa-a.mbtiles").WithType(domain.DataTypeBaseMap).Build()
+
+		// when
+		err := slice.EnsureUsesSources([]domain.GeoDataSource{moved, reliefA})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
+	})
+
+	t.Run("should refuse a slice with no recorded source when sources are given", func(t *testing.T) {
 		// given
 		empty := builddomain.NewGeoSliceBuilder().WithTileSets().WithElevation().Build()
-		name := "mapa-a"
 
 		// when
-		err := empty.EnsureUsesSelection(domain.SourceSelection{BaseMapName: &name})
+		err := empty.EnsureUsesSources([]domain.GeoDataSource{mapA, reliefA})
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrSliceUsesDifferentSource)
+		assert.ErrorContains(t, err, "the slice uses no source")
 	})
 }
 

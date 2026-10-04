@@ -559,6 +559,97 @@ func Test_geoSliceService_Generate_SourceSelection(t *testing.T) {
 	})
 }
 
+func Test_geoSliceService_Sources(t *testing.T) {
+	plan := slicePlan()
+	// westOnly covers the western half of the plan's area and, being
+	// smaller, wins the automatic selection there; wholeWorldish wins the rest
+	westOnly := baseMapSource("west-only", sliceBox(-30, -20, -50, -46.63))
+	whole := baseMapSource("whole", wholeWorldish)
+	relief := reliefSource("dem", wholeWorldish)
+
+	t.Run("should list, sorted by name, every source the automatic selection reads part of the area from, without reading any content", func(t *testing.T) {
+		// given: the readers have no expectations at all — any call fails the test
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{whole, westOnly, relief}, nil)
+
+		// when
+		sources, err := m.service.Sources(plan, domain.SourceSelection{})
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, []domain.GeoDataSource{relief, westOnly, whole}, sources)
+	})
+
+	t.Run("should list only the source requested for a type, never mixing in another", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{whole, westOnly, relief}, nil)
+		name := "whole"
+
+		// when
+		sources, err := m.service.Sources(plan, domain.SourceSelection{BaseMapName: &name})
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, []domain.GeoDataSource{relief, whole}, sources)
+	})
+
+	t.Run("should leave out a registered source whose file is no longer there", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{whole, westOnly, relief}, nil)
+		m.fileChecker.EXPECT().Exists(westOnly.Path).Return(false).AnyTimes()
+		m.fileChecker.EXPECT().Exists(whole.Path).Return(true).AnyTimes()
+		m.fileChecker.EXPECT().Exists(relief.Path).Return(true).AnyTimes()
+
+		// when
+		sources, err := m.service.Sources(plan, domain.SourceSelection{})
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, []domain.GeoDataSource{relief, whole}, sources)
+	})
+
+	t.Run("should refuse a requested name that is not registered, as Generate does", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{whole, relief}, nil)
+		name := "nao-existe"
+
+		// when
+		_, err := m.service.Sources(plan, domain.SourceSelection{BaseMapName: &name})
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrDataSourceNotRegistered)
+	})
+
+	t.Run("should list exactly the sources a slice generated with the same registry and selection records", func(t *testing.T) {
+		// given
+		m := newSliceMocks(t)
+		m.allFilesExist()
+		m.repository.EXPECT().List().Return([]domain.GeoDataSource{whole, westOnly, relief}, nil).Times(2)
+		m.baseMapReader.EXPECT().Levels(gomock.Any()).Return(domain.LevelRange{Min: 0, Max: 16}, nil).AnyTimes()
+		m.baseMapReader.EXPECT().ReadTiles(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ string, _ int, ids []domain.TileID) (domain.TileRead, error) { return tilesFor(ids), nil }).AnyTimes()
+		m.elevationReader.EXPECT().Describe(relief.Path).Return(reliefInfo, nil)
+		m.elevationReader.EXPECT().ReadWindow(relief.Path, gomock.Any()).
+			DoAndReturn(func(_ string, w domain.GridWindow) (domain.ElevationWindow, error) { return samplesFor(w), nil }).AnyTimes()
+
+		// when
+		sources, err := m.service.Sources(plan, domain.SourceSelection{})
+		require.NoError(t, err)
+		slice, err := m.service.Generate(plan, domain.SourceSelection{})
+		require.NoError(t, err)
+
+		// then: both maps and the elevation, as the automatic selection mixes them
+		require.Len(t, sources, 3)
+		assert.NoError(t, slice.EnsureUsesSources(sources))
+	})
+}
+
 func Test_geoSliceService_Export(t *testing.T) {
 	slice := builddomain.NewGeoSliceBuilder().Build()
 

@@ -379,7 +379,7 @@ redesenhados. O que vale depende do que mudou:
 | nada (só um `--output` novo), ou a execução anterior foi interrompida | reaproveitado | reaproveitado | reaproveitados; só os que faltam são desenhados |
 | só `--quality`, com um `--output` novo | reaproveitado | reaproveitado | reaproveitados (só o vídeo é refeito) |
 | `--resolution`, uma flag de aparência ou de sobreposição | reaproveitado | reaproveitado | redesenhados |
-| `--base-map` ou `--elevation` (inclusive passar de seleção automática para explícita, ou o contrário) | reaproveitado | refeito | redesenhados |
+| `--base-map` ou `--elevation`, ou o registro, de um jeito que muda as fontes de que o recorte seria tirado agora (inclusive passar de seleção automática para explícita, ou o contrário) | reaproveitado | refeito | redesenhados |
 | `--duration`, `--fps`, `--distance`, `--tilt`, `--aspect`, `--simplification`, `--smoothing` ou o próprio trajeto | refeito | refeito | redesenhados |
 
 Duas regras de proteção valem aqui, iguais às dos comandos individuais:
