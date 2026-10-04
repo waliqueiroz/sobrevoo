@@ -91,12 +91,12 @@ type manifestFile struct {
 }
 
 // The format this reader understands, and the largest slice file it accepts: the
-// limit of a slice (256 MiB of content) and room for its manifest. A ZIP that
-// declares more is not a slice this tool wrote, and would take the memory of the
-// computer to read.
+// limit of a slice (1.5 GiB of content, config.SliceTuning.MaxSizeBytes) and room
+// for its manifest. A ZIP that declares more is not a slice this tool wrote, and
+// would take the memory of the computer to read.
 const maxManifestBytes = 16 << 20
 
-var maxSliceBytes int64 = 256<<20 + maxManifestBytes
+var maxSliceBytes int64 = 1536<<20 + maxManifestBytes
 
 var planIDPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 

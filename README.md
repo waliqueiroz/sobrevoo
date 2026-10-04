@@ -343,7 +343,7 @@ voo:
   trechos e o que falta em cada um (mapa base, relevo ou os dois). Registre
   um arquivo que cubra mais área em volta do trajeto.
 - **`geo data slice is too large`** (código `20`): o recorte passaria de
-  256 MiB. Acontece com mapas de muito detalhe (níveis de zoom 17 e 18) e a
+  1,5 GiB. Acontece com mapas de muito detalhe (níveis de zoom 17 e 18) e a
   câmera perto do chão. Afaste a câmera com `--distance high`, use um mapa
   com nível máximo de detalhe menor, ou um trajeto mais curto.
 - **`tile format is not supported for drawing`** (código `31`): o mapa base
@@ -702,7 +702,7 @@ interrupção, que no `fly` tem código próprio (`51`).
 | `17` | arquivo de plano inválido | `geodata slice`, `render`, `video` |
 | `18` | arquivo de plano de uma versão não suportada (gere o plano de novo) | `geodata slice`, `render`, `video` |
 | `19` | área não coberta pelos dados registrados | `geodata slice`, `fly` |
-| `20` | recorte grande demais (mais de 256 MiB) | `geodata slice`, `fly` |
+| `20` | recorte grande demais (mais de 1,5 GiB) | `geodata slice`, `fly` |
 | `21` | conteúdo do dado geográfico ilegível | `geodata slice`, `geodata elevation`, `fly` |
 | `22` | unidade de elevação não suportada | `geodata slice`, `geodata elevation`, `fly` |
 | `23` | destino do recorte já existe | `geodata slice --export`, `fly --keep` |
