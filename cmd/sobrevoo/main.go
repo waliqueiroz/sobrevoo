@@ -45,7 +45,7 @@ func run() int {
 
 	cameraPlanExporter := jsonfile.NewCameraPlanExporter()
 	cameraPlanReader := jsonfile.NewCameraPlanReader()
-	cameraPlanService := application.NewCameraPlanService(trackService, cameraPlanExporter, cameraPlanReader, domainLevel(cfg.DefaultLevel), domainCameraTuning(cfg.CameraTuning))
+	cameraPlanService := application.NewCameraPlanService(trackService, cameraPlanExporter, cameraPlanReader, domainCameraTuning(cfg.CameraTuning))
 
 	geoDataInspector := geodatainspector.New()
 	elevationReader := elevationreader.NewGeoTIFF()
@@ -100,11 +100,11 @@ func run() int {
 
 	root := cli.NewRootCommand()
 	root.AddCommand(cli.NewInspectCommand(trackService, domainLevel(cfg.DefaultLevel)))
-	root.AddCommand(cli.NewPlanCommand(cameraPlanService, domainPlanParameters(cfg.PlanDefaults)))
+	root.AddCommand(cli.NewPlanCommand(cameraPlanService, domainPlanParameters(cfg.PlanDefaults, cfg.DefaultLevel)))
 	root.AddCommand(geoDataCommand)
 	root.AddCommand(renderCommand)
 	root.AddCommand(cli.NewVideoCommand(cameraPlanService, videoService, domainVideoQuality(cfg.VideoDefaults.Quality)))
-	root.AddCommand(cli.NewFlightCommand(flightService, domainPlanParameters(cfg.PlanDefaults), defaultResolution, defaultAppearance, defaultOverlay, domainVideoQuality(cfg.VideoDefaults.Quality)))
+	root.AddCommand(cli.NewFlightCommand(flightService, domainPlanParameters(cfg.PlanDefaults, cfg.DefaultLevel), defaultResolution, defaultAppearance, defaultOverlay, domainVideoQuality(cfg.VideoDefaults.Quality)))
 
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

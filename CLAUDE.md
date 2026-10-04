@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Sobrevoo é uma ferramenta de linha de comando pessoal e open source, em Go,
 que vai gerar vídeos de sobrevoo a partir de trajetos GPS (no estilo
-Relive/Strava). Onze features estão implementadas até agora:
+Relive/Strava). Treze features estão implementadas até agora:
 `specs/001-gps-track-processing/` lê um trajeto GPX, trata ele (descarta
 pontos inválidos, reordena por tempo), reduz/suaviza o traçado, e imprime um
 resumo (comando `inspect`); `specs/002-geo-data-registry/` gerencia o
@@ -66,7 +66,22 @@ quadro, com piso em pixels, como o marcador do mapa já tem; o texto ganha
 um contorno escuro fixo, legível sobre qualquer fundo; e a margem de
 segurança passa a ser maior na borda inferior que nas demais, adequada ao
 vídeo vertical — o que muda os pixels de quadros já desenhados, então a
-versão do desenho sobe (`RenderVersion` 3). Ainda não há áudio.
+versão do desenho sobe (`RenderVersion` 3); `specs/012-overlay-ptbr-readability/`
+traduz para português do Brasil todo rótulo que a sobreposição desenha
+(mantendo as abreviações de unidade, "km"/"m", como já estão) e corrige
+três defeitos de legibilidade do texto introduzidos pela etapa anterior —
+o contorno escuro, grosso demais, passa a ser fino e proporcional ao
+tamanho em que a letra está sendo desenhada, a fonte embutida passa a ter
+peso mais forte (ainda vetorial, embutida no binário, sem dependência
+nova) e a largura dos painéis numéricos deixa de pulsar quadro a quadro —,
+o que muda os pixels de novo e sobe a versão do desenho outra vez
+(`RenderVersion` 4); e `specs/013-treatment-level-flags/` leva os níveis
+de simplificação e de suavização do trajeto — até então só escolhíveis no
+`inspect` — para `plan` e `fly`, com os mesmos nomes de opção, os mesmos
+valores aceitos e os mesmos padrões vindos da configuração, passando a
+fazer parte da identidade do plano de câmera (`CameraPlan.ID()`) e, por
+isso, da decisão de reaproveitar um plano, um recorte ou quadros guardados
+por `fly --keep` entre execuções. Ainda não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -543,6 +558,52 @@ código além do valor da constante, porque `NewFrameSetID` já inclui
 `RenderVersion` no hash: quadros da versão `2` passam a ser, automaticamente,
 de outro conjunto, recusados por `render all` sem `--overwrite` e refeitos
 por `fly --keep` ao notar a mudança.
+
+### Os níveis de tratamento em `plan` e `fly` (etapa 13)
+
+`--simplification`/`--smoothing` (`specs/013-treatment-level-flags/`)
+existem, com o mesmo nome, os mesmos valores aceitos e o mesmo padrão
+vindo da configuração, em `plan` e em `fly` — as duas únicas escolhas que,
+desde a etapa 1, só o `inspect` deixava o usuário fazer. Não há parser
+compartilhado novo: `parsePlanParameters`
+(`internal/infra/inbound/cli/plan.go`) já é a única função que `plan.go` e
+`fly.go` chamam para interpretar `--duration`/`--fps`/`--distance`/`--tilt`/
+`--aspect`, e `parseLevel`/`levelName` já são genéricas no pacote `cli`
+(reaproveitadas de `--distance`/`--tilt`) — as duas flags novas entram pelo
+mesmo caminho, sem nenhum código de parsing próprio. Os dois níveis
+tornam-se dois campos de `domain.PlanParameters` (`Simplification`,
+`Smoothing`), ao lado de `Distance`/`Tilt`: `CameraPlanService.Generate`
+passa a chamar `TrackService.Treat` com `parameters.Simplification`/
+`.Smoothing` em vez de um `defaultLevel` próprio injetado no serviço, que
+deixa de existir — a decisão de qual nível é "o padrão" passa a ser
+inteiramente da CLI, o mesmo padrão que `Appearance`/`Resolution` já
+seguem desde a etapa 8. Isso basta para os dois efeitos que a etapa pede
+como regra de negócio: `CameraPlan.ID()` já grava `Distance`/`Tilt` no
+hash de identidade do plano — gravar `Simplification`/`Smoothing` do
+mesmo jeito é a mesma linha, duas vezes —, e `FlightService.reusePlan` já
+decide reaproveitar um plano guardado por `fly --keep` comparando esse
+`ID()`, então o reaproveitamento passa a respeitar os dois níveis novos
+sem nenhuma lógica própria. O arquivo de plano exportado ganha dois
+campos de texto (`parameters.simplification`/`.smoothing`), escritos e
+lidos pelas mesmas funções `levelText`/`parseLevel` que o adapter
+`jsonfile` já usa para `distance`/`tilt` — a ausência desses dois campos
+num arquivo de antes desta etapa cai, sem nenhum código dedicado, no
+mesmo "texto desconhecido lê como `medium`" que `parseLevel` já garante
+(decisão tomada na sessão de `/speckit-clarify`: como a ferramenta ainda
+não tinha sido lançada quando esta etapa foi escrita, um `--keep` sem
+nível registrado é, por definição, um plano feito com o único nível que
+existia antes, o padrão — nunca um caso incerto). `format_version`
+continua `2`: os dois campos são opcionais na leitura, pelo mesmo motivo
+que `parameters.aspect_ratio` (etapa 3) não subiu a versão ao ser
+acrescentado. Nenhum sentinela de erro novo, nenhum código de saída novo:
+um valor fora de `low`/`medium`/`high` continua sendo um erro de uso da
+CLI (código `2`), a mesma categoria que `--distance`/`--tilt` já são.
+`inspect`, `render frame`, `render all`, `video` e `geodata check` não
+mudam — os quatro primeiros porque já faziam ou nunca precisavam fazer o
+que a etapa pede; `geodata check` porque chama `TrackService.Clean`,
+nunca `Treat`, deliberadamente (a verificação de cobertura é sobre o
+trajeto limpo, não simplificado/suavizado, para não mascarar uma lacuna
+real — `specs/002-geo-data-registry/research.md` item 9).
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

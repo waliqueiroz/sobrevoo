@@ -20,9 +20,10 @@ import (
 )
 
 // planDefaults are the defaults the composition root would inject: 30 fps,
-// medium distance and tilt, a 16:9 video and an automatic duration.
+// medium distance, tilt, simplification and smoothing, a 16:9 video and an
+// automatic duration.
 func planDefaults() domain.PlanParameters {
-	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium, Aspect: domain.AspectRatio{Width: 16, Height: 9}}
+	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium, Simplification: domain.LevelMedium, Smoothing: domain.LevelMedium, Aspect: domain.AspectRatio{Width: 16, Height: 9}}
 }
 
 // executePlanCommand runs the "plan" command against an existing temporary
@@ -165,6 +166,20 @@ func Test_PlanCommand_Parameters(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("should translate the simplification and smoothing levels", func(t *testing.T) {
+		// given
+		want := planDefaults()
+		want.Simplification = domain.LevelHigh
+		want.Smoothing = domain.LevelLow
+		service := expectParameters(t, want)
+
+		// when
+		_, err := executePlanCommand(t, service, "--simplification", "high", "--smoothing", "low")
+
+		// then
+		assert.NoError(t, err)
+	})
+
 	t.Run("should translate the aspect ratio", func(t *testing.T) {
 		// given
 		want := planDefaults()
@@ -196,7 +211,7 @@ func Test_PlanCommand_Parameters(t *testing.T) {
 		// given: defaults different from the usual ones
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		want := domain.PlanParameters{FrameRate: 24, Distance: domain.LevelLow, Tilt: domain.LevelHigh, Aspect: domain.AspectRatio{Width: 9, Height: 16}}
+		want := domain.PlanParameters{FrameRate: 24, Distance: domain.LevelLow, Tilt: domain.LevelHigh, Simplification: domain.LevelHigh, Smoothing: domain.LevelLow, Aspect: domain.AspectRatio{Width: 9, Height: 16}}
 		service.EXPECT().Generate(gomock.Any(), want).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
 
 		path := filepath.Join(t.TempDir(), "track.gpx")
@@ -236,14 +251,16 @@ func Test_PlanCommand_UsageErrors(t *testing.T) {
 	}
 
 	for name, args := range map[string][]string{
-		"a non-numeric duration": {"--duration", "abc"},
-		"a NaN duration":         {"--duration", "nan"},
-		"an infinite duration":   {"--duration", "inf"},
-		"an empty duration":      {"--duration", ""},
-		"a non-numeric fps":      {"--fps", "abc"},
-		"a NaN fps":              {"--fps", "NaN"},
-		"an unknown distance":    {"--distance", "perto"},
-		"an unknown tilt":        {"--tilt", "perto"},
+		"a non-numeric duration":    {"--duration", "abc"},
+		"a NaN duration":            {"--duration", "nan"},
+		"an infinite duration":      {"--duration", "inf"},
+		"an empty duration":         {"--duration", ""},
+		"a non-numeric fps":         {"--fps", "abc"},
+		"a NaN fps":                 {"--fps", "NaN"},
+		"an unknown distance":       {"--distance", "perto"},
+		"an unknown tilt":           {"--tilt", "perto"},
+		"an unknown simplification": {"--simplification", "extreme"},
+		"an unknown smoothing":      {"--smoothing", "extreme"},
 	} {
 		t.Run("should return a usage error for "+name, func(t *testing.T) {
 			// when

@@ -20,7 +20,7 @@ import (
 // flightDefaults is the same shape of defaults "plan"/"render all"/"video"
 // already use.
 func flightDefaults() (domain.PlanParameters, domain.Resolution, domain.Appearance, domain.OverlayConfig, domain.VideoQuality) {
-	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium, Aspect: domain.AspectRatio{Width: 9, Height: 16}},
+	return domain.PlanParameters{FrameRate: 30, Distance: domain.LevelMedium, Tilt: domain.LevelMedium, Simplification: domain.LevelMedium, Smoothing: domain.LevelMedium, Aspect: domain.AspectRatio{Width: 9, Height: 16}},
 		domain.Resolution{Width: 1080, Height: 1920},
 		domain.Appearance{
 			TrailColor: domain.RGB{R: 0xFF, G: 0xB0, B: 0x00}, TrailWidthRatio: 0.005,
@@ -160,6 +160,22 @@ func Test_FlightCommand_Parameters(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("should pass the simplification and smoothing flags to the request's parameters, the same way plan parses them", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Cond(func(x any) bool {
+			p := x.(domain.FlightRequest).Parameters
+			return p.Simplification == domain.LevelHigh && p.Smoothing == domain.LevelLow
+		}), gomock.Any()).Return(aFlight(), nil)
+
+		// when
+		_, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4",
+			"--simplification", "high", "--smoothing", "low")
+
+		// then
+		require.NoError(t, err)
+	})
+
 	t.Run("should use the given defaults when no parameter flag is given", func(t *testing.T) {
 		// given
 		m := newFlightCommandMocks(t)
@@ -185,6 +201,21 @@ func Test_FlightCommand_Parameters(t *testing.T) {
 		// then
 		require.Error(t, err)
 		assert.Equal(t, 2, cli.ExitCode(err))
+	})
+
+	t.Run("should refuse an invalid simplification or smoothing with the same usage error plan already gives, without flying anything", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+
+		// when
+		_, _, simplificationErr := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--simplification", "ultra")
+		_, _, smoothingErr := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--smoothing", "ultra")
+
+		// then
+		require.Error(t, simplificationErr)
+		assert.Equal(t, 2, cli.ExitCode(simplificationErr))
+		require.Error(t, smoothingErr)
+		assert.Equal(t, 2, cli.ExitCode(smoothingErr))
 	})
 
 	t.Run("should pass the resolution flag to the request, the same way render all parses it", func(t *testing.T) {

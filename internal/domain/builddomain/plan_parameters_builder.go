@@ -13,11 +13,13 @@ type PlanParametersBuilder struct {
 func NewPlanParametersBuilder() *PlanParametersBuilder {
 	return &PlanParametersBuilder{
 		parameters: domain.PlanParameters{
-			Duration:  new(60 * time.Second),
-			FrameRate: 30,
-			Distance:  domain.LevelMedium,
-			Tilt:      domain.LevelMedium,
-			Aspect:    domain.LandscapeAspectRatio,
+			Duration:       new(60 * time.Second),
+			FrameRate:      30,
+			Distance:       domain.LevelMedium,
+			Tilt:           domain.LevelMedium,
+			Simplification: domain.LevelMedium,
+			Smoothing:      domain.LevelMedium,
+			Aspect:         domain.LandscapeAspectRatio,
 		},
 	}
 }
@@ -44,6 +46,16 @@ func (b *PlanParametersBuilder) WithDistance(level domain.Level) *PlanParameters
 
 func (b *PlanParametersBuilder) WithTilt(level domain.Level) *PlanParametersBuilder {
 	b.parameters.Tilt = level
+	return b
+}
+
+func (b *PlanParametersBuilder) WithSimplification(level domain.Level) *PlanParametersBuilder {
+	b.parameters.Simplification = level
+	return b
+}
+
+func (b *PlanParametersBuilder) WithSmoothing(level domain.Level) *PlanParametersBuilder {
+	b.parameters.Smoothing = level
 	return b
 }
 

@@ -345,6 +345,8 @@ func Test_CameraPlan_ID(t *testing.T) {
 		assert.NotEqual(t, base, with(builder().WithDuration(133*time.Millisecond).Build()), "duration")
 		assert.NotEqual(t, base, with(builder().WithDistance(domain.LevelHigh).Build()), "distance level")
 		assert.NotEqual(t, base, with(builder().WithTilt(domain.LevelLow).Build()), "tilt level")
+		assert.NotEqual(t, base, with(builder().WithSimplification(domain.LevelHigh).Build()), "simplification level")
+		assert.NotEqual(t, base, with(builder().WithSmoothing(domain.LevelLow).Build()), "smoothing level")
 	})
 
 	t.Run("should change when a frame is added", func(t *testing.T) {

@@ -28,12 +28,14 @@ func domainLevelValues(values config.LevelValues) [3]float64 {
 	return table
 }
 
-func domainPlanParameters(defaults config.PlanDefaults) domain.PlanParameters {
+func domainPlanParameters(defaults config.PlanDefaults, defaultLevel config.Level) domain.PlanParameters {
 	return domain.PlanParameters{
-		FrameRate: defaults.FrameRate,
-		Distance:  domainLevel(defaults.Distance),
-		Tilt:      domainLevel(defaults.Tilt),
-		Aspect:    domain.AspectRatio{Width: defaults.AspectWidth, Height: defaults.AspectHeight},
+		FrameRate:      defaults.FrameRate,
+		Distance:       domainLevel(defaults.Distance),
+		Tilt:           domainLevel(defaults.Tilt),
+		Simplification: domainLevel(defaultLevel),
+		Smoothing:      domainLevel(defaultLevel),
+		Aspect:         domain.AspectRatio{Width: defaults.AspectWidth, Height: defaults.AspectHeight},
 	}
 }
 

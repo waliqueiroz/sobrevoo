@@ -35,6 +35,14 @@ type PlanParameters struct {
 	Distance Level
 	Tilt     Level
 
+	// Simplification and Smoothing choose how the track is treated before
+	// planning the camera — the same two choices "inspect" already lets the
+	// user make (013-treatment-level-flags). Both are resolved to a
+	// concrete Level by the caller before the plan is generated; there is
+	// no "use the configured default" behavior left inside the service.
+	Simplification Level
+	Smoothing      Level
+
 	// Aspect is the shape of the video the plan is made for.
 	Aspect AspectRatio
 }

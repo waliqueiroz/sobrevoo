@@ -32,6 +32,8 @@ type readParameters struct {
 	FrameRate       *float64 `json:"frame_rate"`
 	Distance        string   `json:"distance"`
 	Tilt            string   `json:"tilt"`
+	Simplification  string   `json:"simplification"`
+	Smoothing       string   `json:"smoothing"`
 	AspectRatio     *string  `json:"aspect_ratio"`
 }
 
@@ -176,11 +178,13 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 	}
 
 	parameters := domain.PlanParameters{
-		Duration:  new(secondsToDuration(*file.Parameters.DurationSeconds)),
-		FrameRate: *file.Parameters.FrameRate,
-		Distance:  parseLevel(file.Parameters.Distance),
-		Tilt:      parseLevel(file.Parameters.Tilt),
-		Aspect:    aspect,
+		Duration:       new(secondsToDuration(*file.Parameters.DurationSeconds)),
+		FrameRate:      *file.Parameters.FrameRate,
+		Distance:       parseLevel(file.Parameters.Distance),
+		Tilt:           parseLevel(file.Parameters.Tilt),
+		Simplification: parseLevel(file.Parameters.Simplification),
+		Smoothing:      parseLevel(file.Parameters.Smoothing),
+		Aspect:         aspect,
 	}
 
 	return domain.NewCameraPlan(

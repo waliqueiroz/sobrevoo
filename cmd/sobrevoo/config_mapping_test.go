@@ -58,13 +58,15 @@ func Test_domainPlanParameters(t *testing.T) {
 		defaults := config.PlanDefaults{FrameRate: 24, Distance: config.LevelHigh, Tilt: config.LevelLow, AspectWidth: 9, AspectHeight: 16}
 
 		// when
-		parameters := domainPlanParameters(defaults)
+		parameters := domainPlanParameters(defaults, config.LevelHigh)
 
 		// then
 		assert.Nil(t, parameters.Duration)
 		assert.Equal(t, 24.0, parameters.FrameRate)
 		assert.Equal(t, domain.LevelHigh, parameters.Distance)
 		assert.Equal(t, domain.LevelLow, parameters.Tilt)
+		assert.Equal(t, domain.LevelHigh, parameters.Simplification)
+		assert.Equal(t, domain.LevelHigh, parameters.Smoothing)
 		assert.Equal(t, domain.AspectRatio{Width: 9, Height: 16}, parameters.Aspect)
 	})
 }

@@ -51,6 +51,7 @@ relevo que você já registrou com `geodata register` (veja mais abaixo).
 ```sh
 sobrevoo fly <trajeto.gpx> --output <voo.mp4>
              [--duration <segundos>] [--fps <n>] [--distance low|medium|high] [--tilt low|medium|high]
+             [--simplification low|medium|high] [--smoothing low|medium|high]
              [--aspect <L:A>] [--resolution <LxA>]
              [--trail-color <#RRGGBB>] [--trail-width <proporção>] [--marker-color <#RRGGBB>]
              [--marker-radius <proporção>] [--background-color <#RRGGBB>]
@@ -90,6 +91,8 @@ Total time: 00:33:00
 | `--fps` | 1 a 120 | `30` | Quadros por segundo |
 | `--distance` | `low`, `medium`, `high` | `medium` | Quão longe a câmera fica do trajeto |
 | `--tilt` | `low`, `medium`, `high` | `medium` | Quão de cima a câmera olha (`high` é quase vertical) |
+| `--simplification` | `low`, `medium`, `high` | `medium` | Nível de redução de pontos do traçado |
+| `--smoothing` | `low`, `medium`, `high` | `medium` | Nível de suavização do traçado |
 | `--aspect` | `L:A` (`1:5` a `5:1`) | `9:16` | Proporção do vídeo (a abertura e o fechamento enquadram o trajeto inteiro por ela) |
 | `--resolution` | `LxA`, ambos pares, 180 a 3840 por lado, no máximo 3.840×2.160 no total | `1080x1920` | Resolução dos quadros e do vídeo |
 | `--trail-color` | `#RRGGBB` | `#FFB000` | Cor do traçado |
@@ -256,6 +259,7 @@ e `specs/010-geo-data-source-control/contracts/`.
 ```sh
 sobrevoo plan <trajeto.gpx> [--duration <segundos>] [--fps <n>] \
     [--distance low|medium|high] [--tilt low|medium|high] \
+    [--simplification low|medium|high] [--smoothing low|medium|high] \
     [--aspect <L:A>] [--export <plano.json>] [--overwrite]
 ```
 
@@ -288,6 +292,8 @@ Plan written to plano.json
 | `--fps` | 1 a 120 | `30` | Quadros por segundo |
 | `--distance` | `low`, `medium`, `high` | `medium` | Quão longe a câmera fica do trajeto |
 | `--tilt` | `low`, `medium`, `high` | `medium` | Quão de cima a câmera olha (`high` é quase vertical) |
+| `--simplification` | `low`, `medium`, `high` | `medium` | Nível de redução de pontos do traçado |
+| `--smoothing` | `low`, `medium`, `high` | `medium` | Nível de suavização do traçado |
 | `--aspect` | `L:A`, inteiros de 1 a 1000, razão de `1:5` a `5:1` | `9:16` | Proporção do vídeo: a abertura e o fechamento enquadram o trajeto inteiro por ela (`9:16` vertical, `16:9` horizontal) |
 | `--export` | caminho | — | Grava o plano completo em JSON (formato em `specs/003-camera-path-planning/contracts/plan-file.md`) |
 | `--overwrite` | — | — | Com `--export`, substitui um arquivo que já exista (recusa com uso inválido se usada sem `--export`) |
