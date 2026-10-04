@@ -123,7 +123,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 		assert.Contains(t, stdout, "missing base map")
 	})
 
-	t.Run("should print the uncovered segment's start and end coordinates", func(t *testing.T) {
+	t.Run("should print the uncovered segment's start and end coordinates, each as (lat, lon)", func(t *testing.T) {
 		// given
 		output := domain.CoverageReport{
 			Status: domain.CoverageStatusPartial,
@@ -141,8 +141,7 @@ func Test_GeoDataCheckCommand_Execute(t *testing.T) {
 
 		// then
 		require.NoError(t, err)
-		assert.Contains(t, stdout, "60.000000")
-		assert.Contains(t, stdout, "30.000000")
+		assert.Contains(t, stdout, "Uncovered segments:\n  - from (60.000000, 30.000000) to (61.000000, 31.000000): missing base map and elevation\n")
 	})
 
 	t.Run("should print the specific source chosen when two base map sources overlap", func(t *testing.T) {
