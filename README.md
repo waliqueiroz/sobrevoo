@@ -146,7 +146,6 @@ Frames: 1020 requested, 1020 drawn, 0 kept (already in the destination)
 Resolution: 1080x1920
 Time: 00:23:41
 Holes (in the frames drawn now): none
-Destination: /tmp/sobrevoo-fly-2871640193 (frame_000000.png to frame_001019.png)
 Video written to pedalada.mp4
 Frames: 1020
 Duration: 00:00:34.000

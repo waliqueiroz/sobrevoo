@@ -166,18 +166,25 @@ func runFly(
 		return err
 	}
 
-	fmt.Fprint(out, formatFlightSummary(request.Output, summary))
+	fmt.Fprint(out, formatFlightSummary(request, summary))
 	return nil
 }
 
 // formatFlightSummary renders the summary of a single-command run, in
 // English, in the labels and order of contracts/cli.md: the frames summary
 // (as "render all" shows it), then the video summary (as "video" shows it),
-// then the run's own total time.
-func formatFlightSummary(output string, summary domain.FlightSummary) string {
+// then the run's own total time. The frames' destination is shown only under
+// --keep: without it, the frames lived in a temporary directory that no
+// longer exists once the run is over.
+func formatFlightSummary(request domain.FlightRequest, summary domain.FlightSummary) string {
+	framesDirectory := ""
+	if request.Keep != "" {
+		framesDirectory = summary.FramesDirectory
+	}
+
 	var b strings.Builder
-	b.WriteString(formatFramesSummary(summary.Render.Requested, summary.FramesDirectory, summary.Render))
-	b.WriteString(formatVideoSummary(output, summary.Video))
+	b.WriteString(formatFramesSummary(summary.Render.Requested, framesDirectory, summary.Render))
+	b.WriteString(formatVideoSummary(request.Output, summary.Video))
 	fmt.Fprintf(&b, "Total time: %s\n", formatElapsed(summary.Elapsed))
 	return b.String()
 }

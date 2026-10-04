@@ -137,6 +137,7 @@ func runRenderAll(
 
 // formatFramesSummary renders the summary of a drawing of many frames, in
 // English, in the labels and order of specs/005-frame-rendering/contracts/cli.md.
+// An empty directory leaves out the destination line.
 func formatFramesSummary(total int, directory string, summary domain.RenderSummary) string {
 	var b strings.Builder
 
@@ -147,7 +148,9 @@ func formatFramesSummary(total int, directory string, summary domain.RenderSumma
 	if summary.Removed > 0 {
 		fmt.Fprintf(&b, "Removed: %d frames from a previous set\n", summary.Removed)
 	}
-	fmt.Fprintf(&b, "Destination: %s (%s to %s)\n", directory, domain.FrameFileName(0), domain.FrameFileName(total-1))
+	if directory != "" {
+		fmt.Fprintf(&b, "Destination: %s (%s to %s)\n", directory, domain.FrameFileName(0), domain.FrameFileName(total-1))
+	}
 
 	return b.String()
 }
