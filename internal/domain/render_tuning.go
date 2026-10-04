@@ -12,7 +12,12 @@ import "strconv"
 // and elevation-profile marker — the pixels of a frame with the overlay on
 // change; a frame drawn with it off is unaffected, but the set it belongs to
 // still changes, since RenderVersion takes part in FrameSetID regardless.
-const RenderVersion = 3
+// Version 4 (012-overlay-ptbr-readability) draws the overlay's labels in
+// Brazilian Portuguese, from a bolder weight of the same embedded font, with
+// an outline sized from the glyph itself instead of the frame's height, and
+// with the numeric panels' shared width computed once per flight instead of
+// once per frame.
+const RenderVersion = 4
 
 // RGB is a color, 8 bits per channel.
 type RGB struct {
@@ -83,10 +88,13 @@ const (
 	OverlayBottomMarginRatio = 0.14
 
 	// OverlayOutlineRatio and OverlayOutlineMinWidth size the outline drawn
-	// around the screen overlay's text: a fraction of the frame's height,
-	// with a floor in pixels, the same pattern as TrailMinWidth/
-	// MarkerMinRadius (011-overlay-polish FR-004, research.md item 6).
-	OverlayOutlineRatio    = 0.0025
+	// around the screen overlay's text: a fraction of ppem (the glyph's own
+	// size, not the frame's height — 012-overlay-ptbr-readability FR-005,
+	// research.md item 2; before that stage, a fraction of the frame's
+	// height, which let the outline grow as thick as the letter's own
+	// stroke), with a floor in pixels, the same pattern as TrailMinWidth/
+	// MarkerMinRadius.
+	OverlayOutlineRatio    = 0.035
 	OverlayOutlineMinWidth = 1.0
 
 	// ProfileMarkerRadiusRatio and ProfileMarkerMinRadius size the dot that

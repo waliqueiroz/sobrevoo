@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/sfnt"
 )
 
 func Test_FlattenQuad(t *testing.T) {
@@ -244,4 +246,38 @@ func Test_VectorFace_LineHeight(t *testing.T) {
 		// then
 		assert.Equal(t, mask.height, height)
 	})
+}
+
+func Test_VectorFace_Weight(t *testing.T) {
+	t.Run("should rasterize a glyph with more ink than the regular weight would", func(t *testing.T) {
+		// given: the font embedded in the binary is a bold weight
+		// (012-overlay-ptbr-readability FR-006) — a face built here
+		// directly from the regular weight only measures the difference;
+		// production code never imports goregular again after this stage
+		regularFont, err := sfnt.Parse(goregular.TTF)
+		require.NoError(t, err)
+		regular := &vectorFace{font: regularFont, cache: make(map[glyphKey]glyphCacheEntry)}
+		bold := newVectorFace()
+		const ppem = 40
+
+		// when
+		boldMask, ok := bold.glyph('0', ppem)
+		require.True(t, ok)
+		regularMask, ok := regular.glyph('0', ppem)
+		require.True(t, ok)
+
+		// then
+		assert.Greater(t, coverageSum(boldMask), coverageSum(regularMask))
+	})
+}
+
+// coverageSum is the total ink of mask — the sum of every pixel's coverage
+// — used only to compare how heavy two rasterizations of the same glyph
+// are, never for drawing.
+func coverageSum(mask glyphMask) int {
+	sum := 0
+	for _, c := range mask.coverage {
+		sum += int(c)
+	}
+	return sum
 }

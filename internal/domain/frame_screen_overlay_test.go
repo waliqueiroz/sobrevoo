@@ -207,42 +207,6 @@ func Test_FormatOverlayElapsed(t *testing.T) {
 	})
 }
 
-func Test_NumericPanelWidth(t *testing.T) {
-	face := newVectorFace()
-	const ppem = 20
-
-	t.Run("should be the width of the widest non-empty text", func(t *testing.T) {
-		// given
-		short := "DIST 1 m"
-		long := "ELEV 99999 m   GAIN +99999 m"
-
-		// when
-		width := numericPanelWidth(face, ppem, short, long, "")
-
-		// then
-		assert.Equal(t, face.textWidth(long, ppem), width)
-	})
-
-	t.Run("should be zero when every text is empty", func(t *testing.T) {
-		// given / when
-		width := numericPanelWidth(face, ppem, "", "", "")
-
-		// then
-		assert.Equal(t, 0, width)
-	})
-
-	t.Run("should ignore an empty text when taking the widest", func(t *testing.T) {
-		// given
-		only := "TIME 1:23:45"
-
-		// when
-		width := numericPanelWidth(face, ppem, "", only, "")
-
-		// then
-		assert.Equal(t, face.textWidth(only, ppem), width)
-	})
-}
-
 func Test_ProfileMarkerRadius(t *testing.T) {
 	t.Run("should be the ratio of the frame's height when that is above the floor", func(t *testing.T) {
 		// given / when / then
@@ -266,6 +230,115 @@ func Test_ProfileMarkerRadius(t *testing.T) {
 	})
 }
 
+func Test_OutlineRadius(t *testing.T) {
+	t.Run("should be the ratio of ppem when that is above the floor", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, roundHalfUp(OverlayOutlineRatio*200), outlineRadius(200))
+	})
+
+	t.Run("should be the documented floor when the ratio would round below it", func(t *testing.T) {
+		// given: at ppem 10, OverlayOutlineRatio*ppem is 0.35, well under
+		// the floor
+		// when / then
+		assert.Equal(t, int(OverlayOutlineMinWidth), outlineRadius(10))
+	})
+
+	t.Run("should scale proportionally between two ppem values, both above the floor", func(t *testing.T) {
+		// given / when
+		small := outlineRadius(200)
+		large := outlineRadius(400)
+
+		// then
+		assert.Equal(t, 2*small, large)
+	})
+}
+
+func Test_BlockText(t *testing.T) {
+	frame := CameraFrame{
+		MarkerDistance:     8600,
+		TrackElevation:     80,
+		TrackElevationGain: 6,
+		ActivityElapsed:    28*time.Minute + 44*time.Second,
+	}
+
+	t.Run("should write the distance label in Portuguese", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, "DIST "+formatOverlayDistance(frame.MarkerDistance), distanceBlockText(frame))
+	})
+
+	t.Run("should write the elevation and gain labels in Portuguese", func(t *testing.T) {
+		// given
+		want := "ELEV " + formatOverlayElevation(frame.TrackElevation) + "   GANHO " + formatOverlayGain(frame.TrackElevationGain)
+
+		// when / then
+		assert.Equal(t, want, elevationBlockText(frame))
+	})
+
+	t.Run("should write the time label in Portuguese", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, "TEMPO "+formatOverlayElapsed(frame.ActivityElapsed), timeBlockText(frame))
+	})
+
+	t.Run("should never write the old English labels", func(t *testing.T) {
+		// given / when
+		texts := []string{distanceBlockText(frame), elevationBlockText(frame), timeBlockText(frame)}
+
+		// then
+		for _, text := range texts {
+			assert.NotContains(t, text, "GAIN")
+			assert.NotContains(t, text, "TIME")
+		}
+	})
+}
+
+func Test_StablePanelWidth(t *testing.T) {
+	face := newVectorFace()
+	const ppem = 20
+
+	short := CameraFrame{Index: 0, Phase: PhaseFollowing, MarkerDistance: 0, TrackElevation: 80, TrackElevationGain: 6, ActivityElapsed: 0}
+	long := CameraFrame{Index: 1, Phase: PhaseFollowing, MarkerDistance: 123456, TrackElevation: 9999, TrackElevationGain: 88888, ActivityElapsed: 5*time.Hour + 3*time.Minute + 2*time.Second}
+
+	t.Run("should be the width of the widest text found in any frame of the plan, not just one", func(t *testing.T) {
+		// given: the long frame's elevation+gain text is the widest of the
+		// six (three blocks x two frames) — the function must find it even
+		// though it is never the frame asked about by itself (it has no
+		// notion of "the frame asked about": it always looks at every frame)
+		full, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance, OverlayBlockElevation, OverlayBlockTime})
+		plan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceClock, "", []CameraFrame{short, long}, nil, true)
+
+		// when
+		width := stablePanelWidth(face, plan, full, ppem)
+
+		// then
+		assert.Equal(t, face.textWidth(elevationBlockText(long), ppem), width)
+	})
+
+	t.Run("should be zero when no numeric block is shown", func(t *testing.T) {
+		// given
+		noBlocks, _ := NewOverlayConfig(true, nil)
+		plan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceClock, "", []CameraFrame{short, long}, nil, true)
+
+		// when
+		width := stablePanelWidth(face, plan, noBlocks, ppem)
+
+		// then
+		assert.Equal(t, 0, width)
+	})
+
+	t.Run("should ignore a block the plan has no data for, even if config requests it", func(t *testing.T) {
+		// given: no clock reference and no elevation — only distance is
+		// actually shown, whatever config asks for
+		full, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance, OverlayBlockElevation, OverlayBlockTime})
+		plan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceDistance, "", []CameraFrame{short, long}, nil, false)
+
+		// when
+		width := stablePanelWidth(face, plan, full, ppem)
+
+		// then
+		assert.Equal(t, face.textWidth(distanceBlockText(long), ppem), width)
+	})
+}
+
 func Test_ScreenOverlay_Draw(t *testing.T) {
 	face := newVectorFace()
 
@@ -282,22 +355,67 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 	planWith := func(elevationAvailable bool, reference TimeReference) CameraPlan {
 		return NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, reference, "", frames(), nil, elevationAvailable)
 	}
+	// panelWidthFor mirrors what Scene.Render now does before constructing
+	// screenOverlay (frame_scene.go): compute the stable width once, from
+	// the whole plan, and pass it in — draw itself no longer computes it.
+	panelWidthFor := func(plan CameraPlan, config OverlayConfig, height int) int {
+		return stablePanelWidth(face, plan, config, overlayPpem(height))
+	}
 
 	t.Run("should draw nothing when disabled", func(t *testing.T) {
 		// given
 		full, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance, OverlayBlockElevation, OverlayBlockTime, OverlayBlockProfile})
 		disabled, _ := NewOverlayConfig(false, nil)
 		plan := planWith(true, TimeReferenceClock)
+		panelWidth := panelWidthFor(plan, full, 640)
 
 		off, on := blank(), blank()
 
 		// when
 		screenOverlay{image: off, config: disabled, face: face}.draw(plan, 1)
-		screenOverlay{image: on, config: full, face: face}.draw(plan, 1)
+		screenOverlay{image: on, config: full, face: face, panelWidth: panelWidth}.draw(plan, 1)
 
 		// then
 		assert.Equal(t, blank().Pix, off.Pix)
 		assert.NotEqual(t, blank().Pix, on.Pix)
+	})
+
+	t.Run("should draw different pixels than the old English labels would", func(t *testing.T) {
+		// given
+		full, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance, OverlayBlockElevation, OverlayBlockTime})
+		plan := planWith(true, TimeReferenceClock)
+		frame := plan.Frames[1]
+
+		got := blank()
+
+		// when
+		screenOverlay{image: got, config: full, face: face, panelWidth: panelWidthFor(plan, full, 640)}.draw(plan, 1)
+
+		// then: build, by hand, through the same low-level primitives draw
+		// uses, what the old English labels would have drawn at the same
+		// layout — the real output must no longer match it
+		old := blank()
+		oldOverlay := screenOverlay{image: old, face: face}
+		height, width := old.Resolution.Height, old.Resolution.Width
+		marginTop := roundHalfUp(OverlayTopMarginRatio * float64(height))
+		marginSide := roundHalfUp(OverlaySideMarginRatio * float64(width))
+		ppem := overlayPpem(height)
+		pad := roundHalfUp(overlayLinePadding * float64(face.lineHeight(ppem)))
+		lineHeight := face.lineHeight(ppem) + 2*pad
+
+		distanceOld := "DIST " + formatOverlayDistance(frame.MarkerDistance)
+		elevationOld := "ELEV " + formatOverlayElevation(frame.TrackElevation) + "   GAIN " + formatOverlayGain(frame.TrackElevationGain)
+		timeOld := "TIME " + formatOverlayElapsed(frame.ActivityElapsed)
+		panelWidth := max(face.textWidth(distanceOld, ppem), face.textWidth(elevationOld, ppem), face.textWidth(timeOld, ppem))
+
+		y := marginTop
+		oldOverlay.drawLine(marginSide, y, ppem, pad, panelWidth, distanceOld)
+		y += lineHeight + pad
+		oldOverlay.drawLine(marginSide, y, ppem, pad, panelWidth, elevationOld)
+		y += lineHeight + pad
+		oldOverlay.drawLine(marginSide, y, ppem, pad, panelWidth, timeOld)
+
+		assert.NotEqual(t, old.Pix, got.Pix)
 	})
 
 	t.Run("should draw only the requested blocks", func(t *testing.T) {
@@ -309,8 +427,8 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		a, b := blank(), blank()
 
 		// when
-		screenOverlay{image: a, config: distanceOnly, face: face}.draw(plan, 1)
-		screenOverlay{image: b, config: distanceAndTime, face: face}.draw(plan, 1)
+		screenOverlay{image: a, config: distanceOnly, face: face, panelWidth: panelWidthFor(plan, distanceOnly, 640)}.draw(plan, 1)
+		screenOverlay{image: b, config: distanceAndTime, face: face, panelWidth: panelWidthFor(plan, distanceAndTime, 640)}.draw(plan, 1)
 
 		// then: adding the time block changes the image further
 		assert.NotEqual(t, a.Pix, b.Pix)
@@ -341,7 +459,7 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		noBlocks, _ := NewOverlayConfig(true, nil)
 
 		// when
-		screenOverlay{image: withClock, config: timeOnly, face: face}.draw(clockPlan, 1)
+		screenOverlay{image: withClock, config: timeOnly, face: face, panelWidth: panelWidthFor(clockPlan, timeOnly, 640)}.draw(clockPlan, 1)
 		screenOverlay{image: baseline, config: noBlocks, face: face}.draw(clockPlan, 1)
 
 		// then
@@ -368,12 +486,13 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		// given
 		full, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance, OverlayBlockElevation, OverlayBlockTime, OverlayBlockProfile})
 		plan := planWith(true, TimeReferenceClock)
+		panelWidth := panelWidthFor(plan, full, 640)
 
 		first, second := blank(), blank()
 
 		// when
-		screenOverlay{image: first, config: full, face: face}.draw(plan, 1)
-		screenOverlay{image: second, config: full, face: face}.draw(plan, 1)
+		screenOverlay{image: first, config: full, face: face, panelWidth: panelWidth}.draw(plan, 1)
+		screenOverlay{image: second, config: full, face: face, panelWidth: panelWidth}.draw(plan, 1)
 
 		// then
 		assert.Equal(t, first.Pix, second.Pix)
@@ -393,8 +512,8 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		longImg := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
 
 		// when
-		screenOverlay{image: shortImg, config: full, face: face}.draw(shortPlan, 0)
-		screenOverlay{image: longImg, config: full, face: face}.draw(longPlan, 0)
+		screenOverlay{image: shortImg, config: full, face: face, panelWidth: panelWidthFor(shortPlan, full, 1920)}.draw(shortPlan, 0)
+		screenOverlay{image: longImg, config: full, face: face, panelWidth: panelWidthFor(longPlan, full, 1920)}.draw(longPlan, 0)
 
 		// then: the distance panel (the first line) is measured at a row
 		// just below its own top edge — inside the padding, so only the
@@ -422,12 +541,12 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		img := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
 
 		// when
-		screenOverlay{image: img, config: distanceOnly, face: face}.draw(plan, 0)
+		screenOverlay{image: img, config: distanceOnly, face: face, panelWidth: panelWidthFor(plan, distanceOnly, 1920)}.draw(plan, 0)
 
 		// then
 		marginSide := roundHalfUp(OverlaySideMarginRatio * 1080.0)
 		marginTop := roundHalfUp(OverlayTopMarginRatio * 1920.0)
-		ppem := max(1, roundHalfUp(glyphHeightRatio*1920.0))
+		ppem := overlayPpem(1920)
 		pad := roundHalfUp(overlayLinePadding * float64(face.lineHeight(ppem)))
 		want := marginSide + face.textWidth("DIST 0 m", ppem) + 2*pad
 
@@ -489,7 +608,7 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		img := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
 
 		// when
-		screenOverlay{image: img, config: distanceOnly, face: face}.draw(plan, 0)
+		screenOverlay{image: img, config: distanceOnly, face: face, panelWidth: panelWidthFor(plan, distanceOnly, 1920)}.draw(plan, 0)
 
 		// then
 		marginTop := roundHalfUp(OverlayTopMarginRatio * 1920.0)
@@ -509,7 +628,7 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 
 		// when: frame 0, whose profile dot sits at the chart's own left
 		// edge (distance 0), far from the column checked below
-		screenOverlay{image: img, config: full, face: face}.draw(plan, 0)
+		screenOverlay{image: img, config: full, face: face, panelWidth: panelWidthFor(plan, full, 1920)}.draw(plan, 0)
 
 		// then: the profile block, the one closest to the bottom, never
 		// reaches the bottom margin itself
