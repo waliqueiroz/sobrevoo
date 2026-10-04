@@ -285,9 +285,9 @@ func Test_NewFrameMark(t *testing.T) {
 		assert.NotEqual(t, first.SetID, second.SetID)
 	})
 
-	t.Run("should be of version 2 of the drawing, the one whose frames say which plan they came from", func(t *testing.T) {
+	t.Run("should be of version 3 of the drawing, the one with vector-rasterized overlay text", func(t *testing.T) {
 		// given / when / then
-		assert.Equal(t, 2, domain.RenderVersion)
+		assert.Equal(t, 3, domain.RenderVersion)
 	})
 }
 

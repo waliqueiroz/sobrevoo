@@ -22,6 +22,12 @@ type Scene struct {
 	tuning        RenderTuning
 	appearance    Appearance
 	overlayConfig OverlayConfig
+
+	// face rasterizes the screen overlay's text (frame_screen_overlay.go),
+	// built once here and reused by every Render of this Scene — the same
+	// pixel size is used for every frame of one drawing, so every glyph it
+	// ever rasterizes stays in its cache for the rest of the execution.
+	face *vectorFace
 }
 
 // NewScene prepares a slice for drawing. It fails with ErrNoElevationData when
@@ -42,6 +48,7 @@ func NewScene(slice GeoSlice, decoder TileDecoder, tuning RenderTuning, appearan
 		tuning:        tuning,
 		appearance:    appearance,
 		overlayConfig: overlay,
+		face:          newVectorFace(),
 	}
 	for _, grid := range slice.Elevation {
 		scene.surfaces = append(scene.surfaces, newSurface(grid, lowest))
@@ -96,7 +103,7 @@ func (s *Scene) Render(ctx context.Context, plan CameraPlan, index int, resoluti
 	over.drawTrail(trail)
 	over.drawMarker(trail[index])
 
-	screenOverlay{image: image, config: s.overlayConfig, appearance: s.appearance}.draw(plan, index)
+	screenOverlay{image: image, config: s.overlayConfig, appearance: s.appearance, face: s.face}.draw(plan, index)
 
 	return image, stats, nil
 }

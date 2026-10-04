@@ -107,7 +107,7 @@ conta. Um quadro com os dois tipos de pixel conta nas duas colunas.
 ## Compatibilidade
 
 O arquivo não referencia data, hora, caminhos, nome de máquina nem versão do
-binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `2`)
+binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `3`)
 sobe sempre que o algoritmo ou as constantes visuais mudam de forma
 visível; quadros de outra `RenderVersion` pertencem a outro conjunto e não são
 reaproveitados. Consumidores devem ignorar blocos auxiliares que não
@@ -118,3 +118,22 @@ quadros passaram a trazer a identificação do plano dentro deles; os pixels nã
 mudaram. Quadros da versão `1` são, portanto, de outro conjunto (`render all` os
 recusa sem `--overwrite` e os redesenha com ele), e a etapa 6 (`sobrevoo video`)
 os recusa por não trazerem a identificação do plano.
+
+**Nota da décima primeira etapa**: a versão do desenho passou de `2` para `3`
+— desta vez **os pixels mudam**, no acabamento das sobreposições de tela que a
+nona etapa introduziu (texto, painéis numéricos, marcador do perfil de
+elevação e margem de segurança; ver `specs/009-frame-overlays/data-model.md`
+e `specs/011-overlay-polish/contracts/frame-files-change.md`): o texto passa
+de uma fonte bitmap ampliada por fator inteiro para uma fonte vetorial
+embutida (`golang.org/x/image/font/gofont/goregular`), rasterizada por um
+rasterizador próprio e determinístico — nunca
+`golang.org/x/image/vector.Rasterizer`, que tem um caminho em assembly só
+para amd64 —, com um contorno escuro fixo; os três painéis numéricos
+(distância; elevação e ganho; tempo decorrido) passam a compartilhar a
+largura do mais largo presente no quadro; o marcador do perfil de elevação
+ganha um raio proporcional à altura do quadro, com piso em pixels; e a
+margem de segurança passa de uma única razão igual nas quatro bordas para
+três — topo e laterais, e uma maior na base, adequada ao vídeo vertical.
+Nenhum valor exibido, bloco, enquadramento, terreno ou traçado muda.
+Quadros da versão `2` são, portanto, de outro conjunto, pela mesma regra de
+sempre.

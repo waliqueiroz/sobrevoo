@@ -2,12 +2,8 @@ package domain
 
 import (
 	"fmt"
-	"image"
 	"math"
 	"time"
-
-	"golang.org/x/image/font/basicfont"
-	"golang.org/x/image/font/inconsolata"
 )
 
 // screenOverlay draws the fixed, on-screen blocks (distance, elevation and
@@ -23,18 +19,18 @@ type screenOverlay struct {
 	// profile's dot reads as the same marker drawn on the terrain, and
 	// never blends into the profile's own line (OverlayTextColor).
 	appearance Appearance
+
+	// face rasterizes every glyph this block draws, from the vector font
+	// embedded in the binary — never a bitmap font, never a font installed
+	// on the machine (011-overlay-polish FR-001/FR-002, research.md items
+	// 1, 3, 4). Built once per Scene (frame_scene.go) and reused by every
+	// frame of the same render.
+	face *vectorFace
 }
 
-// overlayFace is the font every screen overlay block is drawn with: a
-// bitmap embedded in the binary as Go source (golang.org/x/image), never a
-// font installed on the machine (FR-008). Its glyph mask is fixed data,
-// computed once when the module was built — reading it at render time adds
-// no floating-point operation beyond the alpha blend every other overlay
-// (overlay.blend) already does.
-var overlayFace = inconsolata.Bold8x16
-
-// glyphHeightRatio is about how tall, as a share of the frame's height,
-// one line of overlay text is.
+// glyphHeightRatio is about how tall, as a share of the frame's height, one
+// line of overlay text is — the pixel size (ppem, "pixels per em") a glyph
+// is rasterized at, computed once per draw call, not per glyph.
 const glyphHeightRatio = 0.028
 
 // overlayLinePadding is the gap kept around a line of text within its
@@ -58,38 +54,70 @@ func (s screenOverlay) draw(plan CameraPlan, index int) {
 	frame := plan.Frames[index]
 
 	width, height := s.image.Resolution.Width, s.image.Resolution.Height
-	margin := roundHalfUp(OverlayMarginRatio * float64(min(width, height)))
-	scale := textScale(height)
-	glyphHeight := overlayFace.Ascent + overlayFace.Descent
-	pad := roundHalfUp(overlayLinePadding * float64(glyphHeight) * float64(scale))
-	lineHeight := glyphHeight*scale + 2*pad
+	marginTop := roundHalfUp(OverlayTopMarginRatio * float64(height))
+	marginSide := roundHalfUp(OverlaySideMarginRatio * float64(width))
+	marginBottom := roundHalfUp(OverlayBottomMarginRatio * float64(height))
+	ppem := max(1, roundHalfUp(glyphHeightRatio*float64(height)))
+	pad := roundHalfUp(overlayLinePadding * float64(s.face.lineHeight(ppem)))
+	lineHeight := s.face.lineHeight(ppem) + 2*pad
 
-	y := margin
-	if s.config.Distance {
-		s.drawLine(margin, y, scale, pad, "DIST "+formatOverlayDistance(frame.MarkerDistance))
+	var distanceText, elevationText, timeText string
+	showDistance := s.config.Distance
+	showElevation := s.config.Elevation && plan.ElevationAvailable
+	showTime := s.config.Time && plan.TimeReference == TimeReferenceClock
+
+	if showDistance {
+		distanceText = "DIST " + formatOverlayDistance(frame.MarkerDistance)
+	}
+	if showElevation {
+		elevationText = "ELEV " + formatOverlayElevation(frame.TrackElevation) + "   GAIN " + formatOverlayGain(frame.TrackElevationGain)
+	}
+	if showTime {
+		timeText = "TIME " + formatOverlayElapsed(frame.ActivityElapsed)
+	}
+	panelWidth := numericPanelWidth(s.face, ppem, distanceText, elevationText, timeText)
+
+	y := marginTop
+	if showDistance {
+		s.drawLine(marginSide, y, ppem, pad, panelWidth, distanceText)
 		y += lineHeight + pad
 	}
-	if s.config.Elevation && plan.ElevationAvailable {
-		text := "ELEV " + formatOverlayElevation(frame.TrackElevation) + "   GAIN " + formatOverlayGain(frame.TrackElevationGain)
-		s.drawLine(margin, y, scale, pad, text)
+	if showElevation {
+		s.drawLine(marginSide, y, ppem, pad, panelWidth, elevationText)
 		y += lineHeight + pad
 	}
-	if s.config.Time && plan.TimeReference == TimeReferenceClock {
-		s.drawLine(margin, y, scale, pad, "TIME "+formatOverlayElapsed(frame.ActivityElapsed))
+	if showTime {
+		s.drawLine(marginSide, y, ppem, pad, panelWidth, timeText)
 	}
 	if s.config.Profile && plan.ElevationAvailable {
-		s.drawProfile(plan, index, margin, scale)
+		s.drawProfile(plan, index, marginSide, marginBottom, ppem)
 	}
 }
 
-// drawLine draws one block: a panel sized to fit text at scale plus pad on
-// every side, its top-left corner at (x, y), with the text over it in
-// OverlayTextColor.
-func (s screenOverlay) drawLine(x, y, scale, pad int, text string) {
-	glyphHeight := overlayFace.Ascent + overlayFace.Descent
-	w, h := textWidth(text, scale), glyphHeight*scale
-	drawPanel(s.image, x, y, x+w+2*pad, y+h+2*pad)
-	drawText(s.image, text, x+pad, y+pad, scale, OverlayTextColor)
+// numericPanelWidth is the width every present numeric block's panel
+// shares, in pixels at ppem: the widest of texts, skipping an empty one —
+// empty is how draw marks a block that is not shown this frame
+// (011-overlay-polish FR-005, research.md item 7).
+func numericPanelWidth(face *vectorFace, ppem int, texts ...string) int {
+	width := 0
+	for _, text := range texts {
+		if text == "" {
+			continue
+		}
+		width = max(width, face.textWidth(text, ppem))
+	}
+	return width
+}
+
+// drawLine draws one block: a panel panelWidth pixels wide plus pad on
+// every side, its top-left corner at (x, y), with text over it in
+// OverlayTextColor. panelWidth is shared by every numeric block present in
+// the same draw call (numericPanelWidth), never text's own width alone —
+// the three numeric panels line up at the same width (FR-005).
+func (s screenOverlay) drawLine(x, y, ppem, pad, panelWidth int, text string) {
+	h := s.face.lineHeight(ppem)
+	drawPanel(s.image, x, y, x+panelWidth+2*pad, y+h+2*pad)
+	s.drawText(text, x+pad, y+pad, ppem, OverlayTextColor)
 }
 
 // drawProfile draws the elevation profile block: a panel spanning the
@@ -99,10 +127,10 @@ func (s screenOverlay) drawLine(x, y, scale, pad int, text string) {
 // call, never cached between frames (the same choice overlay.drawTrail
 // already made, research.md item 11) — and a dot at index's own position on
 // it, which is what moves from frame to frame.
-func (s screenOverlay) drawProfile(plan CameraPlan, index, margin, scale int) {
+func (s screenOverlay) drawProfile(plan CameraPlan, index, marginSide, marginBottom, ppem int) {
 	width, height := s.image.Resolution.Width, s.image.Resolution.Height
-	x0, x1 := margin, width-margin
-	y1 := height - margin
+	x0, x1 := marginSide, width-marginSide
+	y1 := height - marginBottom
 	y0 := y1 - roundHalfUp(overlayProfileHeightRatio*float64(height))
 	if x1 <= x0 || y1 <= y0 {
 		return
@@ -134,7 +162,7 @@ func (s screenOverlay) drawProfile(plan CameraPlan, index, margin, scale int) {
 		elevationSpan = 1
 	}
 
-	pad := roundHalfUp(overlayLinePadding * float64(overlayFace.Ascent+overlayFace.Descent) * float64(scale))
+	pad := roundHalfUp(overlayLinePadding * float64(s.face.lineHeight(ppem)))
 	innerX0, innerX1 := x0+pad, x1-pad
 	innerY0, innerY1 := y0+pad, y1-pad
 	if innerX1 <= innerX0 || innerY1 <= innerY0 {
@@ -147,7 +175,8 @@ func (s screenOverlay) drawProfile(plan CameraPlan, index, margin, scale int) {
 		return px, py
 	}
 
-	thickness := max(1, scale/2)
+	radius := profileMarkerRadius(height)
+	thickness := max(1, radius/2)
 	for i := 1; i < len(distances); i++ {
 		fromX, fromY := point(distances[i-1], elevations[i-1])
 		toX, toY := point(distances[i], elevations[i])
@@ -156,7 +185,19 @@ func (s screenOverlay) drawProfile(plan CameraPlan, index, margin, scale int) {
 
 	frame := plan.Frames[index]
 	dotX, dotY := point(frame.MarkerDistance, frame.TrackElevation)
-	s.drawDot(dotX, dotY, max(2, scale), s.appearance.MarkerColor)
+	s.drawDot(dotX, dotY, radius, s.appearance.MarkerColor)
+}
+
+// profileMarkerRadius is the radius, in pixels, of the dot that marks the
+// elevation profile's current position: a fraction of the frame's height,
+// never smaller than the documented floor — the same ratio/floor pattern
+// MarkerRadiusRatio/MarkerMinRadius already use for the marker drawn on the
+// terrain, but with its own fixed constants (ProfileMarkerRadiusRatio/
+// ProfileMarkerMinRadius), since the profile's marker is not a style choice
+// and must stay visible whatever radius the user picked for the terrain
+// marker (FR-006, research.md item 8).
+func profileMarkerRadius(height int) int {
+	return max(int(ProfileMarkerMinRadius), roundHalfUp(ProfileMarkerRadiusRatio*float64(height)))
 }
 
 // drawSegment draws a straight line from (x0, y0) to (x1, y1), thickness
@@ -206,66 +247,90 @@ func absInt(v int) int {
 	return v
 }
 
-// textScale is the integer factor a glyph is scaled by — nearest-neighbor
-// pixel replication, never interpolation, so no floating point enters the
-// per-pixel loop (research.md item 4).
-func textScale(frameHeight int) int {
-	glyphHeight := overlayFace.Ascent + overlayFace.Descent
-	return max(1, roundHalfUp(glyphHeightRatio*float64(frameHeight)/float64(glyphHeight)))
-}
-
-// textWidth is the width, in pixels, drawText would draw text at scale.
-func textWidth(text string, scale int) int {
-	return len(text) * overlayFace.Advance * scale
-}
-
-// glyphOffset returns the row, within face's Mask, where r's glyph starts;
-// ok is false for a rune the font does not have.
-func glyphOffset(face *basicfont.Face, r rune) (offset int, ok bool) {
-	glyphHeight := face.Ascent + face.Descent
-	for _, rng := range face.Ranges {
-		if r >= rng.Low && r < rng.High {
-			return (int(r-rng.Low) + rng.Offset) * glyphHeight, true
-		}
-	}
-	return 0, false
-}
-
 // drawText draws text in color, its top-left corner at (x, y), each glyph
-// scaled by the integer factor scale (pixel replication) and blended over
-// what is already there by its own alpha mask — the same mix formula
-// overlay.blend already uses for the trail and the marker.
-func drawText(img FrameImage, text string, x, y, scale int, color RGB) {
-	mask, ok := overlayFace.Mask.(*image.Alpha)
-	if !ok {
-		return
-	}
-	glyphHeight := overlayFace.Ascent + overlayFace.Descent
+// rasterized by s.face at the given ppem. Every glyph's outline is drawn
+// first, across the whole text, then every glyph's fill, also across the
+// whole text — never outline-then-fill one glyph at a time, so one glyph's
+// outline is never painted back over a neighbor's fill (FR-004, research.md
+// item 6). A rune s.face has no glyph for draws nothing and advances by
+// nothing.
+func (s screenOverlay) drawText(text string, x, y, ppem int, color RGB) {
+	outlineRadius := max(int(OverlayOutlineMinWidth), roundHalfUp(OverlayOutlineRatio*float64(s.image.Resolution.Height)))
 
-	for i := 0; i < len(text); i++ {
-		r := rune(text[i])
-		left := x + i*overlayFace.Advance*scale
-		offset, ok := glyphOffset(overlayFace, r)
-		if !ok {
-			continue
+	penX := x
+	for _, r := range text {
+		mask, ok := s.face.glyph(r, ppem)
+		if ok {
+			s.drawGlyphOutline(mask, penX, y, outlineRadius)
 		}
+		penX += glyphAdvance(mask, ok)
+	}
 
-		for gy := 0; gy < glyphHeight; gy++ {
-			for gx := 0; gx < overlayFace.Width; gx++ {
-				alpha := mask.Pix[(offset+gy)*mask.Stride+gx]
-				if alpha == 0 {
-					continue
-				}
-				coverage := float64(alpha) / 255
+	penX = x
+	for _, r := range text {
+		mask, ok := s.face.glyph(r, ppem)
+		if ok {
+			s.drawGlyphFill(mask, penX, y, color)
+		}
+		penX += glyphAdvance(mask, ok)
+	}
+}
 
-				for sy := 0; sy < scale; sy++ {
-					for sx := 0; sx < scale; sx++ {
-						blendPixel(img, left+gx*scale+sx, y+gy*scale+sy, color, coverage)
-					}
-				}
+// glyphAdvance is mask.advance, or 0 when ok is false (the rune s.face has
+// no glyph for) — shared by drawText's two passes so both advance the pen
+// by exactly the same amount.
+func glyphAdvance(mask glyphMask, ok bool) int {
+	if !ok {
+		return 0
+	}
+	return mask.advance
+}
+
+// drawGlyphFill blends mask's own coverage, in color, at (x, y) — the same
+// mix formula overlay.blend already uses for the trail and the marker.
+func (s screenOverlay) drawGlyphFill(mask glyphMask, x, y int, color RGB) {
+	for gy := 0; gy < mask.height; gy++ {
+		for gx := 0; gx < mask.width; gx++ {
+			if alpha := mask.coverage[gy*mask.width+gx]; alpha > 0 {
+				blendPixel(s.image, x+gx, y+gy, color, float64(alpha)/255)
 			}
 		}
 	}
+}
+
+// drawGlyphOutline blends, in OverlayTextOutlineColor, the coverage of
+// mask dilated by radius pixels — the maximum coverage within radius of
+// each point, which is positive beyond mask's own box exactly where the
+// dilation reaches past an edge pixel of the ink (FR-004, research.md item
+// 6: the same casing-before-core technique TrailCasingColor/MarkerRingColor
+// already use, applied to text).
+func (s screenOverlay) drawGlyphOutline(mask glyphMask, x, y, radius int) {
+	for gy := -radius; gy < mask.height+radius; gy++ {
+		for gx := -radius; gx < mask.width+radius; gx++ {
+			if alpha := mask.dilatedAt(gx, gy, radius); alpha > 0 {
+				blendPixel(s.image, x+gx, y+gy, OverlayTextOutlineColor, float64(alpha)/255)
+			}
+		}
+	}
+}
+
+// dilatedAt is the maximum coverage m has within radius pixels of (gx, gy)
+// — gx, gy may fall outside m's own box, which lets an outline extend past
+// it; a neighbor outside the box counts as zero coverage.
+func (m glyphMask) dilatedAt(gx, gy, radius int) uint8 {
+	var highest uint8
+	for dy := -radius; dy <= radius; dy++ {
+		for dx := -radius; dx <= radius; dx++ {
+			x, y := gx+dx, gy+dy
+			if x < 0 || x >= m.width || y < 0 || y >= m.height {
+				continue
+			}
+			if c := m.coverage[y*m.width+x]; c > highest {
+				highest = c
+			}
+		}
+	}
+	return highest
 }
 
 // blendPixel paints (x, y) with c over what img already has there, by a

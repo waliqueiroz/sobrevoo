@@ -1,86 +1,54 @@
 package domain
 
 import (
-	"image"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/image/font/inconsolata"
+	"github.com/stretchr/testify/require"
 )
 
-// alphaAt reads the embedded font's own alpha mask for r at (gx, gy) within
-// its glyph box, the same way drawText must — so the test does not hardcode
-// the font's byte table.
-func alphaAt(r rune, gx, gy int) uint8 {
-	face := inconsolata.Bold8x16
-	glyphHeight := face.Ascent + face.Descent
-	for _, rng := range face.Ranges {
-		if r >= rng.Low && r < rng.High {
-			y0 := (int(r-rng.Low) + rng.Offset) * glyphHeight
-			mask := face.Mask.(*image.Alpha)
-			return mask.Pix[(y0+gy)*mask.Stride+gx]
-		}
-	}
-	return 0
-}
-
-func Test_DrawText(t *testing.T) {
-	face := inconsolata.Bold8x16
-	glyphWidth, glyphHeight := face.Width, face.Ascent+face.Descent
-
-	t.Run("should light up exactly the glyph's own mask, at scale 1, over a black background with white text", func(t *testing.T) {
-		// given
-		img := NewFrameImage(Resolution{Width: 40, Height: 40}, RGB{})
-
-		// when
-		drawText(img, "0", 0, 0, 1, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
-
-		// then: black (0) mixed with white (255) at coverage alpha/255 is
-		// exactly `alpha` itself — the mask's own byte, unrounded
-		for gy := 0; gy < glyphHeight; gy++ {
-			for gx := 0; gx < glyphWidth; gx++ {
-				want := alphaAt('0', gx, gy)
-				got := img.At(gx, gy)
-				assert.Equal(t, want, got.R, "pixel (%d,%d)", gx, gy)
-				assert.Equal(t, want, got.G, "pixel (%d,%d)", gx, gy)
-				assert.Equal(t, want, got.B, "pixel (%d,%d)", gx, gy)
-			}
-		}
-	})
+func Test_ScreenOverlay_DrawText(t *testing.T) {
+	face := newVectorFace()
 
 	t.Run("should leave pixels far from the text untouched", func(t *testing.T) {
 		// given
 		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
-		img := NewFrameImage(Resolution{Width: 60, Height: 60}, background)
+		img := NewFrameImage(Resolution{Width: 100, Height: 60}, background)
+		overlay := screenOverlay{image: img, face: face}
 
 		// when
-		drawText(img, "0", 0, 0, 1, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
+		overlay.drawText("0", 5, 5, 20, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
 
 		// then
-		assert.Equal(t, background, img.At(50, 50))
+		assert.Equal(t, background, img.At(90, 50))
 	})
 
-	t.Run("should replicate each glyph pixel into a scale x scale block", func(t *testing.T) {
+	t.Run("should paint a fully covered pixel of the glyph's own mask exactly in the text color", func(t *testing.T) {
 		// given
-		const scale = 3
-		img := NewFrameImage(Resolution{Width: 200, Height: 200}, RGB{})
+		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
+		img := NewFrameImage(Resolution{Width: 60, Height: 60}, background)
+		overlay := screenOverlay{image: img, face: face}
+		mask, ok := face.glyph('0', 20)
+		require.True(t, ok)
 
 		// when
-		drawText(img, "0", 0, 0, scale, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
+		overlay.drawText("0", 5, 5, 20, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
 
-		// then
-		for gy := 0; gy < glyphHeight; gy++ {
-			for gx := 0; gx < glyphWidth; gx++ {
-				want := alphaAt('0', gx, gy)
-				for sy := 0; sy < scale; sy++ {
-					for sx := 0; sx < scale; sx++ {
-						got := img.At(gx*scale+sx, gy*scale+sy)
-						assert.Equal(t, want, got.R, "block of glyph pixel (%d,%d)", gx, gy)
-					}
+		// then: find a pixel the mask says is fully covered (coverage 255
+		// blends to exactly the painted color, never a mix with the
+		// background) — the test does not hardcode which (gx, gy) that is,
+		// only that the drawing follows the mask it is given
+		found := false
+		for gy := 0; gy < mask.height && !found; gy++ {
+			for gx := 0; gx < mask.width && !found; gx++ {
+				if mask.coverage[gy*mask.width+gx] == 255 {
+					assert.Equal(t, RGB{R: 0xFF, G: 0xFF, B: 0xFF}, img.At(5+gx, 5+gy))
+					found = true
 				}
 			}
 		}
+		require.True(t, found, "expected at least one fully covered pixel in '0' at ppem 20")
 	})
 
 	t.Run("should draw the same text twice into byte-identical images", func(t *testing.T) {
@@ -90,23 +58,84 @@ func Test_DrawText(t *testing.T) {
 		second := NewFrameImage(Resolution{Width: 200, Height: 60}, background)
 
 		// when
-		drawText(first, "12.3 km", 5, 5, 2, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
-		drawText(second, "12.3 km", 5, 5, 2, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
+		screenOverlay{image: first, face: face}.drawText("12.3 km", 5, 5, 20, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
+		screenOverlay{image: second, face: face}.drawText("12.3 km", 5, 5, 20, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
 
 		// then
 		assert.Equal(t, first.Pix, second.Pix)
 	})
 
-	t.Run("should not draw a rune outside the font's ranges", func(t *testing.T) {
+	t.Run("should not draw anything, and not panic, for a rune outside the font", func(t *testing.T) {
 		// given
 		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
 		img := NewFrameImage(Resolution{Width: 40, Height: 40}, background)
+		overlay := screenOverlay{image: img, face: face}
+		untouched := NewFrameImage(Resolution{Width: 40, Height: 40}, background)
 
 		// when
-		drawText(img, "\u0001", 0, 0, 1, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
+		overlay.drawText("\u0001", 0, 0, 20, RGB{R: 0xFF, G: 0xFF, B: 0xFF})
 
 		// then
-		assert.Equal(t, background, img.At(0, 0))
+		assert.Equal(t, untouched.Pix, img.Pix)
+	})
+
+	t.Run("should draw an outline around the glyph even when the background already matches the text color", func(t *testing.T) {
+		// given: a background of exactly the text color, so the fill pass
+		// alone would leave every pixel it touches unchanged — the only way
+		// a pixel can differ afterwards is the outline pass (FR-004,
+		// research.md item 6), drawn in OverlayTextOutlineColor before the
+		// fill, independent of what is underneath
+		color := OverlayTextColor
+		img := NewFrameImage(Resolution{Width: 60, Height: 60}, color)
+		overlay := screenOverlay{image: img, face: face}
+		mask, ok := face.glyph('0', 20)
+		require.True(t, ok)
+
+		topInk, inkX := -1, -1
+		for gy := 0; gy < mask.height && topInk < 0; gy++ {
+			for gx := 0; gx < mask.width; gx++ {
+				if mask.coverage[gy*mask.width+gx] > 0 {
+					topInk, inkX = gy, gx
+					break
+				}
+			}
+		}
+		require.GreaterOrEqual(t, topInk, 1, "expected a zero-coverage row above the ink to use as the halo target")
+
+		// when
+		overlay.drawText("0", 5, 5, 20, color)
+
+		// then: the row directly above the first inked row, which the
+		// glyph's own mask never covers, still changed — the outline halo
+		assert.NotEqual(t, color, img.At(5+inkX, 5+topInk-1))
+	})
+
+	t.Run("should never extend the outline beyond the documented radius from the glyph's own ink", func(t *testing.T) {
+		// given: at this image height, the outline radius rounds down to
+		// its floor, OverlayOutlineMinWidth (1 px) — two pixels above the
+		// first inked row is outside that radius from it
+		color := OverlayTextColor
+		img := NewFrameImage(Resolution{Width: 60, Height: 60}, color)
+		overlay := screenOverlay{image: img, face: face}
+		mask, ok := face.glyph('0', 20)
+		require.True(t, ok)
+
+		topInk, inkX := -1, -1
+		for gy := 0; gy < mask.height && topInk < 0; gy++ {
+			for gx := 0; gx < mask.width; gx++ {
+				if mask.coverage[gy*mask.width+gx] > 0 {
+					topInk, inkX = gy, gx
+					break
+				}
+			}
+		}
+		require.GreaterOrEqual(t, topInk, 2, "expected at least two zero-coverage rows above the ink")
+
+		// when
+		overlay.drawText("0", 5, 5, 20, color)
+
+		// then
+		assert.Equal(t, color, img.At(5+inkX, 5+topInk-2))
 	})
 }
 
@@ -178,7 +207,68 @@ func Test_FormatOverlayElapsed(t *testing.T) {
 	})
 }
 
+func Test_NumericPanelWidth(t *testing.T) {
+	face := newVectorFace()
+	const ppem = 20
+
+	t.Run("should be the width of the widest non-empty text", func(t *testing.T) {
+		// given
+		short := "DIST 1 m"
+		long := "ELEV 99999 m   GAIN +99999 m"
+
+		// when
+		width := numericPanelWidth(face, ppem, short, long, "")
+
+		// then
+		assert.Equal(t, face.textWidth(long, ppem), width)
+	})
+
+	t.Run("should be zero when every text is empty", func(t *testing.T) {
+		// given / when
+		width := numericPanelWidth(face, ppem, "", "", "")
+
+		// then
+		assert.Equal(t, 0, width)
+	})
+
+	t.Run("should ignore an empty text when taking the widest", func(t *testing.T) {
+		// given
+		only := "TIME 1:23:45"
+
+		// when
+		width := numericPanelWidth(face, ppem, "", only, "")
+
+		// then
+		assert.Equal(t, face.textWidth(only, ppem), width)
+	})
+}
+
+func Test_ProfileMarkerRadius(t *testing.T) {
+	t.Run("should be the ratio of the frame's height when that is above the floor", func(t *testing.T) {
+		// given / when / then
+		assert.Equal(t, roundHalfUp(ProfileMarkerRadiusRatio*2000), profileMarkerRadius(2000))
+	})
+
+	t.Run("should be the documented floor when the ratio would round below it", func(t *testing.T) {
+		// given: at height 100, ProfileMarkerRadiusRatio*height is 1.2,
+		// well under the floor
+		// when / then
+		assert.Equal(t, int(ProfileMarkerMinRadius), profileMarkerRadius(100))
+	})
+
+	t.Run("should scale proportionally between two heights, both above the floor", func(t *testing.T) {
+		// given / when
+		small := profileMarkerRadius(1000)
+		large := profileMarkerRadius(2000)
+
+		// then
+		assert.Equal(t, 2*small, large)
+	})
+}
+
 func Test_ScreenOverlay_Draw(t *testing.T) {
+	face := newVectorFace()
+
 	blank := func() FrameImage {
 		return NewFrameImage(Resolution{Width: 360, Height: 640}, RGB{R: 0x20, G: 0x26, B: 0x2E})
 	}
@@ -202,8 +292,8 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		off, on := blank(), blank()
 
 		// when
-		screenOverlay{image: off, config: disabled}.draw(plan, 1)
-		screenOverlay{image: on, config: full}.draw(plan, 1)
+		screenOverlay{image: off, config: disabled, face: face}.draw(plan, 1)
+		screenOverlay{image: on, config: full, face: face}.draw(plan, 1)
 
 		// then
 		assert.Equal(t, blank().Pix, off.Pix)
@@ -219,8 +309,8 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		a, b := blank(), blank()
 
 		// when
-		screenOverlay{image: a, config: distanceOnly}.draw(plan, 1)
-		screenOverlay{image: b, config: distanceAndTime}.draw(plan, 1)
+		screenOverlay{image: a, config: distanceOnly, face: face}.draw(plan, 1)
+		screenOverlay{image: b, config: distanceAndTime, face: face}.draw(plan, 1)
 
 		// then: adding the time block changes the image further
 		assert.NotEqual(t, a.Pix, b.Pix)
@@ -235,8 +325,8 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		noBlocks, _ := NewOverlayConfig(true, nil)
 
 		// when
-		screenOverlay{image: withoutClock, config: timeOnly}.draw(distancePlan, 1)
-		screenOverlay{image: baseline, config: noBlocks}.draw(distancePlan, 1)
+		screenOverlay{image: withoutClock, config: timeOnly, face: face}.draw(distancePlan, 1)
+		screenOverlay{image: baseline, config: noBlocks, face: face}.draw(distancePlan, 1)
 
 		// then
 		assert.Equal(t, baseline.Pix, withoutClock.Pix)
@@ -251,8 +341,8 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		noBlocks, _ := NewOverlayConfig(true, nil)
 
 		// when
-		screenOverlay{image: withClock, config: timeOnly}.draw(clockPlan, 1)
-		screenOverlay{image: baseline, config: noBlocks}.draw(clockPlan, 1)
+		screenOverlay{image: withClock, config: timeOnly, face: face}.draw(clockPlan, 1)
+		screenOverlay{image: baseline, config: noBlocks, face: face}.draw(clockPlan, 1)
 
 		// then
 		assert.NotEqual(t, baseline.Pix, withClock.Pix)
@@ -267,8 +357,8 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		requested, baseline := blank(), blank()
 
 		// when
-		screenOverlay{image: requested, config: elevationAndProfile}.draw(plan, 1)
-		screenOverlay{image: baseline, config: noBlocks}.draw(plan, 1)
+		screenOverlay{image: requested, config: elevationAndProfile, face: face}.draw(plan, 1)
+		screenOverlay{image: baseline, config: noBlocks, face: face}.draw(plan, 1)
 
 		// then
 		assert.Equal(t, baseline.Pix, requested.Pix)
@@ -282,11 +372,67 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		first, second := blank(), blank()
 
 		// when
-		screenOverlay{image: first, config: full}.draw(plan, 1)
-		screenOverlay{image: second, config: full}.draw(plan, 1)
+		screenOverlay{image: first, config: full, face: face}.draw(plan, 1)
+		screenOverlay{image: second, config: full, face: face}.draw(plan, 1)
 
 		// then
 		assert.Equal(t, first.Pix, second.Pix)
+	})
+
+	t.Run("should give the distance panel the width the longer elevation text needs, when both are shown", func(t *testing.T) {
+		// given
+		full, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance, OverlayBlockElevation})
+		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
+
+		shortPlan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceClock, "",
+			[]CameraFrame{{Index: 0, Phase: PhaseFollowing, MarkerDistance: 0, TrackElevation: 100, TrackElevationGain: 0}}, nil, true)
+		longPlan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceClock, "",
+			[]CameraFrame{{Index: 0, Phase: PhaseFollowing, MarkerDistance: 0, TrackElevation: 9999, TrackElevationGain: 88888}}, nil, true)
+
+		shortImg := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
+		longImg := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
+
+		// when
+		screenOverlay{image: shortImg, config: full, face: face}.draw(shortPlan, 0)
+		screenOverlay{image: longImg, config: full, face: face}.draw(longPlan, 0)
+
+		// then: the distance panel (the first line) is measured at a row
+		// just below its own top edge — inside the padding, so only the
+		// panel's own background can be there, never glyph ink — and it
+		// reaches further right in the plan whose elevation text is longer
+		marginSide := roundHalfUp(OverlaySideMarginRatio * 1080.0)
+		marginTop := roundHalfUp(OverlayTopMarginRatio * 1920.0)
+		panelRight := func(img FrameImage) int {
+			x := marginSide
+			for img.At(x, marginTop+1) != background {
+				x++
+			}
+			return x
+		}
+
+		assert.Less(t, panelRight(shortImg), panelRight(longImg))
+	})
+
+	t.Run("should give the distance panel only its own width when it is the only numeric block shown", func(t *testing.T) {
+		// given
+		distanceOnly, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance})
+		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
+		plan := NewCameraPlan(PlanParameters{FrameRate: 30}, DurationModeExplicit, TimeReferenceClock, "",
+			[]CameraFrame{{Index: 0, Phase: PhaseFollowing, MarkerDistance: 0}}, nil, true)
+		img := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
+
+		// when
+		screenOverlay{image: img, config: distanceOnly, face: face}.draw(plan, 0)
+
+		// then
+		marginSide := roundHalfUp(OverlaySideMarginRatio * 1080.0)
+		marginTop := roundHalfUp(OverlayTopMarginRatio * 1920.0)
+		ppem := max(1, roundHalfUp(glyphHeightRatio*1920.0))
+		pad := roundHalfUp(overlayLinePadding * float64(face.lineHeight(ppem)))
+		want := marginSide + face.textWidth("DIST 0 m", ppem) + 2*pad
+
+		assert.NotEqual(t, background, img.At(want-1, marginTop+1))
+		assert.Equal(t, background, img.At(want, marginTop+1))
 	})
 
 	t.Run("should move the profile's dot for a different frame while the line stays the same", func(t *testing.T) {
@@ -297,10 +443,82 @@ func Test_ScreenOverlay_Draw(t *testing.T) {
 		firstFrame, secondFrame := blank(), blank()
 
 		// when
-		screenOverlay{image: firstFrame, config: profileOnly}.draw(plan, 0)
-		screenOverlay{image: secondFrame, config: profileOnly}.draw(plan, 1)
+		screenOverlay{image: firstFrame, config: profileOnly, face: face}.draw(plan, 0)
+		screenOverlay{image: secondFrame, config: profileOnly, face: face}.draw(plan, 1)
 
 		// then
 		assert.NotEqual(t, firstFrame.Pix, secondFrame.Pix)
+	})
+
+	t.Run("should draw a visibly larger profile marker at a larger resolution of the same aspect ratio", func(t *testing.T) {
+		// given: the dot is drawn at full opacity in appearance.MarkerColor
+		// (the zero value, RGB{0,0,0}, since appearance is not set here),
+		// never blended with the line (OverlayTextColor, white) or the
+		// panel — so counting exactly black pixels counts the dot's own
+		// area, nothing else
+		profileOnly, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockProfile})
+		plan := planWith(true, TimeReferenceClock)
+		countBlack := func(img FrameImage) int {
+			count := 0
+			for y := 0; y < img.Resolution.Height; y++ {
+				for x := 0; x < img.Resolution.Width; x++ {
+					if img.At(x, y) == (RGB{}) {
+						count++
+					}
+				}
+			}
+			return count
+		}
+
+		small := NewFrameImage(Resolution{Width: 360, Height: 640}, RGB{R: 0x20, G: 0x26, B: 0x2E})
+		large := NewFrameImage(Resolution{Width: 1080, Height: 1920}, RGB{R: 0x20, G: 0x26, B: 0x2E})
+
+		// when
+		screenOverlay{image: small, config: profileOnly, face: face}.draw(plan, 1)
+		screenOverlay{image: large, config: profileOnly, face: face}.draw(plan, 1)
+
+		// then
+		assert.Greater(t, countBlack(large), countBlack(small))
+	})
+
+	t.Run("should start the first block exactly at the top and side margins, nothing drawn before them", func(t *testing.T) {
+		// given
+		distanceOnly, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance})
+		plan := planWith(true, TimeReferenceClock)
+		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
+		img := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
+
+		// when
+		screenOverlay{image: img, config: distanceOnly, face: face}.draw(plan, 0)
+
+		// then
+		marginTop := roundHalfUp(OverlayTopMarginRatio * 1920.0)
+		marginSide := roundHalfUp(OverlaySideMarginRatio * 1080.0)
+
+		assert.Equal(t, background, img.At(marginSide, marginTop-1), "above the top margin")
+		assert.Equal(t, background, img.At(marginSide-1, marginTop), "left of the side margin")
+		assert.NotEqual(t, background, img.At(marginSide, marginTop), "the panel's own top-left corner")
+	})
+
+	t.Run("should draw nothing at or below the bottom margin, which is larger than the top and side margins", func(t *testing.T) {
+		// given
+		full, _ := NewOverlayConfig(true, []OverlayBlock{OverlayBlockDistance, OverlayBlockElevation, OverlayBlockTime, OverlayBlockProfile})
+		plan := planWith(true, TimeReferenceClock)
+		background := RGB{R: 0x20, G: 0x26, B: 0x2E}
+		img := NewFrameImage(Resolution{Width: 1080, Height: 1920}, background)
+
+		// when: frame 0, whose profile dot sits at the chart's own left
+		// edge (distance 0), far from the column checked below
+		screenOverlay{image: img, config: full, face: face}.draw(plan, 0)
+
+		// then: the profile block, the one closest to the bottom, never
+		// reaches the bottom margin itself
+		marginSide := roundHalfUp(OverlaySideMarginRatio * 1080.0)
+		marginBottom := roundHalfUp(OverlayBottomMarginRatio * 1920.0)
+		y1 := 1920 - marginBottom
+
+		assert.Equal(t, background, img.At(1080-marginSide-5, y1))
+		assert.Greater(t, OverlayBottomMarginRatio, OverlayTopMarginRatio)
+		assert.Greater(t, OverlayBottomMarginRatio, OverlaySideMarginRatio)
 	})
 }

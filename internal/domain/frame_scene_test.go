@@ -450,6 +450,22 @@ func Test_Scene_Render_ScreenOverlay(t *testing.T) {
 		require.NoError(t, err2)
 		assert.Equal(t, firstImage.Pix, secondImage.Pix)
 	})
+
+	t.Run("should draw the same frame twice from the same Scene into byte-identical images", func(t *testing.T) {
+		// given: the same *Scene, so its vector-font glyph cache
+		// (011-overlay-polish) is reused the second time, not rebuilt
+		plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
+		scene := sceneWith(full)
+
+		// when
+		first, _, err1 := scene.Render(context.Background(), plan, 1, smallFrame)
+		second, _, err2 := scene.Render(context.Background(), plan, 1, smallFrame)
+
+		// then
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		assert.Equal(t, first.Pix, second.Pix)
+	})
 }
 
 func Test_Scene_Render_Stopping(t *testing.T) {
