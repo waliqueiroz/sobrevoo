@@ -70,6 +70,7 @@ func (s screenOverlay) draw(plan CameraPlan, index int) {
 	showDistance := s.config.Distance
 	showElevation := s.config.Elevation && plan.ElevationAvailable
 	showTime := s.config.Time && plan.TimeReference == TimeReferenceClock
+	showSpeed := s.config.Speed && plan.TimeReference == TimeReferenceClock
 
 	y := marginTop
 	if showDistance {
@@ -82,6 +83,10 @@ func (s screenOverlay) draw(plan CameraPlan, index int) {
 	}
 	if showTime {
 		s.drawLine(marginSide, y, ppem, pad, s.panelWidth, timeBlockText(frame))
+		y += lineHeight + pad
+	}
+	if showSpeed {
+		s.drawLine(marginSide, y, ppem, pad, s.panelWidth, speedBlockText(frame))
 	}
 	if s.config.Profile && plan.ElevationAvailable {
 		s.drawProfile(plan, index, marginSide, marginBottom, ppem)
@@ -109,6 +114,13 @@ func timeBlockText(frame CameraFrame) string {
 	return "TEMPO " + formatOverlayElapsed(frame.ActivityElapsed)
 }
 
+// speedBlockText is the fifth block's text (014-speed-overlay-block),
+// following the same labeling convention as the other four — in Brazilian
+// Portuguese, the unit abbreviation ("km/h") kept as is.
+func speedBlockText(frame CameraFrame) string {
+	return "VEL " + formatOverlaySpeed(frame.MarkerSpeed)
+}
+
 // overlayPpem is the pixel size ("pixels per em") a glyph is rasterized at,
 // for a frame height pixels tall — the same formula draw and
 // Scene.numericPanelWidth (frame_scene.go) both use, so the panel width
@@ -119,18 +131,21 @@ func overlayPpem(height int) int {
 }
 
 // stablePanelWidth is the width every present numeric block's panel
-// shares, in pixels at ppem: the widest text any of the three numeric
-// blocks (distance; elevation and gain; time elapsed) has in ANY frame of
-// plan — never just one — so the panels never change width between the
-// first and the last frame of a flight (012-overlay-ptbr-readability
-// FR-007/FR-008, research.md item 4). A block config/plan never shows
-// (config.Distance false, or no clock reference, or no elevation) does not
-// take part; 0 when no numeric block is shown at all.
+// shares, in pixels at ppem: the widest text any of the four numeric
+// blocks (distance; elevation and gain; time elapsed; speed) has in ANY
+// frame of plan — never just one — so the panels never change width
+// between the first and the last frame of a flight
+// (012-overlay-ptbr-readability FR-007/FR-008, research.md item 4;
+// 014-speed-overlay-block adds the speed block to the same mechanism). A
+// block config/plan never shows (config.Distance false, or no clock
+// reference, or no elevation) does not take part; 0 when no numeric block
+// is shown at all.
 func stablePanelWidth(face *vectorFace, plan CameraPlan, config OverlayConfig, ppem int) int {
 	showDistance := config.Distance
 	showElevation := config.Elevation && plan.ElevationAvailable
 	showTime := config.Time && plan.TimeReference == TimeReferenceClock
-	if !showDistance && !showElevation && !showTime {
+	showSpeed := config.Speed && plan.TimeReference == TimeReferenceClock
+	if !showDistance && !showElevation && !showTime && !showSpeed {
 		return 0
 	}
 
@@ -144,6 +159,9 @@ func stablePanelWidth(face *vectorFace, plan CameraPlan, config OverlayConfig, p
 		}
 		if showTime {
 			width = max(width, face.textWidth(timeBlockText(frame), ppem))
+		}
+		if showSpeed {
+			width = max(width, face.textWidth(speedBlockText(frame), ppem))
 		}
 	}
 	return width
@@ -431,6 +449,13 @@ func formatOverlayElevation(meters float64) string {
 // framed as a gain, not a bare measure).
 func formatOverlayGain(meters float64) string {
 	return fmt.Sprintf("+%.0f m", meters)
+}
+
+// formatOverlaySpeed formats meters per second as kilometers per hour, one
+// decimal (014-speed-overlay-block) — the unit anyone who cycles or runs
+// already reads speed in, the same metric convention the other blocks use.
+func formatOverlaySpeed(metersPerSecond float64) string {
+	return fmt.Sprintf("%.1f km/h", metersPerSecond*3.6)
 }
 
 // formatOverlayElapsed formats d as H:MM:SS, never omitting the hour, so

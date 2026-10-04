@@ -11,14 +11,20 @@ const (
 	OverlayBlockElevation OverlayBlock = "elevation"
 	OverlayBlockTime      OverlayBlock = "time"
 	OverlayBlockProfile   OverlayBlock = "profile"
+
+	// OverlayBlockSpeed is the fifth block (014-speed-overlay-block),
+	// different from the other four in one way: it is not among the
+	// default blocks a plain "overlays on" turns on — it only appears when
+	// named explicitly in the list.
+	OverlayBlockSpeed OverlayBlock = "speed"
 )
 
 // OverlayConfig is what the user chose about the screen overlays: whether
-// they are drawn at all, and — when they are — which of the four blocks
-// show. It does not include the hatch of "no map" or the checkerboard of
-// "no elevation" (fixed, part of RenderTuning), nor anything about the
-// trail or the marker drawn on the terrain (Appearance) — it is only about
-// what is drawn fixed on the screen, on top of everything else.
+// they are drawn at all, and — when they are — which blocks show. It does
+// not include the hatch of "no map" or the checkerboard of "no elevation"
+// (fixed, part of RenderTuning), nor anything about the trail or the
+// marker drawn on the terrain (Appearance) — it is only about what is
+// drawn fixed on the screen, on top of everything else.
 type OverlayConfig struct {
 	Enabled bool
 
@@ -26,13 +32,14 @@ type OverlayConfig struct {
 	Elevation bool
 	Time      bool
 	Profile   bool
+	Speed     bool
 }
 
-// NewOverlayConfig checks every element of blocks is one of the four
-// documented names (ErrInvalidOverlayBlock, citing the one that is not) and
-// turns on the corresponding field. When enabled is false the four fields
-// are all false regardless of blocks — turning the overlays off is turning
-// them all off, whatever was asked.
+// NewOverlayConfig checks every element of blocks is one of the documented
+// names (ErrInvalidOverlayBlock, citing the one that is not) and turns on
+// the corresponding field. When enabled is false every field is false
+// regardless of blocks — turning the overlays off is turning them all off,
+// whatever was asked.
 func NewOverlayConfig(enabled bool, blocks []OverlayBlock) (OverlayConfig, error) {
 	config := OverlayConfig{Enabled: enabled}
 	if !enabled {
@@ -49,15 +56,17 @@ func NewOverlayConfig(enabled bool, blocks []OverlayBlock) (OverlayConfig, error
 			config.Time = true
 		case OverlayBlockProfile:
 			config.Profile = true
+		case OverlayBlockSpeed:
+			config.Speed = true
 		default:
-			return OverlayConfig{}, fmt.Errorf("%w: %q, expected one of distance, elevation, time, profile", ErrInvalidOverlayBlock, block)
+			return OverlayConfig{}, fmt.Errorf("%w: %q, expected one of distance, elevation, time, profile, speed", ErrInvalidOverlayBlock, block)
 		}
 	}
 
 	return config, nil
 }
 
-// Fingerprint is a canonical text of the five fields, which takes part in
+// Fingerprint is a canonical text of the six fields, which takes part in
 // the identification of a set of frames (FrameSetID), the same way
 // Appearance.Fingerprint and RenderTuning.Fingerprint already do.
 func (o OverlayConfig) Fingerprint() string {
@@ -72,5 +81,6 @@ func (o OverlayConfig) Fingerprint() string {
 		flag(o.Distance) + "|" +
 		flag(o.Elevation) + "|" +
 		flag(o.Time) + "|" +
-		flag(o.Profile)
+		flag(o.Profile) + "|" +
+		flag(o.Speed)
 }

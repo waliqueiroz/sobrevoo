@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 	"github.com/waliqueiroz/sobrevoo/internal/infra/outbound/config"
 )
@@ -54,6 +56,8 @@ func domainCameraTuning(t config.CameraTuning) domain.CameraTuning {
 		MaxLogDistanceRatePerSecond: t.MaxLogDistanceRatePerSecond,
 		MaxTargetSpeedInDistances:   t.MaxTargetSpeedInDistances,
 		GaussianSigmaSeconds:        t.GaussianSigmaSeconds,
+
+		SpeedWindow: time.Duration(t.SpeedWindowSeconds * float64(time.Second)),
 
 		OverviewTiltDegrees:        t.OverviewTiltDegrees,
 		OverviewVerticalFOVDegrees: t.OverviewVerticalFOVDegrees,

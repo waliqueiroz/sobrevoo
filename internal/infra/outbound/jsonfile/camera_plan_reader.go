@@ -64,6 +64,7 @@ type readMarker struct {
 	Distance  float64  `json:"distance_m"`
 	Elevation *float64 `json:"elevation_m"`
 	Gain      *float64 `json:"gain_m"`
+	Speed     *float64 `json:"speed_mps"`
 }
 
 type readFrame struct {
@@ -137,6 +138,8 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 			return domain.CameraPlan{}, invalidPlanFile("frames[%d].marker.elevation_m is missing", i)
 		case f.Marker.Gain == nil:
 			return domain.CameraPlan{}, invalidPlanFile("frames[%d].marker.gain_m is missing", i)
+		case f.Marker.Speed == nil:
+			return domain.CameraPlan{}, invalidPlanFile("frames[%d].marker.speed_mps is missing", i)
 		}
 
 		frames[i] = domain.CameraFrame{
@@ -155,6 +158,7 @@ func (CameraPlanReader) Read(path string) (domain.CameraPlan, error) {
 			ActivityElapsed:        secondsToDuration(*f.ActivityTimeSeconds),
 			TrackElevation:         *f.Marker.Elevation,
 			TrackElevationGain:     *f.Marker.Gain,
+			MarkerSpeed:            *f.Marker.Speed,
 		}
 	}
 

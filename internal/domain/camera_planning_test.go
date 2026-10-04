@@ -718,3 +718,75 @@ func Test_PlanCamera_LongStopHiddenBySimplification(t *testing.T) {
 		assertMarkerMonotonic(t, plan)
 	})
 }
+
+// Test_PlanCamera_MarkerSpeed covers 014-speed-overlay-block: MarkerSpeed is
+// the average speed over a fixed time window (CameraTuning.SpeedWindow)
+// centered on ActivityElapsed, never the instantaneous speed between two
+// consecutive points.
+func Test_PlanCamera_MarkerSpeed(t *testing.T) {
+	tuning := defaultTuning()
+
+	t.Run("should average the full window to the route's constant speed, away from both ends", func(t *testing.T) {
+		// given: a route travelled at a constant 5 m/s, long enough that the
+		// default speed window (30s) fits entirely on both sides of an
+		// interior frame
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(10000, 90).WithConstantSpeed(5).Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(40 * time.Second).WithFrameRate(30).Build()
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		following := followingFrames(plan)
+		middle := following[len(following)/2]
+		assert.InDelta(t, 5.0, middle.MarkerSpeed, 0.01)
+	})
+
+	t.Run("should shorten the window at the very first frame instead of leaving the speed at zero or jumping", func(t *testing.T) {
+		// given: same constant-speed route; the first frame's marker is at
+		// the very start, where a symmetric window has no "before" side —
+		// only the forward half exists, and on a constant-speed route that
+		// half alone already averages to the exact same speed
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(10000, 90).WithConstantSpeed(5).Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(40 * time.Second).WithFrameRate(30).Build()
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		require.Equal(t, time.Duration(0), plan.Frames[0].ActivityElapsed)
+		assert.InDelta(t, 5.0, plan.Frames[0].MarkerSpeed, 0.01)
+	})
+
+	t.Run("should shorten the window at the very last frame the same way", func(t *testing.T) {
+		// given
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(10000, 90).WithConstantSpeed(5).Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(40 * time.Second).WithFrameRate(30).Build()
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		last := plan.Frames[len(plan.Frames)-1]
+		assert.InDelta(t, 5.0, last.MarkerSpeed, 0.01)
+	})
+
+	t.Run("should be zero throughout when the route has no usable time data", func(t *testing.T) {
+		// given: no timestamps at all, so there is no activity clock to
+		// anchor a window on
+		points := builddomain.NewSyntheticRouteBuilder().WithLine(5000, 90).WithoutTime().Build()
+		parameters := builddomain.NewPlanParametersBuilder().WithDuration(30 * time.Second).WithFrameRate(30).Build()
+
+		// when
+		plan, err := treatedOf(points).PlanCamera(parameters, tuning)
+
+		// then
+		require.NoError(t, err)
+		for i, f := range plan.Frames {
+			assert.Zero(t, f.MarkerSpeed, "frame %d", i)
+		}
+	})
+}

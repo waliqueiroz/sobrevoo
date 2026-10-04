@@ -250,6 +250,38 @@ func Test_CameraPlan_Validate(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
 		assert.ErrorContains(t, err, "frames[1].camera_to_marker_m")
 	})
+
+	t.Run("should refuse a negative marker speed", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).WithMarkerSpeed(-1).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[0].marker_speed_mps")
+	})
+
+	t.Run("should refuse a marker speed that is not a finite number", func(t *testing.T) {
+		// given
+		plan := validPlan().WithFrames(
+			builddomain.NewCameraFrameBuilder().WithIndex(0).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(1).WithMarkerSpeed(math.NaN()).Build(),
+			builddomain.NewCameraFrameBuilder().WithIndex(2).WithMarkerSpeed(math.Inf(1)).Build(),
+		).Build()
+
+		// when
+		err := plan.Validate()
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrPlanFileInvalid)
+		assert.ErrorContains(t, err, "frames[1].marker_speed_mps")
+	})
 }
 
 func Test_CameraPlan_ID(t *testing.T) {
@@ -299,6 +331,7 @@ func Test_CameraPlan_ID(t *testing.T) {
 			f.Tilt -= 1e-5
 			f.MarkerDistance += 1e-5
 			f.CameraToMarkerDistance -= 1e-5
+			f.MarkerSpeed += 1e-5
 		})
 
 		// when / then
@@ -319,6 +352,7 @@ func Test_CameraPlan_ID(t *testing.T) {
 		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.Tilt += 1e-3 }).ID(), "tilt")
 		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.MarkerDistance += 1e-3 }).ID(), "marker distance")
 		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.CameraToMarkerDistance += 1e-3 }).ID(), "camera to marker distance")
+		assert.NotEqual(t, base, planWith(func(f *domain.CameraFrame) { f.MarkerSpeed += 1e-3 }).ID(), "marker speed")
 	})
 
 	t.Run("should change when the index or the phase of a frame changes", func(t *testing.T) {

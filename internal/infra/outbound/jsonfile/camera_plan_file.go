@@ -12,12 +12,13 @@ import (
 
 // planFormatVersion is the version of the exported plan file format
 // (specs/003-camera-path-planning/contracts/plan-file.md,
-// specs/009-frame-overlays/contracts/plan-file-v2.md). It changes when a
-// field is removed, changes meaning, or — as version 2 does — becomes
+// specs/009-frame-overlays/contracts/plan-file-v2.md,
+// specs/014-speed-overlay-block/contracts/plan-file-v3.md). It changes when a
+// field is removed, changes meaning, or — as versions 2 and 3 do — becomes
 // required where no earlier version wrote it, so an old file is refused as
 // an unsupported version instead of being read as if the new fields were
 // simply absent.
-const planFormatVersion = 2
+const planFormatVersion = 3
 
 // number is a JSON number printed with a fixed maximum number of decimal
 // places and no trailing zeros, so the same value always produces the same
@@ -90,6 +91,7 @@ type markerFile struct {
 	Distance  number `json:"distance_m"`
 	Elevation number `json:"elevation_m"`
 	Gain      number `json:"gain_m"`
+	Speed     number `json:"speed_mps"`
 }
 
 type frameFile struct {
@@ -159,7 +161,7 @@ func encodePlan(plan domain.CameraPlan) ([]byte, error) {
 			Camera:              cameraFile{coordinate(frame.CameraLatitude), coordinate(frame.CameraLongitude), measure(frame.CameraAltitude)},
 			Heading:             measure(frame.Heading),
 			Tilt:                measure(frame.Tilt),
-			Marker:              markerFile{coordinate(frame.MarkerLatitude), coordinate(frame.MarkerLongitude), measure(frame.MarkerDistance), measure(frame.TrackElevation), measure(frame.TrackElevationGain)},
+			Marker:              markerFile{coordinate(frame.MarkerLatitude), coordinate(frame.MarkerLongitude), measure(frame.MarkerDistance), measure(frame.TrackElevation), measure(frame.TrackElevationGain), measure(frame.MarkerSpeed)},
 			CameraToMarker:      measure(frame.CameraToMarkerDistance),
 		})
 		if err != nil {

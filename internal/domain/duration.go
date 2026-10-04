@@ -48,6 +48,35 @@ func (r Route) TimeAt(distances []float64, at float64) (time.Duration, bool) {
 	return time.Duration((1-t)*float64(from) + t*float64(to)), true
 }
 
+// DistanceAt is TimeAt's exact inverse (014-speed-overlay-block): given the
+// real time elapsed since the first point, it returns the distance travelled
+// at (meters) along the route — distances holding, for each point, the
+// distance travelled to reach it, as TimeAt's own distances parameter does.
+// The route is clamped to its ends (an at before the first point or after the
+// last one returns that end's distance), and the second return value is false
+// under the same !r.allHaveTime() criterion TimeAt uses.
+func (r Route) DistanceAt(distances []float64, at time.Duration) (float64, bool) {
+	if !r.allHaveTime() {
+		return 0, false
+	}
+
+	first := *r.Points[0].Time
+	i := min(sort.Search(len(r.Points), func(i int) bool {
+		return r.Points[i].Time.Sub(first) >= at
+	}), len(r.Points)-1)
+	if i == 0 {
+		return distances[0], true
+	}
+
+	from := r.Points[i-1].Time.Sub(first)
+	to := r.Points[i].Time.Sub(first)
+	t := clamp(float64(at-from)/float64(to-from), 0, 1)
+	// (1-t)*a + t*b, not a+t*(b-a): the latter is not guaranteed to land on
+	// exactly `b` at t=1 in floating point (the same reason TimeAt's own
+	// lerp takes this form).
+	return (1-t)*distances[i-1] + t*distances[i], true
+}
+
 func (r Route) allHaveTime() bool {
 	if len(r.Points) == 0 {
 		return false

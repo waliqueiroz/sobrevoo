@@ -595,6 +595,23 @@ func Test_RenderFrameCommand_Overlay(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("should turn on the speed block when named in --overlay-blocks, even though it is not in the default list", func(t *testing.T) {
+		// given
+		m := newRenderCommandMocks(t)
+		want, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{domain.OverlayBlockDistance, domain.OverlayBlockSpeed})
+		require.NoError(t, err)
+		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
+		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
+		m.frameService.EXPECT().DrawFrame(gomock.Any(), plan, slice, domain.SingleFrameRequest{Number: 3, Path: "f.png", Resolution: defaultResolution, Appearance: defaultAppearance, Overlay: want}).
+			Return(domain.RenderSummary{Drawn: 1}, nil)
+
+		// when
+		_, _, err = executeRenderFrameCommand(t, m, "plan.json", "slice.zip", "--number", "3", "--output", "f.png", "--overlay-blocks=distance,speed")
+
+		// then
+		require.NoError(t, err)
+	})
+
 	t.Run("should refuse an unknown overlay block with ErrInvalidOverlayBlock before calling the frame service", func(t *testing.T) {
 		// given: no service has an expectation, so any call fails the test
 		m := newRenderCommandMocks(t)

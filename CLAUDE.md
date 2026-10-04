@@ -81,7 +81,23 @@ de simplificação e de suavização do trajeto — até então só escolhíveis
 valores aceitos e os mesmos padrões vindos da configuração, passando a
 fazer parte da identidade do plano de câmera (`CameraPlan.ID()`) e, por
 isso, da decisão de reaproveitar um plano, um recorte ou quadros guardados
-por `fly --keep` entre execuções. Ainda não há áudio.
+por `fly --keep` entre execuções; e `specs/014-speed-overlay-block/`
+acrescenta às sobreposições de tela um quinto bloco, a velocidade da
+atividade (`speed`, rótulo "VEL"), calculado por quadro como a velocidade
+média numa janela de tempo fixa de 30 segundos em torno do instante real da
+atividade — nunca a velocidade instantânea entre dois pontos consecutivos
+do trajeto, que oscilaria demais para ser lida —, encurtada nos extremos
+do trajeto em vez de ausente ou descontínua; ao contrário dos quatro blocos
+de antes, nasce fora da escolha padrão de blocos, só aparece quando pedido
+por nome pelo mesmo mecanismo (`--overlay-blocks`), e só existe quando o
+trajeto tem horário em todos os pontos, exatamente como o bloco de tempo
+decorrido já exige. A velocidade passa a fazer parte do conteúdo do plano
+de câmera, do arquivo de plano exportado e da identidade do plano
+(`CameraPlan.ID()`); como o arquivo ganha um campo por quadro que nenhuma
+versão anterior escrevia, `format_version` sobe de 2 para 3, e um plano
+mais antigo é recusado com a mesma mensagem e o mesmo código de saída que
+uma versão desconhecida já recebe, pedindo para ser gerado de novo. Ainda
+não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -611,6 +627,47 @@ que a etapa pede; `geodata check` porque chama `TrackService.Clean`,
 nunca `Treat`, deliberadamente (a verificação de cobertura é sobre o
 trajeto limpo, não simplificado/suavizado, para não mascarar uma lacuna
 real — `specs/002-geo-data-registry/research.md` item 9).
+
+### A velocidade da atividade na sobreposição (etapa 14)
+
+`specs/014-speed-overlay-block/` acrescenta às sobreposições de tela um
+quinto bloco, `OverlayBlockSpeed` (nome `speed`, rótulo "VEL"), pelo mesmo
+mecanismo com que os quatro já existentes são escolhidos
+(`OverlayConfig`/`--overlay-blocks`) — mas, diferente deles, nasce fora da
+escolha padrão de blocos (`config.RenderDefaults.OverlayBlocks` continua
+`distance,elevation,time,profile`): só aparece quando pedido por nome.
+`CameraFrame` ganha `MarkerSpeed` (metros por segundo), a velocidade média
+da atividade numa janela de tempo fixa (`CameraTuning.SpeedWindow`, 30
+segundos, um limiar interno de `config.go`, nunca uma flag) centrada no
+instante real da atividade do quadro (`ActivityElapsed`) — nunca a
+velocidade instantânea entre dois pontos consecutivos do trajeto, que
+oscila demais para ser lida. O cálculo reaproveita o mecanismo que já
+produz `ActivityElapsed`: `Route.DistanceAt`, o espelho exato de
+`Route.TimeAt` que esta etapa acrescenta (tempo decorrido → distância, em
+vez de distância → tempo decorrido, com a mesma busca por bracket e o
+mesmo `lerp` seguro `(1-t)*a + t*b`), acha a distância nas duas pontas da
+janela; a janela já sai encurtada, nunca ausente nem descontínua, nos
+extremos do trajeto, porque a mesma forma de `clamp` que `TimeAt` já
+aplica faz `DistanceAt` parar no primeiro ou no último ponto. A
+disponibilidade da velocidade usa o mesmo critério que já decide
+`TimeReference == TimeReferenceClock` (trajeto com horário em todo ponto)
+— nenhum campo novo de disponibilidade em `CameraPlan`, ao contrário de
+`ElevationAvailable`, porque não é um critério independente. A velocidade
+passa a fazer parte do conteúdo do plano, do arquivo de plano exportado
+(`frames[].marker.speed_mps`, campo novo e obrigatório) e da identidade do
+plano (`CameraPlan.ID()`, ao lado de `CameraToMarkerDistance`) — diferente
+de `ActivityElapsed`/`TrackElevation`/`TrackElevationGain`, que ficam de
+fora do hash por serem funções determinísticas do que já o compõe, a
+velocidade entra porque o pedido original exige explicitamente que dois
+planos iguais em tudo menos nela sejam planos diferentes. Como o arquivo
+ganha um campo obrigatório que nenhuma versão anterior escrevia,
+`format_version` sobe de `2` para `3` pelo mesmo raciocínio que já valeu
+na transição `1` → `2` (etapa 9): um plano mais antigo é recusado por
+`ErrPlanFormatVersionUnsupported`, a mesma mensagem e o mesmo código de
+saída que já recusam qualquer versão desconhecida, sem nenhum sentinela
+novo. `inspect`, `geodata check`, `video` e a montagem do vídeo não mudam:
+a velocidade é um dado do plano de câmera, consumido só pelo desenho de
+quadros (`render frame`, `render all`, `fly`).
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

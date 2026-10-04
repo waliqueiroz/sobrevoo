@@ -59,6 +59,8 @@ type CameraTuning struct {
 	MaxTargetSpeedInDistances   float64
 	GaussianSigmaSeconds        float64
 
+	SpeedWindowSeconds float64
+
 	OverviewTiltDegrees        float64
 	OverviewVerticalFOVDegrees float64
 	OverviewMargin             float64
@@ -250,6 +252,8 @@ func cameraTuning() CameraTuning {
 		MaxLogDistanceRatePerSecond: 1.5,
 		MaxTargetSpeedInDistances:   1.0,
 		GaussianSigmaSeconds:        0.5,
+
+		SpeedWindowSeconds: 30,
 
 		OverviewTiltDegrees:        60,
 		OverviewVerticalFOVDegrees: verticalFOVDegrees,

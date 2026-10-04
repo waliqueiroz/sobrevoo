@@ -30,6 +30,8 @@ func NewCameraTuningBuilder() *CameraTuningBuilder {
 			MaxTargetSpeedInDistances:   1.0,
 			GaussianSigmaSeconds:        0.5,
 
+			SpeedWindow: 30 * time.Second,
+
 			OverviewTiltDegrees:        60,
 			OverviewVerticalFOVDegrees: 45,
 			OverviewMargin:             1.2,
@@ -70,6 +72,11 @@ func (b *CameraTuningBuilder) WithMaxLogDistanceRatePerSecond(rate float64) *Cam
 
 func (b *CameraTuningBuilder) WithAutoDurationMax(duration time.Duration) *CameraTuningBuilder {
 	b.tuning.AutoDurationMax = duration
+	return b
+}
+
+func (b *CameraTuningBuilder) WithSpeedWindow(window time.Duration) *CameraTuningBuilder {
+	b.tuning.SpeedWindow = window
 	return b
 }
 

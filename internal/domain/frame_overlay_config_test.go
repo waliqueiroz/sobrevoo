@@ -51,6 +51,19 @@ func Test_NewOverlayConfig(t *testing.T) {
 		assert.False(t, config.Profile)
 	})
 
+	t.Run("should turn on the speed block when named, even though it is not among the four default names", func(t *testing.T) {
+		// given / when
+		config, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{domain.OverlayBlockSpeed})
+
+		// then
+		require.NoError(t, err)
+		assert.True(t, config.Speed)
+		assert.False(t, config.Distance)
+		assert.False(t, config.Elevation)
+		assert.False(t, config.Time)
+		assert.False(t, config.Profile)
+	})
+
 	t.Run("should refuse an unknown block name, naming it", func(t *testing.T) {
 		// given / when
 		_, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{"altitude"})
@@ -123,6 +136,16 @@ func Test_OverlayConfig_Fingerprint(t *testing.T) {
 		config := base()
 		other := config
 		other.Profile = false
+
+		// when / then
+		assert.NotEqual(t, config.Fingerprint(), other.Fingerprint())
+	})
+
+	t.Run("should change when Speed changes", func(t *testing.T) {
+		// given
+		config := base()
+		other := config
+		other.Speed = true
 
 		// when / then
 		assert.NotEqual(t, config.Fingerprint(), other.Fingerprint())
