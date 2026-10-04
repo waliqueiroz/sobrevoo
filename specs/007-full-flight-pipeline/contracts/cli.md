@@ -47,7 +47,8 @@ sobrevoo fly <arquivo-de-trajeto> --output <vídeo.mp4>
 
 ### Saída (sucesso)
 
-Em `stderr`, ao entrar em cada uma das cinco etapas, uma linha:
+Em `stderr`, ao entrar em cada uma das cinco etapas — sempre antes do
+trabalho dela, nunca depois —, uma linha:
 
 ```text
 Stage 1/5: treating the track
@@ -61,13 +62,23 @@ Encoding frame 412/1350 (30.5%), elapsed 00:00:41
 
 A linha de progresso de quadro/codificação é exatamente a mesma que `render
 all`/`video` já escrevem (num terminal, uma linha reescrita; sem terminal,
-uma nova a cada 10 quadros/5 segundos e a última). Quando o plano ou o
-recorte são reaproveitados, a etapa correspondente diz isso em vez de
-mostrar progresso:
+uma nova a cada 10 quadros/5 segundos e a última, escrita uma vez só). Como
+cada etapa é anunciada ao começar, um erro sai sempre depois do anúncio da
+etapa em que aconteceu — uma recusa do recorte (`19`, `20`) vem depois de
+`Stage 3/5`, não de `Stage 2/5`. O tratamento do trajeto e o planejamento da
+câmera acontecem numa só chamada (`CameraPlanService.Generate`), que avisa,
+por um callback, quando o trajeto acabou de ser tratado: é nesse momento que
+`Stage 2/5` é anunciado.
+
+Quando o plano ou o recorte são reaproveitados, isso só se sabe depois de a
+etapa começar — o plano é sempre recalculado para ser comparado com o
+guardado —, então o aviso sai numa linha própria, logo abaixo do anúncio:
 
 ```text
-Stage 2/5: planning the camera (unchanged since the last run under --keep, reusing plan.json)
-Stage 3/5: slicing the geo data (unchanged, reusing slice.zip)
+Stage 2/5: planning the camera
+  unchanged since the last run under --keep, reusing plan.json
+Stage 3/5: slicing the geo data
+  unchanged, reusing slice.zip
 ```
 
 Ao final, em `stdout`, o resumo — os mesmos rótulos de `render
@@ -79,7 +90,6 @@ Frames: 1260 requested, 1260 drawn, 0 kept (already in the destination)
 Resolution: 1080x1920
 Time: 00:31:07
 Holes (in the frames drawn now): none
-Destination: /tmp/.sobrevoo-fly-3f9a2c/frames (frame_000000.png to frame_001259.png)
 Video written to /tmp/voo.mp4
 Frames: 1260
 Duration: 00:00:42.000
@@ -92,8 +102,10 @@ Time: 00:00:53
 Total time: 00:31:07 (plan: generated, slice: generated, frames: drawn, video: encoded)
 ```
 
-`Destination` mostra o diretório de quadros que a execução usou de fato — o
-temporário (sem `--keep`) ou `<keep>/frames`. A última linha (`Total time`)
+Do resumo de `render all`, o de `fly` só traz a linha `Destination` com
+`--keep` (`Destination: <keep>/frames (frame_000000.png to ...)`): sem
+`--keep`, os quadros viveram num diretório temporário que já não existe
+quando o resumo é lido. A última linha (`Total time`)
 é própria de `fly`: soma o tempo das cinco etapas e diz, entre parênteses,
 "generated"/"reused" para o plano e o recorte e "drawn"/"encoded" para os
 quadros e o vídeo (sempre um dos dois — nunca "reused" para eles, que a spec

@@ -107,6 +107,26 @@ formato do arquivo nem na exportação/leitura do recorte.
   já contém (o nome do registro usado é, por construção de FR-010, sempre o
   nome pedido quando a seleção foi explícita).
 
+**Revisão (2026-10-04)**: a decisão acima não cumpria FR-011 por inteiro e
+foi substituída. Ela não verificava nada quando a seleção ficava automática,
+então voltar de `--base-map X` para a seleção automática reaproveitava em
+silêncio o recorte de `X` — o "ou vice-versa" de FR-011 —, e só conferia se
+o nome pedido estava *entre* as fontes gravadas, então um recorte automático
+que misturara dois mapas era reaproveitado para um pedido explícito de um
+deles, contra FR-010. Nenhuma das duas falhas se resolve só com a
+procedência gravada (ela não diz se a escolha foi explícita), então a
+primeira alternativa rejeitada acima foi adotada, na forma mais estreita:
+`GeoSliceService.Sources(plan, selection)` calcula, só pelos metadados do
+registro e pelo mesmo caminho de `Generate` (`partitionAvailableSources`,
+`SourceSelection.Resolve`, `BoundingBox.Regions`, `SliceRegions.Sources`),
+as fontes de que um recorte gerado agora seria tirado, e
+`GeoSlice.EnsureUsesSources(sources)` só aceita o recorte guardado se a sua
+procedência for exatamente esse conjunto (tipo, nome e arquivo). Continua sem
+nenhum registro novo nem mudança no formato do arquivo do recorte; a deriva
+do registro entre execuções passa a ser detectada como efeito colateral, e um
+recorte que sairia igual (um pedido explícito da única fonte que a seleção
+automática já usava) continua reaproveitado.
+
 ## 4. Comando de limpeza do registro
 
 **Decisão**: `geodata clear`, com uma flag `--confirm` (booleana, sem valor).

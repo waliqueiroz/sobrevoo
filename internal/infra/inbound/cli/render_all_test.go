@@ -300,7 +300,7 @@ func Test_RenderAllCommand_Overwrite(t *testing.T) {
 		m := newRenderCommandMocks(t)
 		m.planService.EXPECT().Load(gomock.Any()).Return(plan, nil)
 		m.sliceService.EXPECT().Load(gomock.Any()).Return(slice, nil)
-		conflict := fmt.Errorf("%w: 60 frames are of another set; use --overwrite to replace them, or another --output", domain.ErrFrameSetConflict)
+		conflict := fmt.Errorf("%w: 60 frames are of another set; use --overwrite to replace them", domain.ErrFrameSetConflict)
 		m.frameService.EXPECT().DrawFrames(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.RenderSummary{Requested: 60}, conflict)
 
 		// when
@@ -308,7 +308,7 @@ func Test_RenderAllCommand_Overwrite(t *testing.T) {
 
 		// then
 		assert.Equal(t, 37, cli.ExitCode(err))
-		assert.ErrorContains(t, err, "use --overwrite to replace them, or another --output")
+		assert.ErrorContains(t, err, "60 frames are of another set; use --overwrite to replace them, or another --output")
 		assert.Empty(t, stdout)
 	})
 }

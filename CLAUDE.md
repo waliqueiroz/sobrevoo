@@ -167,11 +167,11 @@ adapter.
   (`DetailLevel`, `Estimate`, `EnsureFits`, `EnsurePlanFits`, `NewSizeGuard`),
   `SlicePlan` (`TileCount`, `SampleCount`, `Level`) e `SizeGuard` (o que conta
   para o limite de tamanho e qual nível é reportado), `SliceRegions` (`BaseMaps`,
-  `TilesFor`), `ElevationGridInfo` (`CellAt`, `Window`) e `ElevationGrid` (`At`,
+  `Sources`, `TilesFor`), `ElevationGridInfo` (`CellAt`, `Window`) e `ElevationGrid` (`At`,
   `NoValueCount`, `Range`) — ver `specs/004-geo-data-slice/research.md`; e, na
-  etapa 10, `GeoSlice.EnsureUsesSelection`, que recusa um recorte cuja
-  procedência (`Summary.Sources`, já existente desde a etapa 4) não usa,
-  para um tipo pedido, exatamente a fonte pedida — comparação usada só por
+  etapa 10, `GeoSlice.EnsureUsesSources`, que recusa um recorte cuja
+  procedência (`Summary.Sources`, já existente desde a etapa 4) não é
+  exatamente o conjunto de fontes dado — comparação usada só por
   `FlightService.reuseSlice` para decidir reaproveitar ou não um recorte
   guardado por `--keep`;
   o que sobra como função livre é matemática sem dono (`clamp`, `quantize`,
@@ -206,7 +206,7 @@ adapter.
   `ErrDataSourceTypeMismatch` (um nome pedido explicitamente existe, mas é
   do outro tipo), `ErrRegistryClearNotConfirmed` (`geodata clear` sem
   `--confirm`) e `ErrSliceUsesDifferentSource` (a comparação de
-  `GeoSlice.EnsureUsesSelection`, nunca devolvido a um usuário)), e
+  `GeoSlice.EnsureUsesSources`, nunca devolvido a um usuário)), e
   as portas
   `TrackParser`, `Simplifier`, `Smoother`, `GeoDataInspector`,
   `GeoDataRepository` (ganhou `Clear`, etapa 10), `FileChecker`, `CameraPlanExporter`,
@@ -233,7 +233,7 @@ adapter.
   `SourceSelection`, resolvido antes de tratar o trajeto), `CameraPlanService`
   (`Generate`, `Export`, `Load`) e
   `GeoSliceService` (`Generate` — ganhou o mesmo parâmetro `SourceSelection`
-  —, `Export`, `Load`), `FrameService`
+  —, `Sources`, `Export`, `Load`), `FrameService`
   (`DrawFrame`, `DrawFrames`), `VideoService` (`Assemble`, e as operações que
   `Assemble` já fazia por dentro e passam a existir também sozinhas,
   `CheckEncoder` e `CheckDestination`) e `FlightService` (`Fly`, o comando
@@ -498,16 +498,23 @@ mas é do outro tipo é `ErrDataSourceTypeMismatch`.
 
 O reaproveitamento de um recorte guardado por `fly --keep` passou a exigir
 também que a procedência que o recorte já registra (`Summary.Sources`,
-existente desde a etapa 4) bata com a fonte pedida agora
-(`GeoSlice.EnsureUsesSelection`, `ErrSliceUsesDifferentSource`) — ao lado
-da checagem de plano que `EnsureMatches` já fazia, na mesma linha de
-`FlightService.reuseSlice`. A comparação é contra o que o recorte guardado
-já registra ter usado, não contra uma reconstrução da seleção automática
-atual — se o nome pedido agora não é o que está gravado para aquele tipo
-(inclusive a troca entre seleção automática e explícita, em qualquer
-direção), o recorte é tratado como desatualizado e um novo é gerado; nenhum
-registro novo, nem mudança no formato do arquivo do recorte, foi
-necessário.
+existente desde a etapa 4) seja exatamente o conjunto de fontes que um
+recorte gerado agora usaria (`GeoSliceService.Sources`, que resolve as
+fontes do mesmo jeito que `Generate` — registro, arquivos presentes,
+`SourceSelection.Resolve`, `BoundingBox.Regions` —, só pelos metadados, sem
+ler conteúdo; `GeoSlice.EnsureUsesSources`, `ErrSliceUsesDifferentSource`) —
+ao lado da checagem de plano que `EnsureMatches` já fazia, em
+`FlightService.reuseSlice`. A primeira versão (`EnsureUsesSelection`) só
+conferia se o nome pedido explicitamente estava *entre* as fontes gravadas, e
+nada quando a seleção era automática: voltar de `--base-map X` para a
+seleção automática reaproveitava em silêncio o recorte de `X`, e um recorte
+automático que misturara dois mapas era reaproveitado para um pedido
+explícito de um deles. Comparar com o que seria gerado agora cobre a troca
+entre seleção automática e explícita em qualquer direção (e também um
+registro que mudou entre as execuções), sem nenhum registro novo nem mudança
+no formato do arquivo do recorte; um recorte que sairia igual — um pedido
+explícito da única fonte que a seleção automática já tinha usado — continua
+reaproveitado.
 
 ### O acabamento das sobreposições de tela (etapa 11)
 

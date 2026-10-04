@@ -16,8 +16,10 @@ import (
 // domain.CameraPlanExporter port.
 type CameraPlanService interface {
 	// Generate reads and treats the track from reader and plans the camera
-	// flight over it with the given parameters.
-	Generate(reader io.Reader, parameters domain.PlanParameters) (domain.CameraPlan, error)
+	// flight over it with the given parameters. treated is called once the
+	// track is treated, right before the planning starts, so a caller can
+	// tell the two apart as they happen (may be nil).
+	Generate(reader io.Reader, parameters domain.PlanParameters, treated func()) (domain.CameraPlan, error)
 
 	// Export writes plan to path; unless overwrite is true it refuses a path
 	// that already holds a file.
@@ -58,17 +60,20 @@ func NewCameraPlanService(
 	}
 }
 
-func (s *cameraPlanService) Generate(reader io.Reader, parameters domain.PlanParameters) (domain.CameraPlan, error) {
+func (s *cameraPlanService) Generate(reader io.Reader, parameters domain.PlanParameters, treated func()) (domain.CameraPlan, error) {
 	if err := parameters.Validate(); err != nil {
 		return domain.CameraPlan{}, err
 	}
 
-	treated, err := s.trackService.Treat(reader, parameters.Simplification, parameters.Smoothing)
+	track, err := s.trackService.Treat(reader, parameters.Simplification, parameters.Smoothing)
 	if err != nil {
 		return domain.CameraPlan{}, err
 	}
+	if treated != nil {
+		treated()
+	}
 
-	return treated.PlanCamera(parameters, s.tuning)
+	return track.PlanCamera(parameters, s.tuning)
 }
 
 func (s *cameraPlanService) Export(plan domain.CameraPlan, path string, overwrite bool) error {

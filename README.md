@@ -34,7 +34,7 @@ winget install Gyan.FFmpeg     # Windows
 ```
 
 O Sobrevoo não traz nem baixa o `ffmpeg`; se ele faltar, diz o que instalar
-antes de fazer qualquer outra coisa.
+— no `fly`, antes de começar o voo.
 
 ```sh
 go install github.com/waliqueiroz/sobrevoo/cmd/sobrevoo@latest
@@ -106,7 +106,8 @@ vista pode passar de 15 km de lado.
 O **registro** é a lista dos mapas e relevos que você apresentou ao
 Sobrevoo, cada um com um nome escolhido por você. Ele só guarda o caminho do
 arquivo e a área que ele cobre — o arquivo continua onde está e não pode ser
-movido depois (se for, basta registrá-lo de novo). O registro fica em
+movido depois (se for, remova o registro com `geodata remove` e registre o
+arquivo de novo). O registro fica em
 `~/.sobrevoo/registry.json`.
 
 ```console
@@ -146,7 +147,6 @@ Frames: 1020 requested, 1020 drawn, 0 kept (already in the destination)
 Resolution: 1080x1920
 Time: 00:23:41
 Holes (in the frames drawn now): none
-Destination: /tmp/sobrevoo-fly-2871640193 (frame_000000.png to frame_001019.png)
 Video written to pedalada.mp4
 Frames: 1020
 Duration: 00:00:34.000
@@ -172,11 +172,11 @@ uma fração do tempo.
 
 #### O que acontece durante o voo
 
-Antes de qualquer etapa, o `fly` confere o que pode recusar sem ler o
-trajeto: os valores das flags, depois o destino do vídeo (que precisa
-terminar em `.mp4` e, sem `--overwrite`, ainda não pode existir) e por fim se
-o `ffmpeg` está disponível. Só então passa pelas cinco etapas que a saída
-numera:
+Antes de qualquer etapa, o `fly` confere o que pode recusar sem ler o trajeto:
+os valores das flags (inclusive se `--output` termina em `.mp4`) e se o
+arquivo do trajeto abre, depois o destino do vídeo (que, sem `--overwrite`,
+ainda não pode existir) e por fim se o `ffmpeg` está disponível. Só então
+passa pelas cinco etapas que a saída numera:
 
 1. **Tratamento do trajeto** — lê o GPX, descarta os pontos inválidos e
    reduz e suaviza o traçado (veja `--simplification` e `--smoothing`).
@@ -277,9 +277,9 @@ ligados por padrão: a distância percorrida até o marcador (`DIST`), a
 elevação no ponto do marcador e o ganho acumulado até ali (`ELEV` e
 `GANHO`), o tempo decorrido da atividade (`TEMPO`) e, na parte de baixo, um
 perfil de elevação do trajeto inteiro com um marcador que avança com o voo.
-Os valores vêm só do trajeto, nunca do relevo registrado, e os do último
-quadro coincidem com os que o `inspect` relata para o mesmo trajeto, com os
-mesmos níveis de tratamento.
+Os valores vêm só do trajeto, nunca do relevo registrado; o ganho acumulado
+do último quadro é exatamente o ganho de elevação que o `inspect` relata para
+o mesmo trajeto, com os mesmos níveis de tratamento.
 
 | Flag | Valores | Padrão | O que faz |
 |---|---|---|---|
@@ -295,9 +295,10 @@ pelo relógio.
 ### Escolha da fonte de dados
 
 Com mais de um mapa ou relevo registrado, o Sobrevoo escolhe sozinho, ponto a
-ponto, a fonte que cobre aquele ponto com mais detalhe (a de menor área; em
-caso de empate, a registrada primeiro) — e pode, assim, combinar fontes
-diferentes ao longo de um mesmo trajeto. Para usar uma fonte específica:
+ponto, a fonte mais específica entre as que cobrem aquele ponto (a de menor
+área; em caso de empate, a registrada primeiro) — e pode, assim, combinar
+fontes diferentes ao longo de um mesmo trajeto. Para usar uma fonte
+específica:
 
 | Flag | Valores | Padrão | O que faz |
 |---|---|---|---|
@@ -359,19 +360,26 @@ nesse diretório (criado se ainda não existir), em vez de descartá-los:
 ```
 
 Numa execução seguinte com o mesmo `--keep`, o `fly` reaproveita o que ainda
-vale para o trajeto e os valores informados agora, e avisa na própria linha
-da etapa (`unchanged since the last run under --keep, reusing plan.json`,
-`unchanged, reusing slice.zip`). O plano é sempre recalculado — é rápido —
-e só comparado com o guardado; o ganho de tempo está no recorte e,
-sobretudo, nos quadros, que não são redesenhados. O que vale depende do que
-mudou:
+vale para o trajeto e os valores informados agora, e avisa numa linha logo
+abaixo da etapa:
+
+```console
+Stage 2/5: planning the camera
+  unchanged since the last run under --keep, reusing plan.json
+Stage 3/5: slicing the geo data
+  unchanged, reusing slice.zip
+```
+
+O plano é sempre recalculado — é rápido — e só comparado com o guardado; o
+ganho de tempo está no recorte e, sobretudo, nos quadros, que não são
+redesenhados. O que vale depende do que mudou:
 
 | O que mudou desde a execução anterior | Plano | Recorte | Quadros |
 |---|---|---|---|
 | nada (só um `--output` novo), ou a execução anterior foi interrompida | reaproveitado | reaproveitado | reaproveitados; só os que faltam são desenhados |
 | só `--quality`, com um `--output` novo | reaproveitado | reaproveitado | reaproveitados (só o vídeo é refeito) |
 | `--resolution`, uma flag de aparência ou de sobreposição | reaproveitado | reaproveitado | redesenhados |
-| `--base-map` ou `--elevation` (inclusive passar de seleção automática para explícita, ou o contrário) | reaproveitado | refeito | redesenhados |
+| `--base-map` ou `--elevation`, ou o registro, de um jeito que muda as fontes de que o recorte seria tirado agora (inclusive passar de seleção automática para explícita, ou o contrário) | reaproveitado | refeito | redesenhados |
 | `--duration`, `--fps`, `--distance`, `--tilt`, `--aspect`, `--simplification`, `--smoothing` ou o próprio trajeto | refeito | refeito | redesenhados |
 
 Duas regras de proteção valem aqui, iguais às dos comandos individuais:
@@ -400,7 +408,7 @@ sobrevoo geodata slice plano.json --export recorte.zip
 sobrevoo render frame plano.json recorte.zip --number 300 --output conferir.png --trail-color "#00FF00"
 ```
 
-O quadro sai idêntico, byte a byte, ao mesmo quadro dentro do voo inteiro
+O quadro sai idêntico, pixel a pixel, ao mesmo quadro dentro do voo inteiro
 com os mesmos valores. Depois de satisfeito, `render all` e `video`
 completam o voo a partir do mesmo plano e do mesmo recorte — ou o `fly`, com
 as mesmas flags.
@@ -546,10 +554,10 @@ sobrevoo plan <trajeto.gpx> [--duration <s>] [--fps <n>] [--distance <nível>] [
 ```
 
 Corresponde às etapas 1 e 2 do voo: trata o trajeto e calcula o plano de
-câmera. Aceita
-as flags de câmera, duração, formato e tratamento. Sem `--export`, só mostra
-o resumo; com `--export <plano.json>`, grava o plano completo, em JSON
-(`--overwrite`, só junto com `--export`, substitui um arquivo existente).
+câmera. Aceita as flags de câmera, duração, formato e tratamento. Sem
+`--export`, só mostra o resumo; com `--export <plano.json>`, grava o plano
+completo, em JSON (`--overwrite`, só junto com `--export`, substitui um
+arquivo existente).
 
 ```console
 $ sobrevoo plan pedalada.gpx --export plano.json

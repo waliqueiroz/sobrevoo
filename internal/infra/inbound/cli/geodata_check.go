@@ -75,9 +75,13 @@ func formatCoverage(output domain.CoverageReport) string {
 
 	if len(output.UncoveredSegments) > 0 {
 		fmt.Fprintln(&b, "Uncovered segments:")
+		// Each segment is where it starts and where it ends, as (lat, lon) —
+		// the same way the "area not covered" error of a slice says it — never
+		// as ranges, which would read as a box: the start and the end of a
+		// segment of a loop can be a few meters apart.
 		for _, segment := range output.UncoveredSegments {
-			fmt.Fprintf(&b, "  - lat [%.6f, %.6f], lon [%.6f, %.6f]: missing %s\n",
-				segment.StartLatitude, segment.EndLatitude, segment.StartLongitude, segment.EndLongitude, segment.Missing)
+			fmt.Fprintf(&b, "  - from (%.6f, %.6f) to (%.6f, %.6f): missing %s\n",
+				segment.StartLatitude, segment.StartLongitude, segment.EndLatitude, segment.EndLongitude, segment.Missing)
 		}
 	}
 

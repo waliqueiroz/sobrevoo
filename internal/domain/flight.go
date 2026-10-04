@@ -83,10 +83,10 @@ type FlightProgress struct {
 	Render *RenderProgress
 	Video  *VideoProgress
 
-	// Reused is true when the stage announcement (Render and Video both nil)
-	// for StageCameraPlanning or StageGeoDataSlicing means the plan/slice
-	// under Keep was reused, not (re)computed; meaningless for the other
-	// stages, which are always (re)done.
+	// Reused is true, for StageCameraPlanning or StageGeoDataSlicing, in a
+	// report that comes after the stage's own announcement (Render and Video
+	// both nil, Reused false) to say the plan/slice under Keep was reused, not
+	// (re)written; meaningless for the other stages, which are always (re)done.
 	Reused bool
 }
 

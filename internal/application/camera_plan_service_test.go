@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithFrameRate(0).Build()
 
 		// when
-		_, err := service.Generate(strings.NewReader(""), parameters)
+		_, err := service.Generate(strings.NewReader(""), parameters, nil)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrInvalidFrameRate)
@@ -52,7 +53,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
-		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build())
+		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build(), nil)
 
 		// then
 		assert.ErrorIs(t, err, wantErr)
@@ -67,7 +68,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
-		_, err := service.Generate(strings.NewReader(""), parameters)
+		_, err := service.Generate(strings.NewReader(""), parameters, nil)
 
 		// then
 		assert.NoError(t, err)
@@ -86,7 +87,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
-		plan, err := service.Generate(strings.NewReader(""), parameters)
+		plan, err := service.Generate(strings.NewReader(""), parameters, nil)
 
 		// then
 		require.NoError(t, err)
@@ -102,7 +103,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		parameters := builddomain.NewPlanParametersBuilder().WithDuration(5 * time.Second).Build()
 
 		// when
-		_, err := service.Generate(strings.NewReader(""), parameters)
+		_, err := service.Generate(strings.NewReader(""), parameters, nil)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrDurationTooShort)
@@ -116,7 +117,7 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
-		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build())
+		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build(), nil)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrTrackTooShort)
@@ -130,10 +131,45 @@ func Test_cameraPlanService_Generate(t *testing.T) {
 		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
 
 		// when
-		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build())
+		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build(), nil)
 
 		// then
 		assert.ErrorIs(t, err, domain.ErrTrackTooLarge)
+	})
+
+	t.Run("should say the track is treated after treating it and before planning, even when the planning then fails", func(t *testing.T) {
+		// given: a track too short to plan, so the planning fails after the treatment
+		mockCtrl := gomock.NewController(t)
+		trackService := mockapplication.NewMockTrackService(mockCtrl)
+		treatedCalled := false
+		trackService.EXPECT().Treat(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(io.Reader, domain.Level, domain.Level) (domain.TreatedTrack, error) {
+			assert.False(t, treatedCalled, "not before the track is treated")
+			return treatedRoute(10), nil
+		})
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
+
+		// when
+		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build(), func() { treatedCalled = true })
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrTrackTooShort)
+		assert.True(t, treatedCalled)
+	})
+
+	t.Run("should not say the track is treated when treating it fails", func(t *testing.T) {
+		// given
+		mockCtrl := gomock.NewController(t)
+		trackService := mockapplication.NewMockTrackService(mockCtrl)
+		trackService.EXPECT().Treat(gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.TreatedTrack{}, domain.ErrEmptyFile)
+		service := application.NewCameraPlanService(trackService, nil, nil, tuning)
+		treatedCalled := false
+
+		// when
+		_, err := service.Generate(strings.NewReader(""), builddomain.NewPlanParametersBuilder().Build(), func() { treatedCalled = true })
+
+		// then
+		assert.ErrorIs(t, err, domain.ErrEmptyFile)
+		assert.False(t, treatedCalled)
 	})
 }
 

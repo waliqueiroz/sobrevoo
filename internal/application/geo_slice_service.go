@@ -26,6 +26,14 @@ type GeoSliceService interface {
 	// resulting candidates do not fully cover (ErrAreaNotCovered).
 	Generate(plan domain.CameraPlan, selection domain.SourceSelection) (domain.GeoSlice, error)
 
+	// Sources lists the registered sources a slice of plan generated now with
+	// selection would be extracted from, worked out from the registry alone,
+	// the same way Generate chooses them, without reading any content — what
+	// a slice kept from an earlier run is compared against before it is
+	// reused (GeoSlice.EnsureUsesSources). A requested name that does not
+	// resolve fails as it does in Generate.
+	Sources(plan domain.CameraPlan, selection domain.SourceSelection) ([]domain.GeoDataSource, error)
+
 	// Export writes slice to path; unless overwrite is true it refuses a path
 	// that already exists.
 	Export(slice domain.GeoSlice, path string, overwrite bool) error
@@ -77,12 +85,7 @@ func NewGeoSliceService(
 func (s *geoSliceService) Generate(plan domain.CameraPlan, selection domain.SourceSelection) (domain.GeoSlice, error) {
 	area := plan.AreaOfInterest(s.sliceTuning)
 
-	sources, err := s.repository.List()
-	if err != nil {
-		return domain.GeoSlice{}, err
-	}
-	baseMaps, elevations := partitionAvailableSources(s.fileChecker, sources)
-	baseMaps, elevations, err = selection.Resolve(baseMaps, elevations)
+	baseMaps, elevations, err := s.candidates(selection)
 	if err != nil {
 		return domain.GeoSlice{}, err
 	}
@@ -136,6 +139,28 @@ func (s *geoSliceService) Generate(plan domain.CameraPlan, selection domain.Sour
 	slice := domain.NewGeoSlice(area, tileSets, grids)
 	slice.PlanID = plan.ID()
 	return slice, nil
+}
+
+func (s *geoSliceService) Sources(plan domain.CameraPlan, selection domain.SourceSelection) ([]domain.GeoDataSource, error) {
+	baseMaps, elevations, err := s.candidates(selection)
+	if err != nil {
+		return nil, err
+	}
+
+	regions, _ := plan.AreaOfInterest(s.sliceTuning).Regions(baseMaps, elevations)
+	return regions.Sources(), nil
+}
+
+// candidates are the registered sources of each type a slice may be read
+// from: those whose files are still there, narrowed to the one requested by
+// selection, if any.
+func (s *geoSliceService) candidates(selection domain.SourceSelection) (baseMaps, elevations []domain.GeoDataSource, err error) {
+	sources, err := s.repository.List()
+	if err != nil {
+		return nil, nil, err
+	}
+	baseMaps, elevations = partitionAvailableSources(s.fileChecker, sources)
+	return selection.Resolve(baseMaps, elevations)
 }
 
 // planTiles chooses the level of detail of each base map that wins in some

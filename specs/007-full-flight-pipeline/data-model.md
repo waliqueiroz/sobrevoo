@@ -178,7 +178,7 @@ VideoService, workspace domain.Workspace) FlightService`.
 ## Fluxo de `Fly` (orquestração; nenhuma regra de negócio própria)
 
 1. `videoService.CheckDestination(request.Output, request.Overwrite)`, depois `videoService.CheckEncoder(ctx)` — antes de tocar no trajeto (FR-005, FR-007), na mesma ordem que `Assemble` já confere as duas (destino antes do codificador).
-2. `cameraPlanService.Generate(reader, request.Parameters)` — trata o trajeto e planeja a câmera (etapas 1-2, uma chamada; `Completed` ganha as duas).
+2. `cameraPlanService.Generate(reader, request.Parameters, treated)` — trata o trajeto e planeja a câmera (etapas 1-2, uma chamada). `treated` é chamado entre as duas: `Completed` ganha a etapa 1 e a etapa 2 é anunciada ali, antes do planejamento; a etapa 2 entra em `Completed` depois do passo 3. Toda etapa é anunciada antes do seu trabalho; o reaproveitamento do plano e do recorte, conhecido só depois, é relatado num `FlightProgress{Stage, Reused: true}` à parte.
 3. Se `request.Keep != ""`: tenta reaproveitar `<Keep>/plan.json` (item 4 de `research.md`); senão `cameraPlanService.Export(...)`.
 4. Se `request.Keep != ""`: tenta reaproveitar `<Keep>/slice.zip`; senão `geoSliceService.Generate(plan)` (a cobertura é conferida aqui, item 3) e, se `Keep`, `geoSliceService.Export(...)`.
 5. Resolve o diretório de quadros: `<Keep>/frames` ou `workspace.NewTemporary()` (com a remoção adiada).

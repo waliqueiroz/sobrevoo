@@ -83,3 +83,18 @@ func (mr *MockGeoSliceServiceMockRecorder) Load(path any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Load", reflect.TypeOf((*MockGeoSliceService)(nil).Load), path)
 }
+
+// Sources mocks base method.
+func (m *MockGeoSliceService) Sources(plan domain.CameraPlan, selection domain.SourceSelection) ([]domain.GeoDataSource, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Sources", plan, selection)
+	ret0, _ := ret[0].([]domain.GeoDataSource)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Sources indicates an expected call of Sources.
+func (mr *MockGeoSliceServiceMockRecorder) Sources(plan, selection any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Sources", reflect.TypeOf((*MockGeoSliceService)(nil).Sources), plan, selection)
+}

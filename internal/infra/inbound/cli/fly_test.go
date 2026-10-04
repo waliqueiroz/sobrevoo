@@ -3,6 +3,7 @@ package cli_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -466,13 +467,13 @@ func Test_FlightCommand_Execute(t *testing.T) {
 		// when
 		stdout, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4")
 
-		// then
+		// then: no destination line, since the temporary directory of the
+		// frames is already gone
 		require.NoError(t, err)
 		assert.Equal(t, "Frames: 380 requested, 380 drawn, 0 kept (already in the destination)\n"+
 			"Resolution: 1080x1920\n"+
 			"Time: 00:00:00\n"+
 			"Holes (in the frames drawn now): none\n"+
-			"Destination: /tmp/sobrevoo-fly-1 (frame_000000.png to frame_000379.png)\n"+
 			"Video written to flight.mp4\n"+
 			"Frames: 380\n"+
 			"Duration: 00:00:12.667\n"+
@@ -483,6 +484,38 @@ func Test_FlightCommand_Execute(t *testing.T) {
 			"Encoder: ffmpeg 7.1 (libx264)\n"+
 			"Time: 00:00:00\n"+
 			"Total time: 00:01:05\n", stdout)
+	})
+
+	t.Run("should print where the frames are kept, with --keep", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		flight := aFlight()
+		flight.FramesDirectory = "/tmp/kept/frames"
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(flight, nil)
+
+		// when
+		stdout, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--keep", "/tmp/kept")
+
+		// then
+		require.NoError(t, err)
+		assert.Contains(t, stdout, "Holes (in the frames drawn now): none\n"+
+			"Destination: /tmp/kept/frames (frame_000000.png to frame_000379.png)\n"+
+			"Video written to flight.mp4\n")
+	})
+
+	t.Run("should point to another --keep, not another --output, for frames of another set under --keep", func(t *testing.T) {
+		// given
+		m := newFlightCommandMocks(t)
+		conflict := fmt.Errorf("%w: 380 frames are of another set; use --overwrite to replace them", domain.ErrFrameSetConflict)
+		m.EXPECT().Fly(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(domain.FlightSummary{}, conflict)
+
+		// when
+		stdout, _, err := executeFlyCommand(t, m, aTrackFile(t), "--output", "flight.mp4", "--keep", "/tmp/kept")
+
+		// then
+		assert.Equal(t, 37, cli.ExitCode(err))
+		assert.EqualError(t, err, "frame destination holds frames of another set: 380 frames are of another set; use --overwrite to replace them, or another --keep")
+		assert.Empty(t, stdout)
 	})
 
 	t.Run("should return the error of the run as it is, and print no summary", func(t *testing.T) {

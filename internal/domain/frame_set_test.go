@@ -394,7 +394,8 @@ func Test_FrameDirectory_Plan_Protection(t *testing.T) {
 		assert.ErrorIs(t, errInside, domain.ErrFrameSetConflict)
 		assert.ErrorIs(t, errOutside, domain.ErrFrameSetConflict)
 		assert.ErrorContains(t, errInside, "1 frame is of another set")
-		assert.ErrorContains(t, errInside, "use --overwrite to replace them, or another --output")
+		assert.ErrorContains(t, errInside, "use --overwrite to replace them")
+		assert.NotContains(t, errInside.Error(), "--output", "the flag that chooses another directory is the command's to name")
 	})
 
 	t.Run("should count the frames of another set in the message", func(t *testing.T) {

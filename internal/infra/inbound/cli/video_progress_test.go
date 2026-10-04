@@ -119,6 +119,22 @@ func Test_VideoCommand_Progress(t *testing.T) {
 		assert.Equal(t, "Encoding frame 380/380 (100.0%), elapsed 00:00:02\n", stderr)
 	})
 
+	t.Run("should write the last report only once when it comes twice, when stderr is not a terminal", func(t *testing.T) {
+		// given: the encoder reports the last frame, and so does the service once
+		// the video is whole
+		m := setUp(t, []domain.VideoProgress{
+			{Done: 380, Total: 380, Elapsed: 7 * time.Second},
+			{Done: 380, Total: 380, Elapsed: 8 * time.Second},
+		}, nil)
+
+		// when
+		_, stderr, err := executeVideoWith(t, m, []cli.RenderOption{notTerminal}, "plan.json", "frames", "--output", "flight.mp4")
+
+		// then
+		require.NoError(t, err)
+		assert.Equal(t, "Encoding frame 380/380 (100.0%), elapsed 00:00:07\n", stderr)
+	})
+
 	t.Run("should write nothing on stderr when nothing was reported, on a terminal or not", func(t *testing.T) {
 		// given
 		m := setUp(t, nil, nil)

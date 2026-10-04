@@ -134,7 +134,7 @@ func runPlan(cmd *cobra.Command, cameraPlanService application.CameraPlanService
 	}
 	defer file.Close()
 
-	plan, err := cameraPlanService.Generate(file, parameters)
+	plan, err := cameraPlanService.Generate(file, parameters, nil)
 	if err != nil {
 		return err
 	}

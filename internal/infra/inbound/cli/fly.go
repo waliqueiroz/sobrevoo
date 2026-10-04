@@ -14,14 +14,15 @@ import (
 	"github.com/waliqueiroz/sobrevoo/internal/domain"
 )
 
-// NewFlightCommand creates the "fly" command, which chains the six existing
-// stages behind a single call (FlightService.Fly): from a GPS track straight
-// to a video, using the geo data already registered, without requiring any
-// other command or intermediate file (the seventh stage). defaults are the
-// plan parameters, defaultResolution the frame resolution, defaultAppearance
-// the trail/marker/background the frames are drawn with (008-frame-
-// appearance), defaultOverlay the screen overlay configuration (009-frame-
-// overlays) and defaultQuality the video quality used when the
+// NewFlightCommand creates the "fly" command, which runs the five stages of a
+// flight — the work of the "plan", "geodata slice", "render all" and "video"
+// commands — behind a single call (FlightService.Fly): from a GPS track
+// straight to a video, using the geo data already registered, without
+// requiring any other command or intermediate file (the seventh stage).
+// defaults are the plan parameters, defaultResolution the frame resolution,
+// defaultAppearance the trail/marker/background the frames are drawn with
+// (008-frame-appearance), defaultOverlay the screen overlay configuration
+// (009-frame-overlays) and defaultQuality the video quality used when the
 // corresponding flag is not given — the same defaults "plan", "render all"
 // and "video" already use.
 func NewFlightCommand(
@@ -162,21 +163,31 @@ func runFly(
 		fmt.Fprint(out, formatFlightInterrupted(summary))
 		return err
 	case err != nil:
-		return err
+		// The frames of a run live under --keep (without it, in a new
+		// temporary directory, which never holds another set): another
+		// directory is another --keep, not another --output.
+		return withAnotherDirectoryHint(err, "--keep")
 	}
 
-	fmt.Fprint(out, formatFlightSummary(request.Output, summary))
+	fmt.Fprint(out, formatFlightSummary(request, summary))
 	return nil
 }
 
 // formatFlightSummary renders the summary of a single-command run, in
 // English, in the labels and order of contracts/cli.md: the frames summary
 // (as "render all" shows it), then the video summary (as "video" shows it),
-// then the run's own total time.
-func formatFlightSummary(output string, summary domain.FlightSummary) string {
+// then the run's own total time. The frames' destination is shown only under
+// --keep: without it, the frames lived in a temporary directory that no
+// longer exists once the run is over.
+func formatFlightSummary(request domain.FlightRequest, summary domain.FlightSummary) string {
+	framesDirectory := ""
+	if request.Keep != "" {
+		framesDirectory = summary.FramesDirectory
+	}
+
 	var b strings.Builder
-	b.WriteString(formatFramesSummary(summary.Render.Requested, summary.FramesDirectory, summary.Render))
-	b.WriteString(formatVideoSummary(output, summary.Video))
+	b.WriteString(formatFramesSummary(summary.Render.Requested, framesDirectory, summary.Render))
+	b.WriteString(formatVideoSummary(request.Output, summary.Video))
 	fmt.Fprintf(&b, "Total time: %s\n", formatElapsed(summary.Elapsed))
 	return b.String()
 }

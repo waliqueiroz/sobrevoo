@@ -111,7 +111,7 @@ func Test_PlanCommand_Parameters(t *testing.T) {
 		t.Helper()
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), want).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
+		service.EXPECT().Generate(gomock.Any(), want, nil).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
 		return service
 	}
 
@@ -212,7 +212,7 @@ func Test_PlanCommand_Parameters(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
 		want := domain.PlanParameters{FrameRate: 24, Distance: domain.LevelLow, Tilt: domain.LevelHigh, Simplification: domain.LevelHigh, Smoothing: domain.LevelLow, Aspect: domain.AspectRatio{Width: 9, Height: 16}}
-		service.EXPECT().Generate(gomock.Any(), want).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
+		service.EXPECT().Generate(gomock.Any(), want, nil).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
 
 		path := filepath.Join(t.TempDir(), "track.gpx")
 		require.NoError(t, os.WriteFile(path, []byte("x"), 0o600))
@@ -231,8 +231,8 @@ func Test_PlanCommand_Parameters(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(domain.CameraPlan{}, domain.ErrInvalidDuration)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(domain.CameraPlan{}, domain.ErrInvalidFrameRate)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(domain.CameraPlan{}, domain.ErrInvalidDuration)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(domain.CameraPlan{}, domain.ErrInvalidFrameRate)
 
 		// when
 		_, durationErr := executePlanCommand(t, service, "--duration", "0")
@@ -296,7 +296,7 @@ func Test_PlanCommand_UsageErrors(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).DoAndReturn(func(_ any, parameters domain.PlanParameters) (domain.CameraPlan, error) {
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).DoAndReturn(func(_ any, parameters domain.PlanParameters, _ func()) (domain.CameraPlan, error) {
 			require.NotNil(t, parameters.Duration)
 			return domain.CameraPlan{}, parameters.Validate()
 		}).Times(2)
@@ -328,7 +328,7 @@ func Test_PlanCommand_Execute(t *testing.T) {
 			).Build()
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(plan, nil)
 
 		// when
 		stdout, err := executePlanCommand(t, service)
@@ -352,7 +352,7 @@ func Test_PlanCommand_Execute(t *testing.T) {
 		plan := builddomain.NewCameraPlanBuilder().WithDurationMode(domain.DurationModeExplicit).Build()
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(plan, nil)
 
 		// when
 		stdout, err := executePlanCommand(t, service)
@@ -367,7 +367,7 @@ func Test_PlanCommand_Execute(t *testing.T) {
 		plan := builddomain.NewCameraPlanBuilder().Build()
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(plan, nil)
 
 		// when
 		stdout, err := executePlanCommand(t, service)
@@ -383,7 +383,7 @@ func Test_PlanCommand_Execute(t *testing.T) {
 		plan := builddomain.NewCameraPlanBuilder().WithTimeReference(domain.TimeReferenceDistance, "time data is inconsistent").Build()
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(plan, nil)
 
 		// when
 		stdout, err := executePlanCommand(t, service)
@@ -397,7 +397,7 @@ func Test_PlanCommand_Execute(t *testing.T) {
 		// given: the mock has no expectation for Export
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(builddomain.NewCameraPlanBuilder().Build(), nil)
 
 		// when
 		stdout, err := executePlanCommand(t, service)
@@ -421,7 +421,7 @@ func Test_PlanCommand_Execute(t *testing.T) {
 		for wantErr, code := range cases {
 			mockCtrl := gomock.NewController(t)
 			service := mockapplication.NewMockCameraPlanService(mockCtrl)
-			service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(domain.CameraPlan{}, wantErr)
+			service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(domain.CameraPlan{}, wantErr)
 
 			// when
 			stdout, err := executePlanCommand(t, service)
@@ -441,7 +441,7 @@ func Test_PlanCommand_Export(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(plan, nil)
 		service.EXPECT().Export(plan, "out/plan.json", false).Return(nil)
 
 		// when
@@ -457,7 +457,7 @@ func Test_PlanCommand_Export(t *testing.T) {
 		// given
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(plan, nil)
 		service.EXPECT().Export(plan, "plan.json", true).Return(nil)
 
 		// when
@@ -477,7 +477,7 @@ func Test_PlanCommand_Export(t *testing.T) {
 		for wantErr, code := range cases {
 			mockCtrl := gomock.NewController(t)
 			service := mockapplication.NewMockCameraPlanService(mockCtrl)
-			service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(plan, nil)
+			service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(plan, nil)
 			service.EXPECT().Export(plan, "plan.json", false).Return(wantErr)
 
 			// when
@@ -494,7 +494,7 @@ func Test_PlanCommand_Export(t *testing.T) {
 		// given: the mock has no expectation for Export
 		mockCtrl := gomock.NewController(t)
 		service := mockapplication.NewMockCameraPlanService(mockCtrl)
-		service.EXPECT().Generate(gomock.Any(), gomock.Any()).Return(domain.CameraPlan{}, domain.ErrTrackTooShort)
+		service.EXPECT().Generate(gomock.Any(), gomock.Any(), nil).Return(domain.CameraPlan{}, domain.ErrTrackTooShort)
 
 		// when
 		_, err := executePlanCommand(t, service, "--export", "plan.json")

@@ -56,18 +56,18 @@ func (mr *MockCameraPlanServiceMockRecorder) Export(plan, path, overwrite any) *
 }
 
 // Generate mocks base method.
-func (m *MockCameraPlanService) Generate(reader io.Reader, parameters domain.PlanParameters) (domain.CameraPlan, error) {
+func (m *MockCameraPlanService) Generate(reader io.Reader, parameters domain.PlanParameters, treated func()) (domain.CameraPlan, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Generate", reader, parameters)
+	ret := m.ctrl.Call(m, "Generate", reader, parameters, treated)
 	ret0, _ := ret[0].(domain.CameraPlan)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Generate indicates an expected call of Generate.
-func (mr *MockCameraPlanServiceMockRecorder) Generate(reader, parameters any) *gomock.Call {
+func (mr *MockCameraPlanServiceMockRecorder) Generate(reader, parameters, treated any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockCameraPlanService)(nil).Generate), reader, parameters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockCameraPlanService)(nil).Generate), reader, parameters, treated)
 }
 
 // Load mocks base method.

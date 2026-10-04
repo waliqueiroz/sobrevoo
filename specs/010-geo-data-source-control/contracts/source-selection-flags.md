@@ -86,7 +86,7 @@ reaproveitar o **recorte** depende da fonte.
 | Código | Erro sentinela | Quando |
 |---|---|---|
 | `56` | `ErrDataSourceTypeMismatch` | `--base-map`/`--elevation` pede um nome que está registrado, mas como o outro tipo (por exemplo, `--base-map` apontando para um registro de elevação). |
-| `58` | `ErrSliceUsesDifferentSource` | Reservado para `GeoSlice.EnsureUsesSelection` — hoje só usado internamente por `FlightService.reuseSlice` para decidir reaproveitar ou não um recorte guardado (FR-011); nunca devolvido a um usuário por nenhum comando desta etapa, porque a decisão de não reaproveitar nunca é, por si só, um erro — o comando simplesmente gera um recorte novo. Mapeado aqui por completude, como todo sentinela do domínio já é (`exit_code.go`). |
+| `58` | `ErrSliceUsesDifferentSource` | Reservado para `GeoSlice.EnsureUsesSources` (antes `EnsureUsesSelection`) — hoje só usado internamente por `FlightService.reuseSlice` para decidir reaproveitar ou não um recorte guardado (FR-011); nunca devolvido a um usuário por nenhum comando desta etapa, porque a decisão de não reaproveitar nunca é, por si só, um erro — o comando simplesmente gera um recorte novo. Mapeado aqui por completude, como todo sentinela do domínio já é (`exit_code.go`). |
 
 `ErrDataSourceNotRegistered` (já existente, código `9`) é reaproveitado
 para um nome pedido que não existe no registro em nenhum tipo — a mensagem
