@@ -44,6 +44,13 @@ func (b *OverlayConfigBuilder) WithSpeed() *OverlayConfigBuilder {
 	return b
 }
 
+// WithGain turns on the gain block, which — like WithSpeed — is off by
+// default (015-overlay-redesign).
+func (b *OverlayConfigBuilder) WithGain() *OverlayConfigBuilder {
+	b.config.Gain = true
+	return b
+}
+
 func (b *OverlayConfigBuilder) Build() domain.OverlayConfig {
 	return b.config
 }

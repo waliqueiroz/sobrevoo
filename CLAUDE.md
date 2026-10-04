@@ -96,8 +96,28 @@ de câmera, do arquivo de plano exportado e da identidade do plano
 (`CameraPlan.ID()`); como o arquivo ganha um campo por quadro que nenhuma
 versão anterior escrevia, `format_version` sobe de 2 para 3, e um plano
 mais antigo é recusado com a mesma mensagem e o mesmo código de saída que
-uma versão desconhecida já recebe, pedindo para ser gerado de novo. Ainda
-não há áudio.
+uma versão desconhecida já recebe, pedindo para ser gerado de novo.
+`specs/015-overlay-redesign/` redesenha as sobreposições de tela que a
+etapa 9 introduziu e as etapas 11/12 poliram: os blocos numéricos deixam
+de ser uma pilha de faixas escuras no alto da tela e passam a ser texto
+puro, sem nenhum painel de fundo, lado a lado numa única faixa horizontal,
+repartindo a largura útil em colunas de mesma largura, numa ordem fixa e
+documentada (velocidade, elevação, distância, ganho, tempo decorrido) que
+não depende da ordem pedida em `--overlay-blocks`; dentro de cada bloco, o
+rótulo por extenso (não mais abreviado em caixa alta), o valor num corpo
+bem maior, e a unidade — as três alturas que já eram "rótulo e valor na
+mesma linha" viram três linhas, com a terceira omitida sem deixar vão para
+um bloco sem unidade, como o tempo decorrido. O ganho de elevação
+acumulado deixa de ser um segundo número colado ao bloco de elevação e
+vira um bloco próprio (`gain`), ligado pelo mesmo mecanismo dos demais; a
+escolha padrão de blocos muda de `distance,elevation,time,profile` para
+`distance,elevation,speed,profile` — tempo decorrido e ganho continuam
+disponíveis, só saem do padrão. O gráfico de elevação no rodapé também
+perde o painel e passa a se destacar do terreno pela mesma técnica de
+contorno escuro que o texto já usa. Nenhum valor passa a ser calculado,
+formatado ou arredondado de outro jeito — só a apresentação muda —, e como
+os pixels de um quadro com sobreposições ligadas mudam de verdade,
+`RenderVersion` sobe de 4 para 5. Ainda não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -634,8 +654,8 @@ real — `specs/002-geo-data-registry/research.md` item 9).
 quinto bloco, `OverlayBlockSpeed` (nome `speed`, rótulo "VEL"), pelo mesmo
 mecanismo com que os quatro já existentes são escolhidos
 (`OverlayConfig`/`--overlay-blocks`) — mas, diferente deles, nasce fora da
-escolha padrão de blocos (`config.RenderDefaults.OverlayBlocks` continua
-`distance,elevation,time,profile`): só aparece quando pedido por nome.
+escolha padrão de blocos nesta etapa (a etapa 15 muda esse padrão,
+incluindo `speed` nele): só aparece quando pedido por nome.
 `CameraFrame` ganha `MarkerSpeed` (metros por segundo), a velocidade média
 da atividade numa janela de tempo fixa (`CameraTuning.SpeedWindow`, 30
 segundos, um limiar interno de `config.go`, nunca uma flag) centrada no
@@ -668,6 +688,65 @@ saída que já recusam qualquer versão desconhecida, sem nenhum sentinela
 novo. `inspect`, `geodata check`, `video` e a montagem do vídeo não mudam:
 a velocidade é um dado do plano de câmera, consumido só pelo desenho de
 quadros (`render frame`, `render all`, `fly`).
+
+### O redesenho das sobreposições de tela em colunas (etapa 15)
+
+`specs/015-overlay-redesign/` reescreve a apresentação das sobreposições
+de tela que a etapa 9 introduziu e as etapas 11/12 poliram, sem mudar
+nenhum valor, cálculo, arredondamento ou unidade que elas já mostravam
+(`internal/domain/frame_screen_overlay.go`). Os blocos numéricos deixam de
+ser empilhados verticalmente, cada um sobre uma faixa semitransparente
+(`drawPanel`/`OverlayPanelColor`/`OverlayPanelOpacity`, removidos — sem
+mais nenhum chamador), e passam a ser texto puro, desenhado direto sobre a
+imagem, lado a lado numa única faixa horizontal no alto do quadro: a
+largura útil (`largura do quadro − 2×margem lateral`) é repartida em
+colunas de mesma largura entre os blocos presentes — uma divisão inteira
+simples, sem nenhum escaneamento do plano inteiro — cada bloco
+centralizado na própria coluna. A ordem em que aparecem é sempre a mesma,
+velocidade → elevação → distância → ganho → tempo decorrido
+(`overlayBlockOrder`, em `frame_overlay_config.go`), nunca a ordem em que
+o usuário os escreveu em `--overlay-blocks` — `screenOverlay.draw` nunca lê
+essa ordem, só os campos booleanos de `OverlayConfig`. Dentro de cada
+bloco, a informação vira até três linhas (`overlayBlockText{label, value,
+unit}`, `drawBlock`): o rótulo por extenso e com capitalização normal
+("Distância", não mais "DIST"), num corpo pequeno
+(`OverlayLabelHeightRatio`); o valor, num corpo bem maior
+(`OverlayValueHeightRatio`, o dobro do rótulo); e a unidade, de novo no
+corpo pequeno, só quando o bloco tem uma — o tempo decorrido não desenha
+essa terceira linha, sem deixar o vão que ela ocuparia. As quatro funções
+`formatOverlay*` com unidade passam a devolver o valor e a unidade
+separados, em vez de uma única string concatenada, para alimentar as duas
+linhas; o cálculo e o arredondamento de cada uma continuam exatamente os
+mesmos de antes.
+
+O ganho de elevação acumulado, até aqui um segundo número colado ao bloco
+de elevação na mesma linha ("ELEV 120 m   GANHO +45 m"), vira um bloco
+independente, `OverlayBlockGain` (nome `gain`), pelo mesmo mecanismo de
+seleção dos demais (`NewOverlayConfig`, `OverlayConfig.Gain`): o bloco de
+elevação passa a mostrar só a altitude, o de ganho só o ganho, cada um com
+seu rótulo e sua unidade — pode ser pedido só um, só o outro, os dois, ou
+nenhum. A escolha padrão de blocos (`config.RenderDefaults.OverlayBlocks`)
+muda de `distance,elevation,time,profile` para
+`distance,elevation,speed,profile`: tempo decorrido e ganho continuam
+disponíveis, só saem do padrão, porque mudam menos ao longo de um vídeo e
+porque três colunas cabem com folga onde cinco não caberiam. O gráfico de
+elevação no rodapé (`drawProfile`) também perde o painel e passa a se
+destacar do terreno pela mesma técnica de casca-antes-do-núcleo que
+`TrailCasingColor` já usa para o traçado: a linha e o marcador são
+desenhados duas vezes, primeiro alguns pixels mais largos em
+`OverlayTextOutlineColor` (`profileCasingExtra`, um incremento fixo em
+pixels, não uma razão), depois no tamanho normal por cima — nenhuma
+mudança no conteúdo do gráfico em si (a forma da linha, a posição do
+marcador), só na moldura. Como os blocos presentes não precisam mais
+compartilhar a largura do texto mais largo de todo o plano,
+`stablePanelWidth` e o cache em `Scene` (`panelWidth`/`panelWidthHeight`/
+`panelWidthSet`/`numericPanelWidth`) também saem — mais barato do que o
+mecanismo que substitui, não só diferente. Como os pixels de um quadro com
+sobreposições ligadas mudam de verdade, `RenderVersion` sobe de `4` para
+`5`, e `OverlayConfig.Fingerprint()` ganha um sétimo segmento para o bit
+de `gain` — o mesmo mecanismo de sempre (`FrameSetID`) garante que
+nenhum conjunto de quadros de antes desta etapa se misture com um de
+depois, sem nenhum código novo de comparação.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

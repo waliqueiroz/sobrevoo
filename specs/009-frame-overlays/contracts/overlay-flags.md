@@ -82,3 +82,18 @@ instante real da atividade e a elevação do trajeto por quadro
 mesmo `ErrPlanFormatVersionUnsupported` (código `18`, já existente) que hoje
 recusa qualquer versão que o leitor não conhece — antes de `--overlays`/
 `--overlay-blocks` chegarem a importar.
+
+## Notas de etapas posteriores
+
+- **Etapa 14** (`specs/014-speed-overlay-block/contracts/speed-overlay-block.md`):
+  acrescenta um quinto nome aceito, `speed` — fora da escolha padrão,
+  só aparece quando pedido explicitamente.
+- **Etapa 15** (`specs/015-overlay-redesign/contracts/overlay-blocks-update.md`):
+  acrescenta um sexto nome, `gain` — também fora do padrão; muda a escolha
+  padrão de `distance,elevation,time,profile` para
+  `distance,elevation,speed,profile`; e reescreve por completo a
+  apresentação visual dos blocos (sem painel, em colunas de mesma largura,
+  numa ordem fixa, em três alturas de texto) — ver
+  `specs/015-overlay-redesign/contracts/frame-files-change.md`. O conteúdo
+  desta página sobre as duas flags em si (nomes, formato, quando valem)
+  continua válido; só a lista de nomes aceitos e o padrão mudaram.

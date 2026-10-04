@@ -467,49 +467,6 @@ func Test_Scene_Render_ScreenOverlay(t *testing.T) {
 		assert.Equal(t, first.Pix, second.Pix)
 	})
 
-	t.Run("should give a frame a wider numeric panel when another frame of the same plan has longer text (012-overlay-ptbr-readability)", func(t *testing.T) {
-		// given: the same short frame (index 0), rendered once as the only
-		// frame of its plan, and once as part of a plan that also has a
-		// frame with much longer numeric text — the panel width is
-		// computed from the whole plan, not from the frame being drawn
-		// (research.md item 4), so the two renders of the same frame must
-		// differ. The profile block is left out of noProfile: with it, a
-		// second frame would also change the elevation profile's own line
-		// (it always draws every PhaseFollowing frame, since 009-frame-
-		// overlays) — a difference unrelated to the panel width this
-		// scenario isolates.
-		noProfile, err := domain.NewOverlayConfig(true, []domain.OverlayBlock{domain.OverlayBlockDistance, domain.OverlayBlockElevation, domain.OverlayBlockTime})
-		require.NoError(t, err)
-
-		short := builddomain.NewCameraFrameBuilder().
-			WithIndex(0).WithPhase(domain.PhaseFollowing).
-			WithCameraPosition(behindCamera[0], behindCamera[1]).
-			WithMarkerPosition(southOfCenter[0], southOfCenter[1]).
-			WithCameraAltitude(300).WithHeading(0).WithTilt(20).
-			WithMarkerDistance(0).WithTrackElevation(80).WithTrackElevationGain(6).
-			Build()
-		long := builddomain.NewCameraFrameBuilder().
-			WithIndex(1).WithPhase(domain.PhaseFollowing).
-			WithCameraPosition(behindCamera[0], behindCamera[1]).
-			WithMarkerPosition(southOfCenter[0], southOfCenter[1]).
-			WithCameraAltitude(300).WithHeading(0).WithTilt(20).
-			WithMarkerDistance(123456).WithTrackElevation(9999).WithTrackElevationGain(88888).
-			Build()
-
-		shortOnlyPlan := builddomain.NewCameraPlanBuilder().WithFrames(short).Build()
-		withLongPlan := builddomain.NewCameraPlanBuilder().WithFrames(short, long).Build()
-		alone, withSibling := sceneWith(noProfile), sceneWith(noProfile)
-
-		// when: both render frame 0 — the same frame's own text — of their
-		// respective plans
-		aloneImage, _, err1 := alone.Render(context.Background(), shortOnlyPlan, 0, smallFrame)
-		withSiblingImage, _, err2 := withSibling.Render(context.Background(), withLongPlan, 0, smallFrame)
-
-		// then
-		require.NoError(t, err1)
-		require.NoError(t, err2)
-		assert.NotEqual(t, aloneImage.Pix, withSiblingImage.Pix)
-	})
 }
 
 func Test_Scene_Render_Stopping(t *testing.T) {

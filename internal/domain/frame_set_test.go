@@ -285,9 +285,9 @@ func Test_NewFrameMark(t *testing.T) {
 		assert.NotEqual(t, first.SetID, second.SetID)
 	})
 
-	t.Run("should be of version 4 of the drawing, the one with Portuguese overlay labels and a stable panel width", func(t *testing.T) {
+	t.Run("should be of version 5 of the drawing, the one with the column layout and no overlay panel", func(t *testing.T) {
 		// given / when / then
-		assert.Equal(t, 4, domain.RenderVersion)
+		assert.Equal(t, 5, domain.RenderVersion)
 	})
 }
 
