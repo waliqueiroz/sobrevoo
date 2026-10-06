@@ -4,7 +4,7 @@
 
 **Criado em**: 2026-09-13
 
-**Status**: Rascunho
+**Status**: Implementada
 
 **Entrada**: Descrição do usuário: "Primeira etapa do Sobrevoo, uma ferramenta de linha de comando que gera vídeos de sobrevoo de trajetos, no estilo do Relive e do Strava. Esta etapa cobre apenas a leitura e o tratamento da rota. Nada de mapa, câmera ou vídeo ainda. O usuário aponta a ferramenta para um arquivo de rastreamento GPS de uma atividade (corrida, pedalada, caminhada) e recebe de volta um resumo do que foi lido e de como a rota foi tratada: quantidade de pontos original e após o tratamento, distância total, ganho de elevação, duração, área geográfica ocupada pelo trajeto e eventuais problemas encontrados. Requisitos de comportamento: aceitar mais de um formato de arquivo de rastreamento identificando o formato pelo próprio conteúdo; recusar arquivo inválido, vazio ou com pontos insuficientes com mensagem clara; descartar pontos com coordenadas impossíveis, duplicados consecutivos e saltos fisicamente implausíveis, informando quantos foram descartados; reduzir a quantidade de pontos preservando o formato do trajeto e suavizar o traçado; funcionar para trajetos em qualquer parte do mundo, inclusive cruzando o meridiano de mudança de data; lidar com arquivos sem altitude ou tempo, deixando claro o que estava ausente; permitir ajustar o nível de simplificação e de suavização. Fora de escopo: dados de mapa, relevo, renderização, vídeo, interface gráfica e API."
 

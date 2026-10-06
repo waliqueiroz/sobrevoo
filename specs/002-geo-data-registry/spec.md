@@ -4,7 +4,7 @@
 
 **Criado em**: 2026-09-13
 
-**Status**: Rascunho
+**Status**: Implementada
 
 **Entrada**: Descrição do usuário: "Segunda etapa do Sobrevoo. Esta etapa cobre apenas o gerenciamento dos dados geográficos locais que serão usados para renderizar o vídeo. Nada de câmera, renderização ou vídeo ainda. Como a ferramenta funciona totalmente offline e não embute dados de nenhuma região, o usuário precisa registrar quais arquivos de mapa e de relevo ele já baixou para a sua máquina. A partir desse registro, a ferramenta sabe que áreas do planeta consegue renderizar. O usuário consegue: registrar um arquivo de dados local informando um nome de sua escolha (a ferramenta descobre sozinha o tipo e a área coberta); listar o que já está registrado (nome, tipo, área coberta, se o arquivo ainda existe); remover um registro sem apagar o arquivo; verificar se um trajeto está coberto pelos dados registrados, e entender o que ficou de fora quando não estiver. Requisitos: registro persistente entre execuções e independente de diretório; recusar arquivo inexistente/ilegível/formato não suportado; recusar nome duplicado; detectar arquivo movido/apagado sem falhar; escolha determinística e explicável quando múltiplas fontes cobrem a mesma área; trajeto só é coberto com mapa base E relevo para toda a extensão; nenhuma região privilegiada, incluindo antimeridiano. Fora de escopo: baixar dados, converter formatos, renderização, vídeo, GUI, API."
 
