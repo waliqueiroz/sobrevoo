@@ -135,7 +135,17 @@ superfície plana se a vizinhança inteira não tiver nenhuma, nunca sendo
 tratado como se ele próprio não tivesse elevação. O traçado, o marcador,
 as sobreposições de tela e os dois padrões de "sem dado" continuam fora do
 alcance da luz. Como os pixels do terreno mudam de verdade,
-`RenderVersion` sobe de 5 para 6. Ainda não há áudio.
+`RenderVersion` sobe de 5 para 6. `specs/017-version-flag/` acrescenta ao
+comando raiz a capacidade de informar a própria versão
+(`sobrevoo --version`): uma única linha com o nome do programa e a
+versão, sem tocar em arquivo, registro ou rede. A versão nunca é uma
+constante escrita à mão — vem do próprio binário: a tag usada por
+`go install .../sobrevoo@vX.Y.Z` (que o Go já grava no binário e a
+biblioteca padrão sabe ler), ou, na ausência de uma tag, uma indicação
+honesta de que é uma compilação de desenvolvimento, nunca um número de
+release inventado; uma compilação de release pode fixar a versão
+explicitamente no momento do build, com precedência sobre as outras duas
+fontes. Ainda não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -825,6 +835,49 @@ de domínio em `render_tuning.go`, no mesmo padrão de `NoMapColors`/
 terreno mudam de verdade, `RenderVersion` sobe de `5` para `6` — o mesmo
 mecanismo de sempre (`FrameSetID`) garante que nenhum conjunto de quadros
 de antes desta etapa se misture com um de depois.
+
+### A informação de versão da CLI (etapa 17)
+
+`specs/017-version-flag/` acrescenta `--version` ao comando raiz
+(`internal/infra/inbound/cli/root.go`), reaproveitando o mecanismo que o
+próprio Cobra já tem para isso (`Command.Version`): a flag é registrada
+automaticamente e tratada antes de qualquer outro código do comando, o que
+já garante de graça que `--version` nunca lê arquivo, nunca consulta o
+registro de dados geográficos e nunca acessa rede. Um `VersionTemplate`
+próprio (`"{{.DisplayName}} {{.Version}}\n"`) substitui o padrão do Cobra,
+que insere a palavra "version" no meio — a saída fica só no nome do
+programa e na versão, uma linha, nada mais.
+
+Quem resolve a versão em si é o ponto de entrada descartável
+(`cmd/sobrevoo/version.go`), nunca o domínio — a versão é um detalhe de
+ambiente, não regra de negócio, e nenhum pacote de `internal/domain` ou
+`internal/application` é tocado por esta etapa. `pickVersion` decide entre
+três fontes, nesta ordem de precedência: um `var version` fixado
+explicitamente no momento do build (`-ldflags "-X main.version=vX.Y.Z"`),
+para compilações de release publicadas fora do fluxo `go install`; a
+versão do módulo que `runtime/debug.ReadBuildInfo` já lê do próprio
+binário — a tag usada por `go install .../sobrevoo@vX.Y.Z`, ou, para um
+build local dentro de um checkout git, a pseudo-versão que o "VCS
+stamping" do Go já embute por padrão desde a 1.18
+(`v0.0.0-<timestamp>-<hash>[+dirty]`); e, só na ausência completa de
+informação de build (`-buildvcs=false`, sem `git`, ou build sem suporte a
+módulo), o literal `(devel)`. Nenhum dos dois últimos é uma tag real, e a
+ferramenta nunca inventa um número de release para um binário que não tem
+um. `runtime/debug` é usado diretamente, sem porta nem adaptador — a mesma
+isenção que o Princípio II já aplica a `time.Now()`, porque não é I/O de
+arquivo, rede ou processo externo, só metadado que o linker do Go já
+embutiu no binário.
+
+A lógica de precedência (`pickVersion`) é uma função pura, testada
+diretamente com os três cenários sem precisar compilar nem instalar nenhum
+binário de verdade — `debug.ReadBuildInfo()` dentro de um `go test` não
+reflete nenhum dos três casos reais, então a decisão e a leitura do build
+info são duas funções separadas (`pickVersion`/`readModuleVersion`) pelo
+mesmo motivo que justifica a isenção do Princípio II: decisão pura sim,
+porta não, porque não há I/O real para substituir. Nenhum outro comando
+muda — nenhum subcomando `version` separado, nenhuma informação de data de
+build, commit, versão do Go ou verificação de atualização, tudo
+explicitamente fora de escopo.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 

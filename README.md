@@ -48,6 +48,11 @@ cd sobrevoo
 make build   # gera ./bin/sobrevoo
 ```
 
+Para confirmar o que foi instalado, `sobrevoo --version` imprime o nome do
+programa e a versão numa única linha — a tag usada no `go install` (por
+exemplo, `sobrevoo v0.1.0`), ou uma indicação de que é uma compilação de
+desenvolvimento quando não há tag nenhuma envolvida.
+
 Todo comando aceita `--help`, que lista as flags com seus padrões. As
 mensagens do programa são em inglês.
 

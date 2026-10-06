@@ -98,7 +98,7 @@ func run() int {
 	renderCommand.AddCommand(cli.NewRenderFrameCommand(cameraPlanService, geoSliceService, frameService, defaultResolution, defaultAppearance, defaultOverlay))
 	renderCommand.AddCommand(cli.NewRenderAllCommand(cameraPlanService, geoSliceService, frameService, defaultResolution, defaultAppearance, defaultOverlay))
 
-	root := cli.NewRootCommand()
+	root := cli.NewRootCommand(resolveVersion())
 	root.AddCommand(cli.NewInspectCommand(trackService, domainLevel(cfg.DefaultLevel)))
 	root.AddCommand(cli.NewPlanCommand(cameraPlanService, domainPlanParameters(cfg.PlanDefaults, cfg.DefaultLevel)))
 	root.AddCommand(geoDataCommand)
