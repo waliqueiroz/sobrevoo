@@ -30,6 +30,13 @@ type surface struct {
 
 	// zmin and zmax are the lowest and the highest height of the surface.
 	zmin, zmax float64
+
+	// gradients is the surface's precomputed slope pyramid (016-terrain-
+	// lighting, research.md item 5), built once here from raw — never from
+	// heights, which would invent a slope out of a filled hole. Index 0 is
+	// the finest level, at the grid's own resolution; a later stage adds
+	// coarser levels on top of it, for a normal read from farther away.
+	gradients []terrainGradient
 }
 
 // newSurface builds the surface of a grid. fallback is the height of a grid that
@@ -61,6 +68,8 @@ func newSurface(grid ElevationGrid, fallback float64) *surface {
 	for _, v := range s.heights {
 		s.zmin, s.zmax = math.Min(s.zmin, float64(v)), math.Max(s.zmax, float64(v))
 	}
+
+	s.gradients = newTerrainGradientPyramid(grid.values, s.rows, s.cols)
 	return s
 }
 
@@ -68,6 +77,135 @@ func newSurface(grid ElevationGrid, fallback float64) *surface {
 func (s *surface) isHole(row, col int) bool {
 	v := s.raw[row*s.cols+col]
 	return v != v
+}
+
+// terrainGradient is one level of a surface's precomputed slope pyramid: the
+// derivative of the height at each node, in each grid direction (meters of
+// height change per cell, of this level's own resolution), and how much of
+// it is backed by a real elevation sample — 0 at a node that is itself a
+// hole, 1 at one with a real value (016-terrain-lighting, research.md item
+// 5). A level coarser than 0 is a later stage's addition.
+type terrainGradient struct {
+	rows, cols int
+	dRow, dCol []float32
+	coverage   []float32
+}
+
+// newTerrainGradient builds the finest level of a slope pyramid from a
+// grid's raw samples (a NaN marking a cell the file has no value for),
+// never from the hole-filled heights the ray's geometry uses, which would
+// invent a slope out of a hole. At each node: the central difference
+// between its two opposite raw neighbors, in each direction, when both
+// have a value; the one-sided difference when only one does; zero when
+// neither does, without losing the node's own coverage, which depends only
+// on whether the node itself has a value (research.md item 7).
+func newTerrainGradient(raw []float32, rows, cols int) terrainGradient {
+	g := terrainGradient{
+		rows: rows, cols: cols,
+		dRow:     make([]float32, rows*cols),
+		dCol:     make([]float32, rows*cols),
+		coverage: make([]float32, rows*cols),
+	}
+
+	at := func(row, col int) (value float32, ok bool) {
+		if row < 0 || row >= rows || col < 0 || col >= cols {
+			return 0, false
+		}
+		v := raw[row*cols+col]
+		return v, v == v
+	}
+
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			center, ok := at(row, col)
+			if !ok {
+				continue // coverage, dRow and dCol all stay zero: never read as real
+			}
+			i := row*cols + col
+			g.coverage[i] = 1
+
+			west, hasWest := at(row, col-1)
+			east, hasEast := at(row, col+1)
+			g.dCol[i] = float32(axisDerivative(float64(center), float64(west), float64(east), hasWest, hasEast))
+
+			north, hasNorth := at(row-1, col)
+			south, hasSouth := at(row+1, col)
+			g.dRow[i] = float32(axisDerivative(float64(center), float64(north), float64(south), hasNorth, hasSouth))
+		}
+	}
+	return g
+}
+
+// axisDerivative is the derivative at a node, in the unit of one cell, from
+// its two opposite neighbors: a central difference when both are real, a
+// one-sided difference when only one is, and zero (no information in this
+// direction) when neither is.
+func axisDerivative(center, prev, next float64, hasPrev, hasNext bool) float64 {
+	switch {
+	case hasPrev && hasNext:
+		return (next - prev) / 2
+	case hasNext:
+		return next - center
+	case hasPrev:
+		return center - prev
+	default:
+		return 0
+	}
+}
+
+// newTerrainGradientPyramid is a surface's whole slope pyramid: the finest
+// level (newTerrainGradient, at the grid's own resolution), then each next
+// one half the rows and columns of the last, down to 1×1 — the same shape
+// of pyramid newTileTexture already builds for a tile's mipmaps, applied to
+// the derivative of the height instead of to color (016-terrain-lighting,
+// research.md item 5).
+func newTerrainGradientPyramid(raw []float32, rows, cols int) []terrainGradient {
+	levels := []terrainGradient{newTerrainGradient(raw, rows, cols)}
+	for {
+		last := levels[len(levels)-1]
+		if last.rows <= 1 && last.cols <= 1 {
+			return levels
+		}
+		levels = append(levels, halveGradient(last))
+	}
+}
+
+// halveGradient is the next coarser level of a slope pyramid: half the rows
+// and columns of level (at least one of each), each node the average of its
+// (up to) four children — weighted by how much of each one is backed by a
+// real elevation sample, so a hole never pulls a coarser level's derivative
+// toward an invented value, only dilutes its coverage (research.md item 7).
+// The same halving newTileTexture's halved does for a tile's mipmap, with a
+// weight instead of a plain mean.
+func halveGradient(level terrainGradient) terrainGradient {
+	rows, cols := max(level.rows/2, 1), max(level.cols/2, 1)
+	out := terrainGradient{rows: rows, cols: cols, dRow: make([]float32, rows*cols), dCol: make([]float32, rows*cols), coverage: make([]float32, rows*cols)}
+
+	at := func(row, col int) (dc, dr, cov float64) {
+		row = min(row, level.rows-1)
+		col = min(col, level.cols-1)
+		i := row*level.cols + col
+		return float64(level.dCol[i]), float64(level.dRow[i]), float64(level.coverage[i])
+	}
+
+	for row := 0; row < rows; row++ {
+		for col := 0; col < cols; col++ {
+			dc00, dr00, cov00 := at(2*row, 2*col)
+			dc01, dr01, cov01 := at(2*row, 2*col+1)
+			dc10, dr10, cov10 := at(2*row+1, 2*col)
+			dc11, dr11, cov11 := at(2*row+1, 2*col+1)
+
+			weight := cov00 + cov01 + cov10 + cov11
+			if weight == 0 {
+				continue // dRow, dCol and coverage all stay zero: no real child to average
+			}
+			i := row*cols + col
+			out.coverage[i] = float32(weight / 4)
+			out.dCol[i] = float32((float64(cov00*dc00) + float64(cov01*dc01) + float64(cov10*dc10) + float64(cov11*dc11)) / weight)
+			out.dRow[i] = float32((float64(cov00*dr00) + float64(cov01*dr01) + float64(cov10*dr10) + float64(cov11*dr11)) / weight)
+		}
+	}
+	return out
 }
 
 // fillHoles copies values, giving each NaN the value of the nearest sample that
@@ -178,6 +316,108 @@ func (g placedSurface) interpolate(a, b float64) float64 {
 	north := float64(g.node(r0, c0)*(1-fa)) + float64(g.node(r0, c0+1)*fa)
 	south := float64(g.node(r0+1, c0)*(1-fa)) + float64(g.node(r0+1, c0+1)*fa)
 	return float64(north*(1-fb)) + float64(south*fb)
+}
+
+// levelGradientAt is the coverage-weighted bilinear blend of the four nodes
+// of gradients[level] around node coordinates (a, b): the weighted average
+// derivative in each grid direction, counting only the nodes that have a
+// real elevation sample, and how much of the blend they cover — 0 when
+// none of the four does (the slope there is unknown), up to 1 when all four
+// do (016-terrain-lighting, research.md items 5, 7).
+func (g placedSurface) levelGradientAt(level int, a, b float64) (dCol, dRow, coverage float64) {
+	lvl := g.gradients[level]
+	column, row := math.Floor(a), math.Floor(b)
+	fa, fb := a-column, b-row
+	c0, r0 := int(column), int(row)
+
+	at := func(row, col int) (dc, dr, cov float64) {
+		row = min(max(row, 0), lvl.rows-1)
+		col = min(max(col, 0), lvl.cols-1)
+		i := row*lvl.cols + col
+		return float64(lvl.dCol[i]), float64(lvl.dRow[i]), float64(lvl.coverage[i])
+	}
+
+	dc00, dr00, cov00 := at(r0, c0)
+	dc01, dr01, cov01 := at(r0, c0+1)
+	dc10, dr10, cov10 := at(r0+1, c0)
+	dc11, dr11, cov11 := at(r0+1, c0+1)
+
+	w00 := float64(float64((1-fa)*(1-fb)) * cov00)
+	w01 := float64(float64(fa*(1-fb)) * cov01)
+	w10 := float64(float64((1-fa)*fb) * cov10)
+	w11 := float64(float64(fa*fb) * cov11)
+
+	weight := w00 + w01 + w10 + w11
+	if weight == 0 {
+		return 0, 0, 0
+	}
+
+	dCol = (float64(w00*dc00) + float64(w01*dc01) + float64(w10*dc10) + float64(w11*dc11)) / weight
+	dRow = (float64(w00*dr00) + float64(w01*dr01) + float64(w10*dr10) + float64(w11*dr11)) / weight
+	return dCol, dRow, weight
+}
+
+// gradientAt is levelGradientAt(level, ...), from (x, y) in meters (the
+// plane of a frame) instead of level 0's node coordinates: level's own
+// nodes are half as dense as level-1's, so the node coordinates are scaled
+// by 2⁻ˡᵉᵛᵉˡ before the blend.
+func (g placedSurface) gradientAt(level int, x, y float64) (dCol, dRow, coverage float64) {
+	a, b := g.nodeCoordinates(x, y)
+	scale := math.Ldexp(1, -level)
+	return g.levelGradientAt(level, float64(a*scale), float64(b*scale))
+}
+
+// climbGradientAt is gradientAt(level, x, y), climbing to the next coarser
+// level, and the next, up to the coarsest one of the pyramid, whenever the
+// level asked for has no coverage at (x, y) — the neighborhood is widened
+// until a real sample is found, never invented (016-terrain-lighting
+// FR-008, research.md item 7).
+func (g placedSurface) climbGradientAt(level int, x, y float64) (dCol, dRow, coverage float64) {
+	last := len(g.gradients) - 1
+	for l := max(level, 0); l <= last; l++ {
+		if dCol, dRow, coverage = g.gradientAt(l, x, y); coverage > 0 {
+			return dCol, dRow, coverage
+		}
+	}
+	return 0, 0, 0
+}
+
+// normalAt is the unit surface normal at (x, y) (meters, the plane of a
+// frame), read from the gradient pyramid at the level proportional to
+// footprintMeters — how much ground the screen pixel this normal is for
+// actually covers there — blended between the two nearest levels the same
+// way sampler.color blends between two mipmaps of a tile's texture
+// (016-terrain-lighting FR-007, research.md item 6); it climbs to a coarser
+// level wherever the one chosen has no coverage at (x, y) (climbGradientAt).
+// It always succeeds: the flat normal (0, 0, 1) where no level of the
+// pyramid has any real sample there (research.md items 4, 7).
+func (g placedSurface) normalAt(x, y, footprintMeters float64) (nx, ny, nz float64) {
+	last := len(g.gradients) - 1
+	cellSize := math.Sqrt(float64(g.cx * g.cy))
+	lod := clamp(math.Log2(math.Max(footprintMeters/cellSize, 1)), 0, float64(last))
+	fine := int(math.Floor(lod))
+	fraction := lod - float64(fine)
+	coarse := min(fine+1, last)
+
+	dCol, dRow, coverage := g.climbGradientAt(fine, x, y)
+	if fraction > 0 && coarse != fine {
+		dColCoarse, dRowCoarse, coverageCoarse := g.climbGradientAt(coarse, x, y)
+		switch {
+		case coverage == 0:
+			dCol, dRow, coverage = dColCoarse, dRowCoarse, coverageCoarse
+		case coverageCoarse > 0:
+			dCol = float64(float64(1-fraction)*dCol) + float64(float64(fraction)*dColCoarse)
+			dRow = float64(float64(1-fraction)*dRow) + float64(float64(fraction)*dRowCoarse)
+		}
+	}
+	if coverage == 0 {
+		return 0, 0, 1
+	}
+
+	slopeX := dCol / g.cx
+	slopeY := -dRow / g.cy
+	length := math.Sqrt(float64(slopeX*slopeX) + float64(slopeY*slopeY) + 1)
+	return -slopeX / length, -slopeY / length, 1 / length
 }
 
 // cellAt is the cell that contains (x, y): rows count from the north, columns

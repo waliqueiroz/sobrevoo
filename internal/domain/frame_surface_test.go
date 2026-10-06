@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var nan32 = float32(math.NaN())
@@ -289,5 +290,202 @@ func Test_cameraHeight(t *testing.T) {
 
 		// then: the terrain under the camera is 250 m; the one under the target plus 20 m is less
 		assert.InDelta(t, 252.0, height, 1e-6)
+	})
+}
+
+// eastSlope16 is a 4 x 4 grid whose height only grows eastward (10 m per
+// column), flat north-south — row r, column c: 100 + 10c.
+func eastSlope16() []float32 {
+	values := make([]float32, 16)
+	for r := 0; r < 4; r++ {
+		for c := 0; c < 4; c++ {
+			values[r*4+c] = float32(100 + 10*c)
+		}
+	}
+	return values
+}
+
+func Test_newTerrainGradient(t *testing.T) {
+	t.Run("should take the central difference at an interior node when both opposite neighbors have a value", func(t *testing.T) {
+		// given: a 3x3 grid, height = 10 * column (east slope), flat north-south
+		values := []float32{100, 110, 120, 100, 110, 120, 100, 110, 120}
+
+		// when
+		g := newTerrainGradient(values, 3, 3)
+
+		// then: node (1, 1), the center
+		assert.Equal(t, float32(10), g.dCol[1*3+1])
+		assert.Equal(t, float32(0), g.dRow[1*3+1])
+		assert.Equal(t, float32(1), g.coverage[1*3+1])
+	})
+
+	t.Run("should take a one-sided difference when only one opposite neighbor has a value", func(t *testing.T) {
+		// given: same east slope, but the west neighbor of the center node has no value
+		values := []float32{100, 110, 120, nan32, 110, 120, 100, 110, 120}
+
+		// when
+		g := newTerrainGradient(values, 3, 3)
+
+		// then: node (1, 1): west is a hole, east is 120, center is 110 -> forward difference 120 - 110
+		assert.Equal(t, float32(10), g.dCol[1*3+1])
+		assert.Equal(t, float32(1), g.coverage[1*3+1])
+	})
+
+	t.Run("should be zero in a direction whose two opposite neighbors both lack a value, without losing the node's coverage", func(t *testing.T) {
+		// given: the center node's west and east neighbors both lack a value; north and south do not
+		values := []float32{100, 90, 120, nan32, 110, nan32, 100, 130, 120}
+
+		// when
+		g := newTerrainGradient(values, 3, 3)
+
+		// then
+		assert.Equal(t, float32(0), g.dCol[1*3+1])
+		assert.Equal(t, float32(1), g.coverage[1*3+1]) // the node itself still has a value
+		assert.Equal(t, float32(20), g.dRow[1*3+1])    // the other direction is unaffected
+	})
+
+	t.Run("should have no coverage at a node that itself has no value", func(t *testing.T) {
+		// given
+		values := []float32{100, 110, 120, 100, nan32, 120, 100, 110, 120}
+
+		// when
+		g := newTerrainGradient(values, 3, 3)
+
+		// then
+		assert.Equal(t, float32(0), g.coverage[1*3+1])
+	})
+}
+
+func Test_placedSurface_normalAt(t *testing.T) {
+	t.Run("should be exactly the flat normal over a flat grid", func(t *testing.T) {
+		// given
+		values := make([]float32, 16)
+		for i := range values {
+			values[i] = 100
+		}
+		g := placedGrid(values)
+
+		// when
+		nx, ny, nz := g.normalAt(g.x0+1.5*g.cx, g.y0-1.5*g.cy, 0)
+
+		// then
+		assert.Equal(t, 0.0, nx)
+		assert.Equal(t, 0.0, ny)
+		assert.Equal(t, 1.0, nz)
+	})
+
+	t.Run("should point away from the direction height grows, for a slope that only rises eastward", func(t *testing.T) {
+		// given
+		g := placedGrid(eastSlope16())
+
+		// when
+		nx, ny, nz := g.normalAt(g.x0+1.5*g.cx, g.y0-1.5*g.cy, 0)
+
+		// then: tilts west (away from the east, where height grows), stays level north-south, and still mostly up
+		assert.Less(t, nx, 0.0)
+		assert.InDelta(t, 0.0, ny, 1e-9)
+		assert.Greater(t, nz, 0.0)
+		assert.Less(t, nz, 1.0)
+	})
+
+	t.Run("should grow more tilted the steeper the grid is", func(t *testing.T) {
+		// given: a gentler and a steeper version of the same east slope
+		gentle := placedGrid(eastSlope16())
+		steepValues := make([]float32, 16)
+		for r := 0; r < 4; r++ {
+			for c := 0; c < 4; c++ {
+				steepValues[r*4+c] = float32(100 + 100*c)
+			}
+		}
+		steep := placedGrid(steepValues)
+
+		// when
+		_, _, gentleNz := gentle.normalAt(gentle.x0+1.5*gentle.cx, gentle.y0-1.5*gentle.cy, 0)
+		_, _, steepNz := steep.normalAt(steep.x0+1.5*steep.cx, steep.y0-1.5*steep.cy, 0)
+
+		// then: the steeper slope leans further from straight up
+		assert.Less(t, steepNz, gentleNz)
+	})
+}
+
+func Test_newTerrainGradientPyramid(t *testing.T) {
+	t.Run("should have one level per halving, down to 1x1", func(t *testing.T) {
+		// given: an 8x8 grid (shape only matters here, values do not)
+		values := make([]float32, 64)
+
+		// when
+		levels := newTerrainGradientPyramid(values, 8, 8)
+
+		// then: 8 -> 4 -> 2 -> 1
+		require.Len(t, levels, 4)
+		assert.Equal(t, 1, levels[3].rows)
+		assert.Equal(t, 1, levels[3].cols)
+	})
+
+	t.Run("should average a coarser level's derivative and coverage, weighted by how much of each child is real, never inventing from a hole", func(t *testing.T) {
+		// given: a 2x2 grid — one level 0, one level 1 of 1x1 — an east slope of 10 per cell,
+		// with one of the four nodes a hole
+		values := []float32{100, 110, 120, nan32}
+
+		// when
+		levels := newTerrainGradientPyramid(values, 2, 2)
+
+		// then: level 1 averages the three real children's coverage (1 each) and derivative,
+		// weighted — not a plain mean of all four (which would silently treat the hole as 0)
+		require.Len(t, levels, 2)
+		assert.Equal(t, float32(0.75), levels[1].coverage[0])
+		assert.InDelta(t, 20.0/3, levels[1].dCol[0], 1e-6)
+		assert.InDelta(t, 40.0/3, levels[1].dRow[0], 1e-6)
+	})
+}
+
+func Test_placedSurface_normalAt_Pyramid(t *testing.T) {
+	t.Run("should read a flatter normal from a larger footprint than from a smaller one, over terrain whose local slope alternates", func(t *testing.T) {
+		// given: a 16x16 grid whose height rises by step then resets every 4 columns — a real,
+		// strong local slope that alternates in sign, like the project's own synthetic
+		// relevo-sp.tif sample (test/samples); queried near the middle of the grid
+		values := make([]float32, 16*16)
+		for r := 0; r < 16; r++ {
+			for c := 0; c < 16; c++ {
+				values[r*16+c] = float32(100 + 50*(c%4))
+			}
+		}
+		grid := testGrid("dem", 16, 16, 0.008, -0.008, 0.001, values)
+		g := newSurface(grid, 0).place(equatorPlane(0))
+		x, y := g.x0+8.5*g.cx, g.y0-8.5*g.cy
+		cell := 0.001 * math.Pi / 180 * earthRadiusMeters
+
+		// when
+		_, _, nzSmall := g.normalAt(x, y, 0)
+		_, _, nzLarge := g.normalAt(x, y, 8*cell)
+
+		// then: the larger footprint averages the alternation toward flat (nz closer to 1),
+		// without reaching it exactly (some residual slope remains over 8 cells)
+		assert.Greater(t, nzLarge, nzSmall)
+		assert.Less(t, nzLarge, 1.0)
+	})
+
+	t.Run("should climb to a coarser level, and find a real slope there, when the finest level has no coverage at all", func(t *testing.T) {
+		// given: an eastward slope with a small hole carved out of it, queried exactly at the
+		// hole's center, where the four nodes of the finest level are all inside the hole
+		values := make([]float32, 64)
+		for r := 0; r < 8; r++ {
+			for c := 0; c < 8; c++ {
+				values[r*8+c] = float32(100 + 10*c)
+			}
+		}
+		for _, i := range []int{3*8 + 3, 3*8 + 4, 4*8 + 3, 4*8 + 4} {
+			values[i] = nan32
+		}
+		grid := testGrid("dem", 8, 8, 0.004, -0.004, 0.001, values)
+		g := newSurface(grid, 0).place(equatorPlane(0))
+		x, y := g.x0+4.0*g.cx, g.y0-4.0*g.cy // node coordinates (3.5, 3.5): exactly the hole's center
+
+		// when
+		nx, _, nz := g.normalAt(x, y, 0)
+
+		// then: not the flat fallback (0, 0, 1) — a coarser level found the real slope around the hole
+		assert.Less(t, nx, 0.0)
+		assert.Less(t, nz, 1.0)
 	})
 }
