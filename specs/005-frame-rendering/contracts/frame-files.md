@@ -50,8 +50,9 @@ altura absoluta somada à elevação do recorte; campo de visão vertical de 45�
 pixels quadrados), em perspectiva:
 
 1. **Terreno** com o relevo das amostras de elevação (superfície contínua,
-   com oclusão correta), vestido com as peças do mapa base, **sem iluminação
-   nem sombra**.
+   com oclusão correta), vestido com as peças do mapa base e iluminado por
+   uma luz direcional fixa, conforme a inclinação real da superfície em
+   cada ponto (016-terrain-lighting; ver nota da décima sexta etapa).
 2. **Traçado** do trajeto: a linha das posições do marcador dos quadros `0` a
    `k` (`k` = o quadro desenhado), sobre o terreno; só o trecho já percorrido,
    terminando no marcador. O primeiro quadro (marcador no início) não tem
@@ -67,10 +68,11 @@ O traçado e o marcador obedecem à oclusão do terreno.
 | Elemento | Aparência |
 |---|---|
 | Fundo (fora do recorte; céu) | cor lisa `#20262E` |
-| **Sem imagem de mapa** (peça ausente do recorte, ou terreno onde não há peças, como além de ±85,0511°) | hachura diagonal de 45° com período de 12 px na tela, alternando `#C8C8C8` e `#6E6E6E` |
-| **Sem elevação** (célula do relevo sem valor) | xadrez de quadrados de 12 px na tela, alternando `#FF00FF` e `#3A003A` |
-| Traçado | linha de largura `max(2, 0,5% da altura da imagem)` px em `#FFB000`, com contorno de 1 px em `#101010` |
-| Marcador | disco de raio `max(4, 1,2% da altura)` px em `#E5252A`, com anel branco `#FFFFFF` de `max(1,5, 0,3% da altura)` px |
+| **Terreno com imagem de mapa** | a cor da peça do mapa, multiplicada por um fator de brilho fixo entre `0,75` e `1,15`, conforme a inclinação real da superfície naquele ponto em relação a uma luz direcional fixa (azimute 315°, altura 45° — 016-terrain-lighting; ver nota da décima sexta etapa) |
+| **Sem imagem de mapa** (peça ausente do recorte, ou terreno onde não há peças, como além de ±85,0511°) | hachura diagonal de 45° com período de 12 px na tela, alternando `#C8C8C8` e `#6E6E6E` — **não iluminada** |
+| **Sem elevação** (célula do relevo sem valor) | xadrez de quadrados de 12 px na tela, alternando `#FF00FF` e `#3A003A` — **não iluminado** |
+| Traçado | linha de largura `max(2, 0,5% da altura da imagem)` px em `#FFB000`, com contorno de 1 px em `#101010` — **não iluminado** |
+| Marcador | disco de raio `max(4, 1,2% da altura)` px em `#E5252A`, com anel branco `#FFFFFF` de `max(1,5, 0,3% da altura)` px — **não iluminado** |
 
 Os padrões dependem só da posição do **pixel na tela**, com `x` a coluna e `y`
 a linha, a partir de 0 no canto superior esquerdo: na hachura, `#C8C8C8` onde
@@ -107,7 +109,7 @@ conta. Um quadro com os dois tipos de pixel conta nas duas colunas.
 ## Compatibilidade
 
 O arquivo não referencia data, hora, caminhos, nome de máquina nem versão do
-binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `5`)
+binário — para preservar a igualdade byte a byte. `RenderVersion` (hoje `6`)
 sobe sempre que o algoritmo ou as constantes visuais mudam de forma
 visível; quadros de outra `RenderVersion` pertencem a outro conjunto e não são
 reaproveitados. Consumidores devem ignorar blocos auxiliares que não
@@ -157,3 +159,15 @@ de elevação no rodapé também perde o painel, destacando-se do terreno por
 contorno. Nenhum valor exibido, cálculo, arredondamento, unidade,
 enquadramento, terreno ou traçado muda. Quadros da versão `4` são,
 portanto, de outro conjunto.
+
+**Nota da décima sexta etapa**: a versão do desenho passou de `5` para `6`
+(`specs/016-terrain-lighting/contracts/frame-files-change.md`): o terreno
+vestido com imagem de mapa passa a ser iluminado por uma luz direcional
+fixa (azimute 315°, altura 45°, nunca escolhida pelo usuário), que clareia
+ou escurece a cor do mapa conforme a inclinação real da superfície em cada
+ponto, numa faixa fixa entre `0,75` e `1,15` — uma superfície plana
+permanece exatamente igual à cor de antes desta etapa, qualquer que seja a
+altura da luz. O traçado, o marcador, as sobreposições de tela e os dois
+padrões de "sem dado" (hachura e xadrez) continuam sem nenhuma mudança —
+só a cor dos pixels de terreno com imagem de mapa muda. Quadros da versão
+`5` são, portanto, de outro conjunto.

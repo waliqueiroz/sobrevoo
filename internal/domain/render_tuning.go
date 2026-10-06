@@ -26,7 +26,15 @@ import "strconv"
 // becomes its own block; and the elevation profile at the bottom loses its
 // panel too, standing out from the terrain through the same text-outline
 // technique instead.
-const RenderVersion = 5
+// Version 6 (016-terrain-lighting) lights the terrain itself: the color a
+// ray's hit point gets from the base map is lightened or darkened by a
+// fixed directional light, from the slope of the surface at that exact
+// point — never a baked shading, so it agrees with the geometry on screen
+// at any camera angle or distance. A flat surface is always neutral
+// (unchanged), whatever the light's direction; only the pixels of terrain
+// drawn with a base map image change — the trail, the marker, the screen
+// overlays and the two "no data" patterns are untouched.
+const RenderVersion = 6
 
 // RGB is a color, 8 bits per channel.
 type RGB struct {
@@ -123,6 +131,28 @@ const (
 	// (FR-018).
 	OverlayLabelHeightRatio = 0.020
 	OverlayValueHeightRatio = 0.040
+
+	// TerrainLightAzimuthDegrees and TerrainLightAltitudeDegrees are the
+	// fixed direction of the directional light that shades the terrain:
+	// 315° (from the north-west) and 45° above the horizon, the usual
+	// convention of shaded-relief maps ("hillshade") — the same compass
+	// convention CameraFrame.Heading already uses, clockwise from north
+	// (016-terrain-lighting FR-001, research.md item 2). Neither is
+	// adjustable by the user (FR-011).
+	TerrainLightAzimuthDegrees  = 315.0
+	TerrainLightAltitudeDegrees = 45.0
+
+	// TerrainLightMinFactor and TerrainLightMaxFactor bound how much the
+	// terrain's lighting can darken or lighten the base map's color: a
+	// fixed range, chosen to give the relief visible volume without
+	// washing out the map (016-terrain-lighting FR-003, research.md item
+	// 8) — in particular a light base map (e.g. an OSM-style light theme,
+	// background around 240-245), whose near-white tones clip to pure
+	// white well before the geometric maximum the lighting formula can
+	// reach (≈1.29, at a 45° slope facing the light exactly). Neither is
+	// adjustable by the user (FR-011).
+	TerrainLightMinFactor = 0.75
+	TerrainLightMaxFactor = 1.15
 )
 
 // RenderTuning holds the heuristic constants of drawing a frame. They are

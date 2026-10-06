@@ -175,10 +175,13 @@ func (s *Scene) drawTerrain(ctx context.Context, ground terrain, plane framePlan
 }
 
 // drawPixel draws the pixel (x, y): the ray of the camera through it, the first
-// terrain it meets, and what the terrain shows there — the color of the map, the
-// hatch of terrain with no map image, or the checkerboard of terrain over a cell
-// with no elevation, which comes first. seen is false for a ray that meets
-// nothing, which leaves the background: that is no hole.
+// terrain it meets, and what the terrain shows there — the color of the map,
+// lightened or darkened by the terrain's fixed directional light according to
+// the surface's own normal at that point (016-terrain-lighting); the hatch of
+// terrain with no map image; or the checkerboard of terrain over a cell with
+// no elevation, which comes first and is never lit, like the hatch. seen is
+// false for a ray that meets nothing, which leaves the background: that is no
+// hole.
 func (s *Scene) drawPixel(ground terrain, plane framePlane, cam camera, sampler *sampler, image FrameImage, depth []float32, x, y int) (state pixelState, seen bool, err error) {
 	dx, dy, dz := cam.ray(x, y)
 	hit, ok := ground.trace(cam.position[0], cam.position[1], cam.position[2], dx, dy, dz)
@@ -199,7 +202,18 @@ func (s *Scene) drawPixel(ground terrain, plane framePlane, cam camera, sampler 
 
 	switch state {
 	case stateImage:
-		image.Set(x, y, color)
+		// footprint is how much ground, in meters, this pixel actually covers at the hit's
+		// distance — the same "how many ground units a screen pixel covers here" sampler.color
+		// already computes for the texture's level of detail (research.md item 6), with the same
+		// slant correction (a ray that grazes the ground covers more of it per pixel).
+		footprint := float64(sampler.pixelAngle*hit.t) / math.Sqrt(math.Max(math.Abs(dz), 0.1))
+		nx, ny, nz := ground[hit.grid].normalAt(hit.x, hit.y, footprint)
+		factor := terrainLightFactor(nx, ny, nz)
+		image.Set(x, y, RGB{
+			rounded(float64(float64(color.R) * factor)),
+			rounded(float64(float64(color.G) * factor)),
+			rounded(float64(float64(color.B) * factor)),
+		})
 	case stateNoMap:
 		image.Set(x, y, NoMapColors[hatchTone(x, y)])
 	case stateNoElevation:

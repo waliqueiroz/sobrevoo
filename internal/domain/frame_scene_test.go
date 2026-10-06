@@ -398,7 +398,173 @@ func Test_Scene_Render_Determinism(t *testing.T) {
 		// then
 		require.NoError(t, err)
 		sum := sha256.Sum256(image.Pix)
-		assert.Equal(t, "5e19f91e82243d5d058ca91cf6da1192aefa376293f552f388543260f7dfa793", hex.EncodeToString(sum[:]))
+		assert.Equal(t, "7c65df9a868038182d4b902aa3f67e8de18e21d0950bda293316efbcb39ad399", hex.EncodeToString(sum[:]))
+	})
+}
+
+// eastWestSlope is an n × n grid whose height grows only eastward, flat
+// north-south — row r, column c: base + step*c. A negative step grows
+// westward instead.
+func eastWestSlope(n int, base, step float32) []float32 {
+	values := make([]float32, n*n)
+	for r := 0; r < n; r++ {
+		for c := 0; c < n; c++ {
+			values[r*n+c] = base + step*float32(c)
+		}
+	}
+	return values
+}
+
+// sawtoothSlope is an n × n grid whose height rises by step then resets
+// every 4 columns, flat north-south — a real, strong local slope that
+// alternates in sign every few cells, like the project's own synthetic
+// relevo-sp.tif sample (test/samples): a coarse reading of it averages the
+// alternation toward flat; a fine one does not.
+func sawtoothSlope(n int, base, step float32) []float32 {
+	values := make([]float32, n*n)
+	for r := 0; r < n; r++ {
+		for c := 0; c < n; c++ {
+			values[r*n+c] = base + step*float32(c%4)
+		}
+	}
+	return values
+}
+
+// Test_Scene_Render_TerrainLight is the one file of tests that checks the
+// terrain's directional lighting (016-terrain-lighting): every other test
+// of this file draws a flat plain (flat), over which the lighting is
+// always neutral, so none of their pixel assertions about the terrain are
+// touched by it.
+func Test_Scene_Render_TerrainLight(t *testing.T) {
+	southOfCenter := [2]float64{-0.004, 0}
+	behindCamera := [2]float64{-0.008, 0}
+	plan := planOf(0, 20, 300, southOfCenter, behindCamera, 3)
+
+	t.Run("should lighten a slope whose horizontal lean faces the light more than the map's own color", func(t *testing.T) {
+		// given: a slope that rises eastward — its exposed face leans west, toward part of the
+		// fixed light's direction (from the north-west)
+		slice := sceneSlice(40, 0.0005, eastWestSlope(40, 100, 10), worldTile())
+		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
+		require.NoError(t, err)
+
+		// when
+		image, _, err := scene.Render(context.Background(), plan, 1, smallFrame)
+
+		// then: the whole visible ground is one color (the slope's gradient, and so its lighting
+		// factor, is the same everywhere on this uniformly sloped grid), lighter than the map's own
+		require.NoError(t, err)
+		lit := image.At(32, 35)
+		assert.True(t, rowIsAll(image, 35, lit))
+		assert.NotEqual(t, mapColor, lit)
+		assert.Greater(t, int(lit.G), int(mapColor.G))
+	})
+
+	t.Run("should darken a slope whose horizontal lean faces away from the light more than the map's own color", func(t *testing.T) {
+		// given: the mirrored slope, rising westward — its exposed face leans east, away from the light
+		slice := sceneSlice(40, 0.0005, eastWestSlope(40, 100, -10), worldTile())
+		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
+		require.NoError(t, err)
+
+		// when
+		image, _, err := scene.Render(context.Background(), plan, 1, smallFrame)
+
+		// then
+		require.NoError(t, err)
+		shaded := image.At(32, 35)
+		assert.True(t, rowIsAll(image, 35, shaded))
+		assert.NotEqual(t, mapColor, shaded)
+		assert.Less(t, int(shaded.G), int(mapColor.G))
+	})
+
+	t.Run("should leave a flat surface's color exactly unchanged", func(t *testing.T) {
+		// given
+		slice := sceneSlice(40, 0.0005, flat(40, 100), worldTile())
+		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
+		require.NoError(t, err)
+
+		// when
+		image, _, err := scene.Render(context.Background(), plan, 1, smallFrame)
+
+		// then
+		require.NoError(t, err)
+		assert.True(t, rowIsAll(image, 35, mapColor))
+	})
+
+	t.Run("should leave the no-map hatch exactly as it is, untouched by the terrain's lighting", func(t *testing.T) {
+		// given: no tile at all, over a slope (not a flat plain) — the hatch never reaches
+		// sampler.color, so it never goes through the lighting branch either
+		slice := holeSlice(0, eastWestSlope(40, 100, 10), worldTileSet(nil))
+		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(3), sceneAppearance, sceneOverlay)
+		require.NoError(t, err)
+		view := planOf(0, 45, 300, southOfCenter, behindCamera, 2)
+
+		// when
+		image, _, err := scene.Render(context.Background(), view, 1, smallFrame)
+
+		// then
+		require.NoError(t, err)
+		for y := 0; y < 36; y++ {
+			for x := 0; x < 64; x++ {
+				if c := image.At(x, y); c != sceneAppearance.BackgroundColor {
+					assert.Equal(t, noMapAt(x, y), c, "pixel %d,%d", x, y)
+				}
+			}
+		}
+	})
+
+	t.Run("should leave the no-elevation checkerboard exactly as it is, untouched by the terrain's lighting", func(t *testing.T) {
+		// given: a block of cells with no value, over a slope, with its tile
+		slice := holeSlice(0, withHoleBlock(eastWestSlope(40, 100, 10)), worldTileSet([]domain.Tile{worldTile()}))
+		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(3), sceneAppearance, sceneOverlay)
+		require.NoError(t, err)
+		view := planOf(0, 45, 300, southOfCenter, behindCamera, 2)
+
+		// when
+		image, _, err := scene.Render(context.Background(), view, 1, smallFrame)
+
+		// then
+		require.NoError(t, err)
+		checkered := pixelsOf(image, func(x, y int, c domain.RGB) bool { return c == noElevationAt(x, y) })
+		assert.Greater(t, checkered, 100)
+		assert.Equal(t, checkered, pixelsOf(image, func(_, _ int, c domain.RGB) bool {
+			return c == domain.NoElevationColors[0] || c == domain.NoElevationColors[1]
+		}), "no other pixel has the colors of the checkerboard")
+	})
+
+	t.Run("should read a smoother lighting from farther away than from close up, over terrain whose local slope alternates", func(t *testing.T) {
+		// given: a terrain with a real, strong, alternating local slope (like the project's own
+		// synthetic relevo-sp.tif sample), its period a few dozen meters so a close-up pixel and a
+		// far-away one differ by several periods, not a fraction of one; seen almost straight down,
+		// at the same angle, from very close and from very far away
+		slice := sceneSlice(200, 0.0001, sawtoothSlope(200, 10, 5), worldTile())
+		scene, err := domain.NewScene(slice, solidDecoder(t, mapColor), tuningWithWorkers(2), sceneAppearance, sceneOverlay)
+		require.NoError(t, err)
+		centerPoint := [2]float64{0, 0}
+		nearPlan := planOf(0, 80, 100, centerPoint, centerPoint, 1)
+		farPlan := planOf(0, 80, 5000, centerPoint, centerPoint, 1)
+
+		// when
+		nearImage, _, err1 := scene.Render(context.Background(), nearPlan, 0, smallFrame)
+		farImage, _, err2 := scene.Render(context.Background(), farPlan, 0, smallFrame)
+
+		// then: the average difference between neighboring pixels of the bottom row (ground, at
+		// this angle, in both images) is smaller far away — a coarser level of the pyramid
+		// smooths the alternation that a finer one still shows up close
+		require.NoError(t, err1)
+		require.NoError(t, err2)
+		roughness := func(image domain.FrameImage, y int) float64 {
+			total := 0
+			for x := 1; x < image.Resolution.Width; x++ {
+				a, b := image.At(x-1, y), image.At(x, y)
+				diff := int(a.G) - int(b.G)
+				if diff < 0 {
+					diff = -diff
+				}
+				total += diff
+			}
+			return float64(total) / float64(image.Resolution.Width-1)
+		}
+		assert.Less(t, roughness(farImage, 35), roughness(nearImage, 35))
 	})
 }
 

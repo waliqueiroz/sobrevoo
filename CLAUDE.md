@@ -117,7 +117,25 @@ perde o painel e passa a se destacar do terreno pela mesma técnica de
 contorno escuro que o texto já usa. Nenhum valor passa a ser calculado,
 formatado ou arredondado de outro jeito — só a apresentação muda —, e como
 os pixels de um quadro com sobreposições ligadas mudam de verdade,
-`RenderVersion` sobe de 4 para 5. Ainda não há áudio.
+`RenderVersion` sobe de 4 para 5. `specs/016-terrain-lighting/` acrescenta
+iluminação ao terreno: em cada ponto onde um raio toca o chão, a cor que
+vem do mapa base passa a ser clareada ou escurecida conforme a inclinação
+real da superfície naquele ponto em relação a uma luz direcional fixa, de
+direção e altura documentadas (nunca escolhida pelo usuário, nunca assada
+num arquivo de mapa, por isso concordando com a geometria em qualquer
+ângulo e distância de câmera), numa faixa fixa entre o mais claro e o mais
+escuro escolhida para dar volume sem sujar o mapa — uma superfície plana
+permanece exatamente igual à cor de antes desta etapa, qualquer que seja a
+altura da luz. A inclinação é lida numa vizinhança proporcional ao quanto
+cada pixel da tela cobre de terreno naquela distância — grande ao longe,
+pequena de perto —, para a iluminação ser estável ao longo do voo e suave
+entre pixels vizinhos; um ponto com elevação conhecida cuja vizinhança tem
+buracos usa só as amostras reais disponíveis, e só recebe o tom neutro de
+superfície plana se a vizinhança inteira não tiver nenhuma, nunca sendo
+tratado como se ele próprio não tivesse elevação. O traçado, o marcador,
+as sobreposições de tela e os dois padrões de "sem dado" continuam fora do
+alcance da luz. Como os pixels do terreno mudam de verdade,
+`RenderVersion` sobe de 5 para 6. Ainda não há áudio.
 
 **A constituição do projeto (`.specify/memory/constitution.md`) é
 vinculante.** Ela é curta — leia antes de fazer mudanças estruturais. As
@@ -747,6 +765,66 @@ sobreposições ligadas mudam de verdade, `RenderVersion` sobe de `4` para
 de `gain` — o mesmo mecanismo de sempre (`FrameSetID`) garante que
 nenhum conjunto de quadros de antes desta etapa se misture com um de
 depois, sem nenhum código novo de comparação.
+
+### A iluminação direcional do terreno (etapa 16)
+
+`specs/016-terrain-lighting/` acrescenta sombreamento direcional ao
+terreno que o lançamento de raios da etapa 5 já desenha: em
+`Scene.drawPixel` (`frame_scene.go`), no ramo que já resolve a cor da
+imagem de mapa (`stateImage` — nunca `stateNoMap`/`stateNoElevation`, que
+continuam intocados), essa cor é multiplicada por `terrainLightFactor`
+(`frame_terrain_light.go`), calculado a partir da normal real da
+superfície no ponto do raio e de uma luz direcional fixa, **nunca
+escolhida pelo usuário** (azimute 315°, altura 45° — a convenção de
+"hillshade" cartográfico, a mesma convenção angular que
+`CameraFrame.Heading` já usa). O fator é `clamp(1 + dot(N − cima, luz),
+TerrainLightMinFactor, TerrainLightMaxFactor)` (`render_tuning.go`,
+`0,75`–`1,15`): como `N − cima` é zero quando a superfície é plana, uma
+superfície plana sai **exatamente** igual à cor de antes desta etapa,
+qualquer que seja a altura da luz — nenhum caso especial, consequência da
+própria aritmética. A faixa foi revisada de `0,6`–`1,4` depois que um
+quadro real sobre um mapa base claro (um tema claro de estilo OSM, fundo
+~240–245) mostrou mais de 10% dos pixels saturando em branco puro — o
+máximo geométrico real da fórmula é `≈1,293` (numa encosta de 45°
+alinhada com o azimute da luz), então o antigo teto de `1,4` nunca era
+alcançado e só escondia a saturação real, que `255/1,293 ≈ 197` já
+deixava clara; `1,15` não elimina a saturação por completo num mapa tão
+claro, mas reduz bastante o excesso, sem apagar o volume nas encostas
+moderadas.
+
+A normal não vem da derivada de uma única célula (que cintilaria ao
+longe): `surface` (`frame_surface.go`) ganha uma pirâmide de gradiente
+(`terrainGradient`, `newTerrainGradientPyramid`) — o mesmo padrão de
+mipmap que `newTileTexture`/`halved` já usam para a textura de uma peça
+do mapa base, só que para a derivada da altura, construída a partir das
+amostras **cruas** da grade (nunca das alturas com buracos preenchidos
+que a geometria do raio usa) — com uma cobertura por nível que resolve,
+sem nenhum `if` dedicado, os três casos da regra de FR-008
+(`specs/016-terrain-lighting/spec.md`): um ponto que é, ele próprio, um
+buraco de elevação nunca chega à pirâmide (continua caindo no xadrez de
+sempre); um ponto com elevação cuja vizinhança tem buracos usa só as
+amostras reais, porque a agregação por nível nunca mistura um valor de
+"sem dado" como se fosse zero; e só recai no tom neutro de superfície
+plana quando a pirâmide inteira, subindo de nível (`climbGradientAt`),
+não encontra nenhuma amostra real ali. `placedSurface.normalAt(x, y,
+footprintMeters)` escolhe o nível proporcional ao quanto aquele pixel da
+tela cobre de terreno — a mesma fórmula que `sampler.color` já usa para o
+nível de detalhe da textura (`frame_imagery.go`), aplicada à inclinação em
+vez de à cor —, misturando entre os dois níveis vizinhos para a
+iluminação ser estável ao longo do voo e suave entre pixels vizinhos
+(FR-007), não só entre quadros.
+
+O traçado, o marcador e as sobreposições de tela continuam desenhados
+depois, sobre o terreno já iluminado, sem conhecer a luz; o hachurado de
+"sem mapa" e o xadrez de "sem elevação" também não são iluminados — a luz
+atinge só o terreno com imagem de mapa de verdade. Nenhuma porta, nenhum
+serviço, nenhuma flag de CLI e nenhum formato de arquivo (plano, recorte,
+quadro) muda — a direção, a altura e a faixa fixa de brilho são constantes
+de domínio em `render_tuning.go`, no mesmo padrão de `NoMapColors`/
+`OverlayTextColor`, sem superfície nova de configuração. Como os pixels do
+terreno mudam de verdade, `RenderVersion` sobe de `5` para `6` — o mesmo
+mecanismo de sempre (`FrameSetID`) garante que nenhum conjunto de quadros
+de antes desta etapa se misture com um de depois.
 
 ### Portas, service layer e regra de negócio (Princípios I, II e IX da constituição)
 
