@@ -8,7 +8,9 @@ import "github.com/spf13/cobra"
 
 // NewRootCommand creates the "sobrevoo" root command. Subcommands (such as
 // "inspect") are attached by the composition root (cmd/sobrevoo/main.go).
-func NewRootCommand() *cobra.Command {
+// version is resolved by that same composition root (cmd/sobrevoo/version.go)
+// and handed here ready to use — this package never resolves it itself.
+func NewRootCommand(version string) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "sobrevoo",
 		Short: "Sobrevoo generates flyover videos from GPS tracks",
@@ -18,7 +20,17 @@ func NewRootCommand() *cobra.Command {
 		// contradict that (contracts/cli.md).
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		Version:       version,
 	}
+
+	// Setting Version makes Cobra register a --version flag that short-
+	// circuits before any other command code runs (including RunE), prints
+	// the template below, and returns nil — already satisfying "no file,
+	// registry or network access" for free. The default template inserts
+	// the word "version" between the two; this one keeps the line down to
+	// exactly the program name and the version, nothing else
+	// (contracts/version-flag.md).
+	root.SetVersionTemplate("{{.DisplayName}} {{.Version}}\n")
 
 	return root
 }
